@@ -1,14 +1,17 @@
 import numpy as np
 import scipy as sp
 import torch
+from torch import nn
 from easydict import EasyDict as edict
 from tqdm import tqdm, trange
+from typing import Union, List
 
-from .distribution import grad_energy
+from .distribution import grad_energy, Distribution, torchDist
 from .utils import time_comp
+from .feature import Feature
 
 
-def ula(z, target, proposal, step_size, n_steps=1):
+def ula(z: torch.FloatTensor, target: Union[Distribution, torchDist], proposal: Union[Distribution, torchDist], step_size: float, n_steps: int = 1) -> List[torch.FloatTensor]:
     zs = []
     device = z.device
     
@@ -19,23 +22,33 @@ def ula(z, target, proposal, step_size, n_steps=1):
         z = z - step_size * grad + noise_scale * noise
         z = z.data
         z.requires_grad_(True)
-        zs.append(z)
+        zs.append(z.data)
 
     return zs
 
 
 @time_comp
-def soul(z, gen, ref_dist, feature, params):
+def soul(
+        z: torch.FloatTensor, 
+        gen: nn.Module, 
+        ref_dist: Union[Distribution, torchDist], 
+        feature: Feature, 
+        n_steps: int,
+        burn_in_steps: int,
+        n_sampling_steps: int = 3,
+        weight_step: float = 0.1,
+        step_size: float = 0.01,
+        every: int = 10,
+        ) -> List[torch.FloatTensor]:
     zs = []
-    params = edict(params)
 
     # saving parameter initialization
     #n_stride_im = params['stride_save_image']
     #n_stride_curve = params['stride_save_curve']
     #n_stride = min(n_stride_im, n_stride_curve)
-    ne = 0  # number of epochs
+    #ne = 0  # number of epochs
 
-    feature.weight = params.weight
+    #feature.weight = params.weight
     feature(gen(z))
 
     def target(z):
@@ -49,18 +62,18 @@ def soul(z, gen, ref_dist, feature, params):
     # saving folder initialization
     #fd = save_init(params, feature)
 
-    for it in trange(params.n_steps):
+    for it in trange(n_steps):
         #cond = params['save'] == 'all' and (np.mod(it, n_stride) == 0)
         z.requires_grad_()
 
         # WEIGHT UPDATE
         with torch.no_grad():
-            feature.weight = feature.weight_up(feature.avg_feature.data, params.weight_step)
-            condition_avg = it > params.burnin or it == 0
+            feature.weight = feature.weight_up(feature.avg_feature.data, weight_step)
+            condition_avg = it > burn_in_steps or it == 0
 
             # weight average
             if condition_avg:
-                n_avg = max(it - params.burnin, 0)
+                n_avg = max(it - burn_in_steps, 0)
                 feature.avg_weight.upd(feature.weight)
 
             # save weight
@@ -68,9 +81,12 @@ def soul(z, gen, ref_dist, feature, params):
             #    feature.save_weight(params, f_avg, w, w_avg, it, ne, fd)
         feature.avg_feature.reset()
 
-        ne += params.n_sampling_steps
-        z = ula(z, target, None, params.step_size, n_steps=params.n_sampling_steps)
-        zs.append(z)     
+        #ne += params.n_sampling_steps
+        inter_zs = ula(z, target, None, step_size, n_steps=n_sampling_steps)
+        z = inter_zs[-1]
+        
+        if it > burn_in_steps and it % every == 0:
+            zs.append(z)    
     # build final model
     #model = build_model(params, x, x_grad, x0, w, w_avg, w0, feature)
     return zs

@@ -1,0 +1,12 @@
+generator:
+  target: models.dcgan.Generator
+  init_keys:
+    ...
+  ckpt: ""
+
+discriminator:
+  target: models.dcgan.Discriminator
+  init_keys:
+    ...
+  ckpt: ""
+

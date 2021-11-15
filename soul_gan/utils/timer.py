@@ -25,16 +25,3 @@ def time_comp(fun):
 
         return model
     return wrapper
-
-
-def save_latents():
-    raise NotImplementedError
-
-def save_weights():
-    raise NotImplementedError
-
-def compute_is():
-    raise NotImplementedError
-
-def compute_fid():
-    raise NotImplementedError

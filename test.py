@@ -7,19 +7,20 @@ from soul_gan.feature import FeatureFactory
 from general_utils import DotConfig, random_seed
 
 
-def load_gan(config):
-    gen.eval()
-    dis.eval()
-    return gen, dis
+# def load_gan(config):
+#     gen.eval()
+#     dis.eval()
+#     return gen, dis
 
 
 def parse_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument('configs', type=str)
-    parser.add_argument('--n_steps', type=int, default=100)
-    parser.add_argument('--n_sampling_steps', type=int, default=3)
-    parser.add_argument('--seed', type=int)
-    parser.add_argument('--device', type=int)
+    parser.add_argument('gan_config', type=str)
+    # parser.add_argument('--n_steps', type=int, default=100)
+    # parser.add_argument('--n_sampling_steps', type=int, default=3)
+    # parser.add_argument('--seed', type=int)
+    # parser.add_argument('--device', type=int)
 
     args = parser.parse_args()
     return args
@@ -46,17 +47,18 @@ def main(config, device):
 if __name__ == '__main__':
     args = parse_arguments()
     config = DotConfig(args.config)
-    if args.n_steps is not None:
-        config.n_steps = args.n_steps
-    if args.n_sampling_steps is not None:
-        config.n_sampling_steps = args.n_sampling_steps
-    if args.seed is not None:
-        config.seed = args.seed
-    if args.device is not None:
-        config.device = args.device
+    gan_config = DotConfig(args.gan_config)
+    # if args.n_steps is not None:
+    #     config.n_steps = args.n_steps
+    # if args.n_sampling_steps is not None:
+    #     config.n_sampling_steps = args.n_sampling_steps
+    # if args.seed is not None:
+    #     config.seed = args.seed
+    # if args.device is not None:
+    #     config.device = args.device
 
     if config.seed is not None:
         random_seed(config.seed)
 
     device = torch.device(config.device if torch.cuda.is_available() else 'cpu') 
-    main(config, device)
+    main(config, gan_config, device)

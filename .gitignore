@@ -1,2 +1,14 @@
 **__pycache__
 **__ipynb_checkpoints__
+**.egg-info
+
+data/**
+!data/.gitkeep
+
+thirdparty/**
+!thirdparty/.gitkeep
+
+
+notebooks/**
+!notebooks/.gitkeep
+

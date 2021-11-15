@@ -1,10 +1,14 @@
 from abc import ABC, abstractmethod
 from functools import wraps
-from typing import Callable
+from typing import Callable, Any, Dict, List
 
 import numpy as np
 import torch
 import torchvision
+
+from pytorch_fid.inception import InceptionV3
+
+from soul_gan.utils.metrics import batch_inception
 
 
 # from main.nnclass import CNN
@@ -14,10 +18,10 @@ import torchvision
 class AvgHolder(object):
     cnt : int = 0
     
-    def __init__(self, init_val):
+    def __init__(self, init_val: Any = 0):
         self.val = init_val
     
-    def upd(self, new_val):
+    def upd(self, new_val: Any):
         self.cnt += 1
         alpha = 1. / self.cnt
         if isinstance(self.val, list):
@@ -32,29 +36,29 @@ class AvgHolder(object):
         else:
             self.val = 0
         
-    def data(self):
+    def data(self) -> Any:
         return self.val
 
 
 class Feature(ABC):
-    def __init__(self):
-        self.avg_weight = AvgHolder(0)
-        self.avg_feature = AvgHolder(0)
+    def __init__(self, n_features=1):
+        self.avg_weight = AvgHolder([0]*n_features)
+        self.avg_feature = AvgHolder([0]*n_features)
 
-    def log_prob(self, out):
+    def log_prob(self, out: List[torch.FloatTensor]) -> torch.FloatTensor:
         lik_f = 0
-        out_lik = out.copy()
-        for l in range(len(out_lik)):
-            lik_f += torch.dot(self.weight[l], out_lik[l])
-        lik_f *= -1
+        #out_lik = out.copy()
+        for l in range(len(out)):
+            lik_f -= torch.dot(self.weight[l], out[l])
+
         return lik_f
 
-    def weight_up(self, out, step):
+    def weight_up(self, out: List[torch.FloatTensor], step: float):
         for i in range(len(self.weight)):
-            self.weight[i] += + step * (out[i] - self.ref_feature[i])
+            self.weight[i] += step * (out[i] - self.ref_feature[i])
 
     @staticmethod
-    def average_feature(feature_method):
+    def average_feature(feature_method: Callable) -> Callable:
         @wraps
         def with_avg(self, *args, **kwargs):
             out = feature_method(self, *args, **kwargs)
@@ -64,7 +68,7 @@ class Feature(ABC):
 
 
 class FeatureFactory:
-    registry = {}
+    registry: Dict = {}
 
     @classmethod
     def register(cls, name: str) -> Callable:
@@ -87,16 +91,39 @@ class FeatureFactory:
 @FeatureFactory.register('inception_score')
 class InceptionScoreFeature(Feature):
     def __init__(self, **kwargs):
-        super().__init__()
-        self.model = torchvision.models.inception_v3(pretrained=True)
-        self.ref_feature = kwargs.get('ref_feature', 11.5)
+        super().__init__(n_features=1)
+        self.device = kwargs.get('device', 0)
+        self.model = torchvision.models.inception_v3(pretrained=True, transform_input=False).to(self.device)
+        self.ref_score = kwargs.get('ref_score', np.log(11.5))
+
+        self.weight = [0]
     
     @Feature.average_feature
-    def __call__(self, x):
-        pis = torch.softmax(self.model(x), -1)
-        avg_pis = pis.mean(0)
-        score = None
-        return score
+    def __call__(self, x) -> List[torch.FloatTensor]:
+        pis = batch_inception(x, self.model, resize=True)
+        scores = torch.kl_div(pis, torch.log(pis.mean(0)[None, :])).sum(1).mean(0) - self.ref_feature
+        
+        return [scores]
+
+
+@FeatureFactory.register('inception_score')
+class InceptionV3MeanFeature(Feature):
+    def __init__(self, **kwargs):
+        super().__init__()
+        self.device = kwargs.get('device', 0)
+        self.block_ids = kwargs.get('block_ids', [3])
+
+        self.model = InceptionV3(self.block_ids).to(self.device)
+
+        self.weight = [0]*len(self.block_ids)
+    
+    @Feature.average_feature
+    def __call__(self, x) -> List[torch.FloatTensor]:
+        out = self.model(x)
+        for i in range(out):
+            out[i] = out[i].mean(1) # - ref_value
+        
+        return out
 
     
 class CNNFeature(Feature):

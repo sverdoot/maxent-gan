@@ -39,9 +39,11 @@ pyro-ppl = "^1.5"
 easydict = "^1"
 seaborn = ">=0"
 pyyaml = ">=0"
+pytorch-fid = {git = "https://github.com/mseitzer/pytorch-fid"}
+
 
 [tool.isort]
-src_paths = ["iterative_sir"]
+src_paths = ["soul_gan"]
 multi_line_output = 3
 include_trailing_comma = true
 force_grid_wrap = 0
