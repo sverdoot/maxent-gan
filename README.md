@@ -16,9 +16,14 @@ poetry config virtualenvs.create false --local
 poetry install
 ```
 
-```zsh
-cd thirdparty
-git clone 
+Put CIFAR-10 into directory ```data/cifar10```  using this script
+
+```python
+import torchvision.datasets as dset
+
+cifar = dset.CIFAR10(root='data/cifar10', download=True)
 ```
+
+
 
 
