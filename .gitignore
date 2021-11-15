@@ -2,10 +2,10 @@
 **__ipynb_checkpoints__
 **.egg-info
 
-data/**
+data/*
 !data/.gitkeep
 
-thirdparty/**
+thirdparty/*
 !thirdparty/.gitkeep
 
 
