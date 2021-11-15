@@ -28,7 +28,7 @@ class GANTarget(Distribution):
     @staticmethod
     def latent_target(z: torch.FloatTensor, gen: nn.Module, dis: nn.Module, proposal: Union[Distribution, torchDist]) -> Tuple[torch.FloatTensor, torch.FloatTensor, torch.FloatTensor]:
         dgz = dis(gen(z))
-        logp_z = proposal(z)
+        logp_z = proposal.log_prob(z)
         energy = -(logp_z + dgz)
         return -energy, logp_z, dgz
 

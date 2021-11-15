@@ -41,6 +41,7 @@ seaborn = ">=0"
 pyyaml = ">=0"
 pytorch-fid = {git = "https://github.com/mseitzer/pytorch-fid"}
 wandb = "^0.12.6"
+pyyml = "^0.0.2"
 
 
 [tool.isort]

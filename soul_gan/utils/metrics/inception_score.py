@@ -32,7 +32,7 @@ def batch_inception(
         if resize:
             x = up(x)
         x = inception_model(x)
-        return F.softmax(x).data
+        return F.softmax(x, -1).data
 
     preds = get_pred(imgs)
     return preds
@@ -83,7 +83,7 @@ def get_inception_score(
     def get_pred(x):
         if resize:
             x = up(x)
-        x = inception_model(x)
+        x = inception_model(x).logits
         return F.softmax(x).data.cpu()#.numpy()
 
     # Get predictions

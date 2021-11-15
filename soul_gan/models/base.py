@@ -1,13 +1,18 @@
 from torch import nn
+from typing import Optional
 
-class ModuleRegisry:
+
+class ModelRegistry:
     registry = {}
 
     @classmethod
-    def register(cls, name: str) -> nn.Module:
+    def register(cls, name: Optional[str] = None) -> nn.Module:
         def inner_wrapper(wrapped_class: nn.Module) -> nn.Module:
-
-            cls.registry[name] = wrapped_class
+            if name is None:
+                name_ = wrapped_class.__name__
+            else:
+                name_ = name
+            cls.registry[name_] = wrapped_class
             return wrapped_class
 
         return inner_wrapper

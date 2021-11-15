@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from functools import wraps
-from typing import Callable, Any, Dict, List
+from typing import Callable, Any, Dict, List, Optional
 
 import numpy as np
 import torch
@@ -36,6 +36,7 @@ class AvgHolder(object):
         else:
             self.val = 0
         
+    @property
     def data(self) -> Any:
         return self.val
 
@@ -55,11 +56,11 @@ class Feature(ABC):
 
     def weight_up(self, out: List[torch.FloatTensor], step: float):
         for i in range(len(self.weight)):
-            self.weight[i] += step * (out[i] - self.ref_feature[i])
+            self.weight[i] += step * (out[i] - self.ref_score[i])
 
     @staticmethod
     def average_feature(feature_method: Callable) -> Callable:
-        @wraps
+        #@wraps
         def with_avg(self, *args, **kwargs):
             out = feature_method(self, *args, **kwargs)
             self.avg_feature.upd(out)
@@ -71,12 +72,14 @@ class FeatureFactory:
     registry: Dict = {}
 
     @classmethod
-    def register(cls, name: str) -> Callable:
+    def register(cls, name: Optional[str] = None) -> Callable:
 
         def inner_wrapper(wrapped_class: Feature) -> Callable:
-            #if name in cls.registry:
-                # logger.warning('Executor %s already exists. Will replace it', name)
-            cls.registry[name] = wrapped_class
+            if name is None:
+                name_ = wrapped_class.__name__
+            else:
+                name_ = name
+            cls.registry[name_] = wrapped_class
             return wrapped_class
 
         return inner_wrapper
@@ -94,19 +97,20 @@ class InceptionScoreFeature(Feature):
         super().__init__(n_features=1)
         self.device = kwargs.get('device', 0)
         self.model = torchvision.models.inception_v3(pretrained=True, transform_input=False).to(self.device)
-        self.ref_score = kwargs.get('ref_score', np.log(11.5))
+        self.model.eval()
+        self.ref_score = kwargs.get('ref_score', [np.log(11.5)])
 
         self.weight = [0]
     
     @Feature.average_feature
     def __call__(self, x) -> List[torch.FloatTensor]:
         pis = batch_inception(x, self.model, resize=True)
-        scores = torch.kl_div(pis, torch.log(pis.mean(0)[None, :])).sum(1).mean(0) - self.ref_feature
+        scores = torch.kl_div(pis, torch.log(pis.mean(0)[None, :])).sum(1).mean(0) - self.ref_score[0]
         
-        return [scores]
+        return [scores[None]]
 
 
-@FeatureFactory.register('inception_score')
+@FeatureFactory.register()
 class InceptionV3MeanFeature(Feature):
     def __init__(self, **kwargs):
         super().__init__()

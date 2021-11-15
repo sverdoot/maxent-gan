@@ -66,12 +66,10 @@ def soul(
         #cond = params['save'] == 'all' and (np.mod(it, n_stride) == 0)
         z.requires_grad_()
 
-        # WEIGHT UPDATE
         with torch.no_grad():
-            feature.weight = feature.weight_up(feature.avg_feature.data, weight_step)
+            feature.weight_up(feature.avg_feature.data, weight_step)
             condition_avg = it > burn_in_steps or it == 0
 
-            # weight average
             if condition_avg:
                 n_avg = max(it - burn_in_steps, 0)
                 feature.avg_weight.upd(feature.weight)
@@ -81,12 +79,11 @@ def soul(
             #    feature.save_weight(params, f_avg, w, w_avg, it, ne, fd)
         feature.avg_feature.reset()
 
-        #ne += params.n_sampling_steps
+
         inter_zs = ula(z, target, None, step_size, n_steps=n_sampling_steps)
         z = inter_zs[-1]
         
         if it > burn_in_steps and it % save_every == 0:
             zs.append(z)    
-    # build final model
-    #model = build_model(params, x, x_grad, x0, w, w_avg, w0, feature)
+
     return zs

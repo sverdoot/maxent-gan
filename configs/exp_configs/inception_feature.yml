@@ -1,0 +1,34 @@
+dir: &dir log
+n_steps: &n_steps 500
+every: &every 10
+seed: null
+device: 0
+
+sample:
+  save_dir: *dir
+  
+  feature:
+    name: inception_score
+    params: {}
+
+  total_n: 1000
+  batch_size: 100
+  save_every: *every
+
+  params:
+    n_steps: *n_steps
+    save_every: *every
+    burn_in_steps: 0
+
+
+compute_fid:
+
+
+compute_is:
+
+
+logging:
+  wandb: null
+
+
+

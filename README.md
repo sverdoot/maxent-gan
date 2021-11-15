@@ -29,5 +29,13 @@ cifar = dset.CIFAR10(root='data/cifar10', download=True)
 ```
 
 
+## Usage 
+
+
+```zsh
+python run.py configs/exp_configs/inception_feature.yml configs/gan_configs/dcgan.yml
+```
+
+
 
 

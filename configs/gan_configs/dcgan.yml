@@ -1,12 +1,12 @@
 generator:
-  target: models.dcgan.Generator
-  init_keys:
-    ...
-  ckpt: ""
+  name: DCGANGenerator
+  params:
+      ngpu: 1
+  ckpt_path: "checkpoints/dcgan/netG_epoch_199.pth"
 
 discriminator:
-  target: models.dcgan.Discriminator
-  init_keys:
-    ...
-  ckpt: ""
+  name: DCGANDiscriminator
+  params:
+      ngpu: 1
+  ckpt_path: "checkpoints/dcgan/netD_epoch_199.pth"
 
