@@ -4,7 +4,8 @@ from typing import Union
 
 
 def save_latents(latents: np.ndarray, path: Union[str, Path], format: str='npy'):
-    path = Path()
+    path = Path(path)
+    
     raise NotImplementedError
 
 def save_weights():

@@ -38,7 +38,7 @@ def soul(
         n_sampling_steps: int = 3,
         weight_step: float = 0.1,
         step_size: float = 0.01,
-        every: int = 10,
+        save_every: int = 10,
         ) -> List[torch.FloatTensor]:
     zs = []
 
@@ -85,7 +85,7 @@ def soul(
         inter_zs = ula(z, target, None, step_size, n_steps=n_sampling_steps)
         z = inter_zs[-1]
         
-        if it > burn_in_steps and it % every == 0:
+        if it > burn_in_steps and it % save_every == 0:
             zs.append(z)    
     # build final model
     #model = build_model(params, x, x_grad, x0, w, w_avg, w0, feature)

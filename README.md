@@ -16,6 +16,10 @@ poetry config virtualenvs.create false --local
 poetry install
 ```
 
+```zsh
+conda activate soul
+```
+
 Put CIFAR-10 into directory ```data/cifar10```  using this script
 
 ```python
