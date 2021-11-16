@@ -1,7 +1,6 @@
 import argparse
 import datetime
 from pathlib import Path
-from typing import Tuple
 
 import numpy as np
 import torch
@@ -10,35 +9,10 @@ from yaml import Dumper, Loader
 
 from soul_gan.distribution import GANTarget
 from soul_gan.feature import FeatureRegistry
-from soul_gan.models import ModelRegistry
+from soul_gan.models.utils import load_gan
 from soul_gan.sample import soul
 from soul_gan.utils.callbacks import CallbackRegistry
 from soul_gan.utils.general_utils import DotConfig, random_seed
-
-
-def load_gan(
-    config: DotConfig, device: torch.device
-) -> Tuple[torch.nn.Module, torch.nn.Module]:
-    gen = ModelRegistry.create_model(
-        config.generator.name, **config.generator.params
-    ).to(device)
-    state_dict = torch.load(
-        Path(config.generator.ckpt_path, map_location=device)
-    )
-    gen.load_state_dict(state_dict)
-
-    dis = ModelRegistry.create_model(
-        config.discriminator.name, **config.discriminator.params
-    ).to(device)
-    state_dict = torch.load(
-        Path(config.discriminator.ckpt_path, map_location=device)
-    )
-    dis.load_state_dict(state_dict)
-
-    gen.eval()
-    dis.eval()
-
-    return gen, dis
 
 
 def parse_arguments():

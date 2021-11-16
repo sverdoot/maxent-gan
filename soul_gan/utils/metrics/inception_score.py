@@ -5,11 +5,21 @@ Code is borrowed from repository https://github.com/sbarratt/inception-score-pyt
 from typing import Iterable, Optional, Tuple, Union
 
 import numpy as np
+from soul_gan.distribution import GANTarget
 import torch
+from torch._C import device
 import torch.utils.data
 from torch import nn
 from torch.nn import functional as F
 from torchvision.models.inception import inception_v3
+
+from pathlib import Path
+import argparse
+import yaml
+from yaml import Loader
+from soul_gan.models.utils import load_gan
+from soul_gan.utils.general_utils import DotConfig
+
 
 N_INCEPTION_CLASSES = 1000
 
@@ -117,6 +127,17 @@ def get_inception_score(
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--gan_config', type=str)
+    parser.add_argument('--device', type=int, defsult=0)
+    args = parser.parse_args()
+
+    device = torch.device(args.device)
+
+    if args.gan_config:
+        gan_config = DotConfig(yaml.load(Path(args.gan_config).open('r'), Loader))
+        gen, _ = load_gan(gan_config, device)
+    
 
     class IgnoreLabelDataset(torch.utils.data.Dataset):
         def __init__(self, orig):

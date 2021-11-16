@@ -4,6 +4,7 @@ from typing import Any, Callable, Dict, List, Optional
 import numpy as np
 import torch
 import torchvision
+from torchvision import transforms
 from pytorch_fid.inception import InceptionV3
 
 from soul_gan.utils.metrics import batch_inception
@@ -124,6 +125,13 @@ class InceptionScoreFeature(Feature):
             pretrained=True, transform_input=False
         ).to(self.device)
         self.model.eval()
+        self.transform = transforms.Compose(
+            [
+                transforms.Scale(32),
+                transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+            ]
+        )
+
         self.ref_score = kwargs.get("ref_score", [np.log(11.5)])
 
         self.weight = [0]
@@ -140,7 +148,7 @@ class InceptionScoreFeature(Feature):
     @Feature.invoke_callbacks
     @Feature.average_feature
     def __call__(self, x) -> List[torch.FloatTensor]:
-        pis = batch_inception(x, self.model, resize=True)
+        pis = batch_inception(self.transform(x), self.model, resize=True)
         score = (
             (pis * (torch.log(pis) - torch.log(pis.mean(0)[None, :])))
             .sum(1)
