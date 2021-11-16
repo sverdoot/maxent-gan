@@ -9,6 +9,8 @@ from typing import Iterable, Optional, Tuple, Union
 import numpy as np
 import torch
 import torch.utils.data
+import torchvision.datasets as dset
+import torchvision.transforms as transforms
 import yaml
 from torch import nn
 from torch.nn import functional as F
@@ -90,14 +92,15 @@ def get_inception_score(
     def get_pred(x):
         if resize:
             x = up(x)
-        x = inception_model(x).logits
+        x = inception_model(x)
         return F.softmax(x).data.cpu()  # .numpy()
 
     # Get predictions
     preds = torch.zeros((N, N_INCEPTION_CLASSES))
 
-    for i, batch in enumerate(dataloader, 0):
-        batch = batch.type(dtype)
+    for i, batch in enumerate(dataloader):
+        # print(batch)
+        batch = batch[0].type(dtype)
         # batchv = Variable(batch)
         if generate_from_latents:
             batch = gen(batch)
@@ -120,13 +123,17 @@ def get_inception_score(
             )
         )
 
-    return torch.mean(split_scores), torch.std(split_scores), preds
+    return (
+        torch.mean(torch.stack(split_scores, 0)),
+        torch.std(torch.stack(split_scores, 0)),
+        preds,
+    )
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--gan_config", type=str)
-    parser.add_argument("--device", type=int, defsult=0)
+    parser.add_argument("--device", type=int, default=0)
     args = parser.parse_args()
 
     device = torch.device(args.device)
@@ -137,40 +144,60 @@ if __name__ == "__main__":
         )
         gen, _ = load_gan(gan_config, device)
 
-    class IgnoreLabelDataset(torch.utils.data.Dataset):
-        def __init__(self, orig):
-            self.orig = orig
-
-        def __getitem__(self, index):
-            return self.orig[index][0]
-
-        def __len__(self):
-            return len(self.orig)
-
-    import torchvision.datasets as dset
-    import torchvision.transforms as transforms
-
-    cifar = dset.CIFAR10(
-        root="data/",
-        download=True,
-        transform=transforms.Compose(
+        n_imgs = 1000
+        imgs = gen(torch.randn(n_imgs, gen.z_dim).to(device))
+        transform = transforms.Compose(
             [
                 transforms.Scale(32),
-                transforms.ToTensor(),
+                # transforms.ToTensor(),
                 transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
             ]
-        ),
-    )
-
-    IgnoreLabelDataset(cifar)
-
-    print("Calculating Inception Score...")
-    print(
-        get_inception_score(
-            IgnoreLabelDataset(cifar),
-            cuda=True,
-            batch_size=100,
-            resize=True,
-            splits=10,
         )
-    )
+        imgs = transform(imgs)
+
+        print("Calculating Inception Score...")
+        print(
+            get_inception_score(
+                imgs,
+                cuda=True,
+                batch_size=50,
+                resize=True,
+                splits=10,
+            )[:-1]
+        )
+    else:
+
+        class IgnoreLabelDataset(torch.utils.data.Dataset):
+            def __init__(self, orig):
+                self.orig = orig
+
+            def __getitem__(self, index):
+                return self.orig[index][0]
+
+            def __len__(self):
+                return len(self.orig)
+
+        cifar = dset.CIFAR10(
+            root="data/",
+            download=True,
+            transform=transforms.Compose(
+                [
+                    transforms.Scale(32),
+                    transforms.ToTensor(),
+                    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+                ]
+            ),
+        )
+
+        IgnoreLabelDataset(cifar)
+
+        print("Calculating Inception Score...")
+        print(
+            get_inception_score(
+                IgnoreLabelDataset(cifar),
+                cuda=True,
+                batch_size=100,
+                resize=True,
+                splits=10,
+            )[:-1]
+        )
