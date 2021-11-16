@@ -1,6 +1,2 @@
-from .base import ModelRegistry
-
-import soul_gan.models.dcgan
-
-
-# from .dcgan.dcgan import Generator, Discriminator
+from .base import ModelRegistry  # noqa: F401
+from .dcgan import DCGANDiscriminator, DCGANGenerator  # noqa: F401

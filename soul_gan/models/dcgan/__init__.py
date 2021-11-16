@@ -1,1 +1,1 @@
-from .dcgan import DCGANGenerator, DCGANDiscriminator
+from .dcgan import DCGANDiscriminator, DCGANGenerator  # noqa: F401

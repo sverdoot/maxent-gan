@@ -1,7 +1,7 @@
-import torch
 from torch import nn
 
 from soul_gan.models import ModelRegistry
+
 
 @ModelRegistry.register()
 class DCGANGenerator(nn.Module):
@@ -11,7 +11,7 @@ class DCGANGenerator(nn.Module):
         self.ngpu = ngpu
         self.main = nn.Sequential(
             # input is Z, going into a convolution
-            nn.ConvTranspose2d(     nz, ngf * 8, 4, 1, 0, bias=False),
+            nn.ConvTranspose2d(nz, ngf * 8, 4, 1, 0, bias=False),
             nn.BatchNorm2d(ngf * 8),
             nn.ReLU(True),
             # state size. (ngf*8) x 4 x 4
@@ -23,18 +23,22 @@ class DCGANGenerator(nn.Module):
             nn.BatchNorm2d(ngf * 2),
             nn.ReLU(True),
             # state size. (ngf*2) x 16 x 16
-            nn.ConvTranspose2d(ngf * 2,     ngf, 4, 2, 1, bias=False),
+            nn.ConvTranspose2d(ngf * 2, ngf, 4, 2, 1, bias=False),
             nn.BatchNorm2d(ngf),
             nn.ReLU(True),
-            nn.ConvTranspose2d(    ngf,      nc, kernel_size=1, stride=1, padding=0, bias=False),
-            nn.Tanh()
+            nn.ConvTranspose2d(
+                ngf, nc, kernel_size=1, stride=1, padding=0, bias=False
+            ),
+            nn.Tanh(),
         )
 
     def forward(self, input):
         if input.ndim == 2:
             input = input[..., None, None]
         if input.is_cuda and self.ngpu > 1:
-            output = nn.parallel.data_parallel(self.main, input, range(self.ngpu))
+            output = nn.parallel.data_parallel(
+                self.main, input, range(self.ngpu)
+            )
         else:
             output = self.main(input)
         return output
@@ -63,12 +67,14 @@ class DCGANDiscriminator(nn.Module):
             nn.LeakyReLU(0.2, inplace=True),
             # state size. (ndf*8) x 4 x 4
             nn.Conv2d(ndf * 8, 1, 2, 2, 0, bias=False),
-            nn.Sigmoid()
+            nn.Sigmoid(),
         )
 
     def forward(self, input):
         if input.is_cuda and self.ngpu > 1:
-            output = nn.parallel.data_parallel(self.main, input, range(self.ngpu))
+            output = nn.parallel.data_parallel(
+                self.main, input, range(self.ngpu)
+            )
         else:
             output = self.main(input)
 

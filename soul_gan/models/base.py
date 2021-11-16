@@ -1,5 +1,6 @@
-from torch import nn
 from typing import Optional
+
+from torch import nn
 
 
 class ModelRegistry:

@@ -8,8 +8,10 @@ data/*
 thirdparty/*
 !thirdparty/.gitkeep
 
-notebooks/**
-!notebooks/.gitkeep
+# notebooks/**
+# !notebooks/.gitkeep
 
 log/**
 !log/.gitkeep
+
+wandb/*

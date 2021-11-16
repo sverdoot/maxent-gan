@@ -1,33 +1,28 @@
 """
-Code is borrowed from repository https://github.com/sbarratt/inception-score-pytorch/blob/master/inception_score.py
+Code is borrowed from repository https://github.com/sbarratt/inception-score-pytorch/blob/master/inception_score.py # noqa: E501
 """
 
-from typing import Iterable, Tuple
-import torch
-from torch import nn
-from torch.autograd import Variable
-from torch.nn import functional as F
-import torch.utils.data
-from torch.utils.data.dataset import Dataset
-
-from torchvision.models.inception import inception_v3
+from typing import Iterable, Optional, Tuple, Union
 
 import numpy as np
-from scipy.stats import entropy
-from typing import Optional, Union
-
+import torch
+import torch.utils.data
+from torch import nn
+from torch.nn import functional as F
+from torchvision.models.inception import inception_v3
 
 N_INCEPTION_CLASSES = 1000
 
 
 def batch_inception(
-        imgs: torch.Tensor, 
-        inception_model: nn.Module,  
-        resize: bool = False,
-        ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    imgs: torch.Tensor,
+    inception_model: nn.Module,
+    resize: bool = False,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
 
     device = imgs.device
-    up = nn.Upsample(size=(299, 299), mode='bilinear').to(device)
+    up = nn.Upsample(size=(299, 299), mode="bilinear").to(device)
+
     def get_pred(x):
         if resize:
             x = up(x)
@@ -39,16 +34,16 @@ def batch_inception(
 
 
 def get_inception_score(
-        imgs: Iterable, 
-        inception_model: Optional[nn.Module] = None, 
-        gen: Optional[nn.Module] = None, 
-        generate_from_latents: bool = False, 
-        cuda: bool = True, 
-        batch_size: int=32, 
-        resize: bool = False, 
-        splits: int = 1, 
-        device: Union[torch.device, int] = 0
-        ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    imgs: Iterable,
+    inception_model: Optional[nn.Module] = None,
+    gen: Optional[nn.Module] = None,
+    generate_from_latents: bool = False,
+    cuda: bool = True,
+    batch_size: int = 32,
+    resize: bool = False,
+    splits: int = 1,
+    device: Union[torch.device, int] = 0,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Computes the inception score of the generated images imgs
     imgs -- Torch dataset of (3xHxW) numpy images normalized in the range [-1, 1]
     cuda -- whether or not to run on GPU
@@ -65,7 +60,9 @@ def get_inception_score(
         dtype = torch.cuda.FloatTensor
     else:
         if torch.cuda.is_available():
-            print("WARNING: You have a CUDA device, so you should probably set cuda=True")
+            print(
+                "WARNING: You have a CUDA device, so you should probably set cuda=True"
+            )
         dtype = torch.FloatTensor
 
     # Set up dataloader
@@ -76,45 +73,51 @@ def get_inception_score(
 
     # Load inception model
     if inception_model is None:
-        inception_model = inception_v3(pretrained=True, transform_input=False).type(dtype)
+        inception_model = inception_v3(
+            pretrained=True, transform_input=False
+        ).type(dtype)
         inception_model.eval()
-    
-    up = nn.Upsample(size=(299, 299), mode='bilinear').type(dtype)
+
+    up = nn.Upsample(size=(299, 299), mode="bilinear").type(dtype)
+
     def get_pred(x):
         if resize:
             x = up(x)
         x = inception_model(x).logits
-        return F.softmax(x).data.cpu()#.numpy()
+        return F.softmax(x).data.cpu()  # .numpy()
 
     # Get predictions
     preds = torch.zeros((N, N_INCEPTION_CLASSES))
 
     for i, batch in enumerate(dataloader, 0):
         batch = batch.type(dtype)
-        #batchv = Variable(batch)
+        # batchv = Variable(batch)
         if generate_from_latents:
-            batchv = gen(batchv)
+            batch = gen(batch)
         batch_size_i = batch.size()[0]
 
-        preds[i*batch_size:i*batch_size + batch_size_i] = get_pred(batchv)
+        preds[i * batch_size : i * batch_size + batch_size_i] = get_pred(batch)
 
     # Now compute the mean kl-div
     split_scores = []
 
     for k in range(splits):
-        part = preds[k * (N // splits): (k+1) * (N // splits), :]
+        part = preds[k * (N // splits) : (k + 1) * (N // splits), :]
         py = torch.mean(part, 0)
-        scores = []
         split_scores.append(
-            torch.exp(torch.mean(
-                torch.kl_div(part, torch.log(py[None, :])).sum(1)
-                ))
+            torch.exp(
+                (part * (torch.log(part) - torch.log(py[None, :])))
+                .sum(1)
+                .mean(0)
+                # torch.mean(torch.kl_div(part, torch.log(py[None, :])).sum(1))
+            )
         )
 
     return torch.mean(split_scores), torch.std(split_scores), preds
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
+
     class IgnoreLabelDataset(torch.utils.data.Dataset):
         def __init__(self, orig):
             self.orig = orig
@@ -128,15 +131,27 @@ if __name__ == '__main__':
     import torchvision.datasets as dset
     import torchvision.transforms as transforms
 
-    cifar = dset.CIFAR10(root='data/', download=True,
-                             transform=transforms.Compose([
-                                 transforms.Scale(32),
-                                 transforms.ToTensor(),
-                                 transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
-                             ])
+    cifar = dset.CIFAR10(
+        root="data/",
+        download=True,
+        transform=transforms.Compose(
+            [
+                transforms.Scale(32),
+                transforms.ToTensor(),
+                transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+            ]
+        ),
     )
 
     IgnoreLabelDataset(cifar)
 
-    print ("Calculating Inception Score...")
-    print (get_inception_score(IgnoreLabelDataset(cifar), cuda=True, batch_size=32, resize=True, splits=10))
+    print("Calculating Inception Score...")
+    print(
+        get_inception_score(
+            IgnoreLabelDataset(cifar),
+            cuda=True,
+            batch_size=100,
+            resize=True,
+            splits=10,
+        )
+    )

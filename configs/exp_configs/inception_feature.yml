@@ -4,8 +4,9 @@ every: &every 10
 seed: null
 device: 0
 
-sample:
+sample: &sample_params
   save_dir: *dir
+  sub_dir: test
   
   feature:
     name: inception_score
@@ -20,12 +21,33 @@ sample:
     save_every: *every
     burn_in_steps: 0
 
+    n_sampling_steps: &n_sampling_steps 10
+    weight_step: 0.1
+    step_size: 0.01
+    save_every: 10
 
 compute_fid:
 
 
 compute_is:
 
+
+
+wandb_init_params: &wandb_init_params
+  project: &wandb_project soul_gan
+  entity: &wandb_account sverdoot
+  name: &name inception_score
+  config: *sample_params
+
+callbacks:
+  feature_callbacks:
+    wandb:
+      name: WandbCallback
+      params:
+        init_params:
+          <<: *wandb_init_params
+          reinit: False
+        invoke_every: *n_sampling_steps
 
 logging:
   wandb: null

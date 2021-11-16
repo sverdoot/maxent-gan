@@ -1,1 +1,1 @@
-from .inception_score import get_inception_score, batch_inception
+from .inception_score import batch_inception, get_inception_score  # noqa: F401
