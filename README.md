@@ -1,5 +1,12 @@
 # Experiments on sampling from GAN with constraints
 
+- [Experiments on sampling from GAN with constraints](#experiments-on-sampling-from-gan-with-constraints)
+  - [Getting started](#getting-started)
+  - [Usage](#usage)
+
+
+
+
 ## Getting started
 
 ```zsh
@@ -31,11 +38,21 @@ cifar = dset.CIFAR10(root='data/cifar10', download=True)
 
 ## Usage 
 
+To use wandb:
+
+```
+wandb login
+```
 
 ```zsh
 python run.py configs/exp_configs/inception_feature.yml configs/gan_configs/dcgan.yml
 ```
 
 
+use pre-commit via 
+
+```zsh
+pre-commit run -a
+```
 
 
