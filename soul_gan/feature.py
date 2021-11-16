@@ -4,8 +4,8 @@ from typing import Any, Callable, Dict, List, Optional
 import numpy as np
 import torch
 import torchvision
-from torchvision import transforms
 from pytorch_fid.inception import InceptionV3
+from torchvision import transforms
 
 from soul_gan.utils.metrics import batch_inception
 

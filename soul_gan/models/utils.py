@@ -1,6 +1,7 @@
 from pathlib import Path
-import torch
 from typing import Tuple
+
+import torch
 
 from soul_gan.models import ModelRegistry
 from soul_gan.utils.general_utils import DotConfig
@@ -29,4 +30,3 @@ def load_gan(
     dis.eval()
 
     return gen, dis
-    
