@@ -94,7 +94,7 @@ class Feature(ABC):
             out = feature_method(self, x, *args, **kwargs)
             info = self.get_useful_info(x, out)
             for callback in self.callbacks:
-                callback.invoke(self.inverse_transform(x), info)
+                callback.invoke(info)
             self.avg_feature.upd(out)
             return out
 
@@ -149,8 +149,7 @@ class InceptionScoreFeature(Feature):
         self.model.eval()
         self.transform = transforms.Normalize(mean, std)
 
-        self.ref_feature = kwargs.get("ref_score", [np.log(11.5)])
-
+        self.ref_feature = kwargs.get("ref_score", [np.log(9.5)])
         self.weight = [torch.zeros(1).to(self.device)]
 
     # @staticmethod
@@ -161,7 +160,8 @@ class InceptionScoreFeature(Feature):
             "inception score": np.exp(
                 feature_out[0].mean().item() + self.ref_feature[0]
             ),
-            "weight": self.weight[0]
+            "weight": self.weight[0],
+            "imgs": self.inverse_transform(x).detach().cpu().numpy()
             # for i, val in enumerate(feature_out)
         }
 
@@ -197,7 +197,8 @@ class DiscriminatorFeature(Feature):
     ) -> Dict:
         return {
             "D(G(z))": torch.mean(feature_out[0] + self.ref_feature[0]).item(),
-            "weight": self.weight[0]
+            "weight": self.weight[0],
+            "imgs": self.inverse_transform(x).detach().cpu().numpy()
             # for i, val in enumerate(feature_out)
         }
 

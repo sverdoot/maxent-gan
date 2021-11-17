@@ -1,9 +1,11 @@
 from abc import ABC, abstractmethod
-from typing import Dict, Optional
+from typing import Dict, List, Optional, Union
 
+import numpy as np
 import torch
 import torchvision
 from torchvision import transforms
+from torchvision.utils import make_grid
 
 from soul_gan.utils.metrics.inception_score import batch_inception
 
@@ -41,7 +43,10 @@ class CallbackRegistry:
 @CallbackRegistry.register()
 class WandbCallback(Callback):
     def __init__(
-        self, invoke_every: int = 1, init_params: Optional[Dict] = None
+        self,
+        invoke_every: int = 1,
+        init_params: Optional[Dict] = None,
+        keys: Optional[List[str]] = None,
     ):
         init_params = init_params if init_params else {}
         import wandb
@@ -50,25 +55,53 @@ class WandbCallback(Callback):
         wandb.init(**init_params)
 
         self.invoke_every = invoke_every
+        self.keys = keys
 
-    def invoke(self, x: torch.FloatTensor, info: Dict[str, float]):
+        self.img_transform = transforms.Resize(
+            128, interpolation=transforms.InterpolationMode.NEAREST
+        )
+
+    def invoke(self, info: Dict[str, Union[float, np.ndarray]]):
         if self.cnt % self.invoke_every == 0:
             wandb = self.wandb
-            wandb.log(info)
+            if not self.keys:
+                self.keys = info.keys()
+            log = dict()
+            for key in self.keys:
+                if isinstance(info[key], np.ndarray):
+                    log[key] = wandb.Image(
+                        make_grid(
+                            self.img_transform(
+                                torch.from_numpy(info[key][:25])
+                            ),
+                            nrow=5,
+                        ),
+                        caption=key,
+                    )
+                else:
+                    log[key] = info[key]
+            wandb.log(log)
         self.cnt += 1
 
 
 class InceptionScoreCallback(Callback):
-    def __init__(self, invoke_every=1):
+    def __init__(
+        self,
+        invoke_every: int = 1,
+        device: Union[str, int, torch.device] = "cuda",
+    ):
         self.model = torchvision.models.inception_v3(
             pretrained=True, transform_input=False
-        )
+        ).to(device)
+        self.model.eval()
         self.transform = transforms.Normalize(
             mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
         )
 
-    def invoke(self, x: torch.FloatTensor, info: Dict[str, float]):
-        pis = batch_inception(x, self.model, resize=True)
+    def invoke(self, info: Dict[str, Union[float, np.ndarray]]):
+        imgs = torch.from_numpy(info["imgs"]).to(self.device)
+        imgs = self.transform(imgs)
+        pis = batch_inception(imgs, self.model, resize=True)
         score = (
             (pis * (torch.log(pis) - torch.log(pis.mean(0)[None, :])))
             .sum(1)
