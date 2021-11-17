@@ -1,8 +1,10 @@
 # Experiments on sampling from GAN with constraints
 
+
 - [Experiments on sampling from GAN with constraints](#experiments-on-sampling-from-gan-with-constraints)
   - [Getting started](#getting-started)
   - [Usage](#usage)
+  - [TODO:](#todo)
 
 
 
@@ -54,5 +56,14 @@ use pre-commit via
 ```zsh
 pre-commit run -a
 ```
+
+## TODO:
+
+* add FID computation
+* rewrite loop in run
+* write callbacks (IS, saving latents, ...)
+* add more features and test
+* add reset method to Feature and Callbacks
+* add parallelism...
 
 
