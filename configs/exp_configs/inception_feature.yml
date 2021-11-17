@@ -24,9 +24,9 @@ sample: &sample_params
     save_every: *every
     burn_in_steps: 0
 
-    n_sampling_steps: &n_sampling_steps 1 #10
-    weight_step: 0 #0.1
-    step_size: 0 #0.01 #0.01
+    n_sampling_steps: &n_sampling_steps 3 #10
+    weight_step: 0.01
+    step_size: 0.01 #0.01
     save_every: *n_sampling_steps
 
 compute_fid:
@@ -44,14 +44,13 @@ wandb_init_params: &wandb_init_params
 
 callbacks:
   feature_callbacks:
-    {}
-    # wandb:
-    #   name: WandbCallback
-    #   params:
-    #     init_params:
-    #       <<: *wandb_init_params
-    #       reinit: False
-    #     invoke_every: *n_sampling_steps
+    wandb:
+      name: WandbCallback
+      params:
+        init_params:
+          <<: *wandb_init_params
+          reinit: False
+        invoke_every: *n_sampling_steps
 
 logging:
   wandb: null
