@@ -1,11 +1,20 @@
 from torch import nn
 
 from soul_gan.models import ModelRegistry
+from soul_gan.models.utils import NormalizeInverse
 
 
 @ModelRegistry.register()
 class DCGANGenerator(nn.Module):
-    def __init__(self, ngpu=1, nc=3, nz=100, ngf=64):
+    def __init__(
+        self,
+        ngpu=1,
+        nc=3,
+        nz=100,
+        ngf=64,
+        mean=(0.5, 0.5, 0.5),
+        std=(0.5, 0.5, 0.5),
+    ):
         super().__init__()
         self.z_dim = nz
         self.ngpu = ngpu
@@ -31,6 +40,8 @@ class DCGANGenerator(nn.Module):
             ),
             nn.Tanh(),
         )
+
+        self.inverse_transform = NormalizeInverse(mean, std)
 
     def forward(self, input):
         if input.ndim == 2:
@@ -67,7 +78,7 @@ class DCGANDiscriminator(nn.Module):
             nn.LeakyReLU(0.2, inplace=True),
             # state size. (ndf*8) x 4 x 4
             nn.Conv2d(ndf * 8, 1, 2, 2, 0, bias=False),
-            nn.Sigmoid(),
+            # nn.Sigmoid(),
         )
 
     def forward(self, input):

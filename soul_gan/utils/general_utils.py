@@ -1,8 +1,16 @@
 import random
 from collections import Mapping
+from pathlib import Path
 
 import numpy as np
 import torch
+
+
+def get_project_root() -> Path:
+    return Path(__file__).parent.parent.parent
+
+
+ROOT_DIR = get_project_root()
 
 
 class DotConfig(Mapping):

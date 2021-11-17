@@ -2,18 +2,17 @@ dir: &dir log
 n_steps: &n_steps 500
 every: &every 10
 seed: null
-device: &device cuda
+device: &device 0
 
 sample: &sample_params
   save_dir: *dir
   sub_dir: test
   
   feature:
-    name: inception_score
+    name: DiscriminatorFeature
     params: 
       device: *device
-      mean: [0.485, 0.456, 0.406]
-      std: [0.229, 0.224, 0.225]
+      dis: null
 
   total_n: 1000
   batch_size: 100
@@ -24,9 +23,9 @@ sample: &sample_params
     save_every: *every
     burn_in_steps: 0
 
-    n_sampling_steps: &n_sampling_steps 1 #10
-    weight_step: 0 #0.1
-    step_size: 0 #0.01 #0.01
+    n_sampling_steps: &n_sampling_steps 10 #10
+    weight_step: 0.1
+    step_size: 0.01 #0.01
     save_every: *n_sampling_steps
 
 compute_fid:
@@ -39,19 +38,19 @@ compute_is:
 wandb_init_params: &wandb_init_params
   project: &wandb_project soul_gan
   entity: &wandb_account sverdoot
-  name: &name inception_score
+  name: &name discriminator_feature
   config: *sample_params
 
 callbacks:
   feature_callbacks:
-    {}
-    # wandb:
-    #   name: WandbCallback
-    #   params:
-    #     init_params:
-    #       <<: *wandb_init_params
-    #       reinit: False
-    #     invoke_every: *n_sampling_steps
+    #{}
+    wandb:
+      name: WandbCallback
+      params:
+        init_params:
+          <<: *wandb_init_params
+          reinit: False
+        invoke_every: *n_sampling_steps
 
 logging:
   wandb: null

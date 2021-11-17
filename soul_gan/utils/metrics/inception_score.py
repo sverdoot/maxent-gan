@@ -21,6 +21,8 @@ from soul_gan.models.utils import load_gan
 from soul_gan.utils.general_utils import DotConfig
 
 N_INCEPTION_CLASSES = 1000
+MEAN_TRASFORM = [0.485, 0.456, 0.406]
+STD_TRANSFORM = [0.229, 0.224, 0.225]
 
 
 def batch_inception(
@@ -62,17 +64,17 @@ def get_inception_score(
     N = len(imgs)
 
     assert batch_size > 0
-    assert N > batch_size
+    assert N >= batch_size
 
     # Set up dtype
-    if cuda:
-        dtype = torch.cuda.FloatTensor
-    else:
-        if torch.cuda.is_available():
-            print(
-                "WARNING: You have a CUDA device, so you should probably set cuda=True"
-            )
-        dtype = torch.FloatTensor
+    # if cuda:
+    #     dtype = torch.cuda.FloatTensor
+    # else:
+    #     if torch.cuda.is_available():
+    #         print(
+    #             "WARNING: You have a CUDA device, so you should probably set cuda=True"
+    #         )
+    #     dtype = torch.FloatTensor
 
     # Set up dataloader
     if not isinstance(imgs, torch.utils.data.Dataset):
@@ -83,24 +85,29 @@ def get_inception_score(
     # Load inception model
     if inception_model is None:
         inception_model = inception_v3(
-            pretrained=True, transform_input=False
-        ).type(dtype)
+            pretrained=True,
+            transform_input=False,  # False
+        ).to(
+            device
+        )  # type(dtype)
         inception_model.eval()
 
-    up = nn.Upsample(size=(299, 299), mode="bilinear").type(dtype)
+    up = nn.Upsample(size=(299, 299), mode="bilinear").to(
+        device
+    )  # type(dtype)
 
     def get_pred(x):
         if resize:
             x = up(x)
         x = inception_model(x)
-        return F.softmax(x).data.cpu()  # .numpy()
+        return F.softmax(x, -1).data.cpu()  # .numpy()
 
     # Get predictions
     preds = torch.zeros((N, N_INCEPTION_CLASSES))
 
     for i, batch in enumerate(dataloader):
         # print(batch)
-        batch = batch[0].type(dtype)
+        batch = batch[0].to(device)  # type(dtype)
         # batchv = Variable(batch)
         if generate_from_latents:
             batch = gen(batch)
@@ -144,14 +151,12 @@ if __name__ == "__main__":
         )
         gen, _ = load_gan(gan_config, device)
 
-        n_imgs = 1000
+        n_imgs = 100  # 1000
         imgs = gen(torch.randn(n_imgs, gen.z_dim).to(device))
-        transform = transforms.Compose(
-            [
-                transforms.Scale(32),
-                # transforms.ToTensor(),
-                transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
-            ]
+        imgs = gen.inverse_transform(imgs)
+
+        transform = transforms.Normalize(
+            mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
         )
         imgs = transform(imgs)
 
@@ -160,9 +165,9 @@ if __name__ == "__main__":
             get_inception_score(
                 imgs,
                 cuda=True,
-                batch_size=50,
+                batch_size=100,
                 resize=True,
-                splits=10,
+                splits=1,
             )[:-1]
         )
     else:
@@ -184,7 +189,7 @@ if __name__ == "__main__":
                 [
                     transforms.Scale(32),
                     transforms.ToTensor(),
-                    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+                    # transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
                 ]
             ),
         )

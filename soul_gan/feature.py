@@ -9,7 +9,6 @@ from torchvision import transforms
 
 from soul_gan.utils.metrics import batch_inception
 
-# from functools import wraps
 # from main.nnclass import CNN
 # from main.util.save_util import save_image_general, save_weight_vgg_feature
 
@@ -41,11 +40,21 @@ class AvgHolder(object):
 
 
 class Feature(ABC):
-    def __init__(self, n_features=1, callbacks=None):
+    def __init__(
+        self,
+        n_features: int = 1,
+        callbacks: Optional[List] = None,
+        inverse_transform=None,
+    ):
         self.avg_weight = AvgHolder([0] * n_features)
         self.avg_feature = AvgHolder([0] * n_features)
 
         self.callbacks = callbacks if callbacks else []
+
+        if not inverse_transform:
+            self.inverse_transform = transforms.Normalize((0, 0, 0), (1, 1, 1))
+        else:
+            self.inverse_transform = inverse_transform
 
     def log_prob(self, out: List[torch.FloatTensor]) -> torch.FloatTensor:
         lik_f = 0
@@ -57,7 +66,7 @@ class Feature(ABC):
 
     def weight_up(self, out: List[torch.FloatTensor], step: float):
         for i in range(len(self.weight)):
-            self.weight[i] += step * (out[i] - self.ref_score[i])
+            self.weight[i] += step * (out[i] - self.ref_feature[i])
 
     @staticmethod
     def average_feature(feature_method: Callable) -> Callable:
@@ -70,7 +79,9 @@ class Feature(ABC):
         return with_avg
 
     @staticmethod
-    def get_useful_info(feature_out: List[torch.FloatTensor]) -> Dict:
+    def get_useful_info(
+        x: torch.FloatTensor, feature_out: List[torch.FloatTensor]
+    ) -> Dict:
         return {
             f"feature_{i}": val.mean().item()
             for i, val in enumerate(feature_out)
@@ -79,11 +90,11 @@ class Feature(ABC):
     @staticmethod
     def invoke_callbacks(feature_method: Callable) -> Callable:
         # @wraps
-        def with_callbacks(self, *args, **kwargs):
-            out = feature_method(self, *args, **kwargs)
-            info = self.get_useful_info(out)
+        def with_callbacks(self, x, *args, **kwargs):
+            out = feature_method(self, x, *args, **kwargs)
+            info = self.get_useful_info(x, out)
             for callback in self.callbacks:
-                callback.invoke(info)
+                callback.invoke(self.inverse_transform(x), info)
             self.avg_feature.upd(out)
             return out
 
@@ -118,64 +129,129 @@ class FeatureRegistry:
 
 @FeatureRegistry.register("inception_score")
 class InceptionScoreFeature(Feature):
-    def __init__(self, callbacks=None, **kwargs):
-        super().__init__(n_features=1, callbacks=callbacks)
+    def __init__(
+        self,
+        callbacks: Optional[List] = None,
+        inverse_transform=None,
+        mean=(0.485, 0.456, 0.406),
+        std=(0.229, 0.224, 0.225),
+        **kwargs,
+    ):
+        super().__init__(
+            n_features=1,
+            callbacks=callbacks,
+            inverse_transform=inverse_transform,
+        )
         self.device = kwargs.get("device", 0)
-        self.model = torchvision.models.inception_v3(
+        self.model = torchvision.models.inception.inception_v3(
             pretrained=True, transform_input=False
         ).to(self.device)
         self.model.eval()
-        self.transform = transforms.Compose(
-            [
-                transforms.Scale(32),
-                transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
-            ]
-        )
+        self.transform = transforms.Normalize(mean, std)
 
-        self.ref_score = kwargs.get("ref_score", [np.log(11.5)])
+        self.ref_feature = kwargs.get("ref_score", [np.log(11.5)])
 
-        self.weight = [0]
+        self.weight = [torch.zeros(1).to(self.device)]
 
     # @staticmethod
-    def get_useful_info(self, feature_out: List[torch.FloatTensor]) -> Dict:
+    def get_useful_info(
+        self, x: torch.FloatTensor, feature_out: List[torch.FloatTensor]
+    ) -> Dict:
         return {
             "inception score": np.exp(
-                feature_out[0].mean().item() + self.ref_score[0]
-            )
+                feature_out[0].mean().item() + self.ref_feature[0]
+            ),
+            "weight": self.weight[0]
             # for i, val in enumerate(feature_out)
         }
 
     @Feature.invoke_callbacks
     @Feature.average_feature
     def __call__(self, x) -> List[torch.FloatTensor]:
-        pis = batch_inception(self.transform(x), self.model, resize=True)
+        x = self.inverse_transform(x)
+        x = self.transform(x)
+        pis = batch_inception(x, self.model, resize=True)
         score = (
             (pis * (torch.log(pis) - torch.log(pis.mean(0)[None, :])))
             .sum(1)
             .mean(0)
             # torch.kl_div(pis, torch.log(pis.mean(0)[None, :]), reduction=None).sum(1).mean(0)
         )
-        score -= self.ref_score[0]
+        score -= self.ref_feature[0]
+        return [score[None]]
+
+
+@FeatureRegistry.register()
+class DiscriminatorFeature(Feature):
+    def __init__(self, dis, callbacks=None, **kwargs):
+        super().__init__(n_features=1, callbacks=callbacks)
+        self.device = kwargs.get("device", 0)
+        self.dis = dis
+        self.ref_feature = kwargs.get("ref_score", [0.0])
+
+        self.weight = [torch.zeros(1).to(self.device)]
+
+    # @staticmethod
+    def get_useful_info(
+        self, x: torch.FloatTensor, feature_out: List[torch.FloatTensor]
+    ) -> Dict:
+        return {
+            "D(G(z))": torch.mean(feature_out[0] + self.ref_feature[0]).item(),
+            "weight": self.weight[0]
+            # for i, val in enumerate(feature_out)
+        }
+
+    @Feature.invoke_callbacks
+    @Feature.average_feature
+    def __call__(self, x) -> List[torch.FloatTensor]:
+        score = self.dis(x).mean()
+        score -= self.ref_feature[0]
         return [score[None]]
 
 
 @FeatureRegistry.register()
 class InceptionV3MeanFeature(Feature):
+    IDX_TO_DIM = {0: 64, 1: 192, 2: 768, 3: 2048}
+
     def __init__(self, **kwargs):
         super().__init__()
         self.device = kwargs.get("device", 0)
         self.block_ids = kwargs.get("block_ids", [3])
 
         self.model = InceptionV3(self.block_ids).to(self.device)
+        self.model.eval()
 
-        self.weight = [0] * len(self.block_ids)
+        # self.transform = transforms.Compose(
+        #     [
+        #         transforms.Scale(32),
+        #         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+        #     ]
+        # )
+        feature_dims = [self.IDX_TO_DIM[idx] for idx in self.block_ids]
+
+        self.ref_feature = [
+            torch.zeros(dim, device=self.device) for dim in feature_dims
+        ]
+
+        self.weight = [
+            torch.zeros(dim, device=self.device) for dim in feature_dims
+        ]
+
+    def get_useful_info(self, feature_out: List[torch.FloatTensor]) -> Dict:
+        return {
+            "feature": feature_out[0].mean().item()
+            + self.ref_feature[0].mean().item(),  # noqa: W503
+            "weight": self.weight[0].mean().item()
+            # for i, val in enumerate(feature_out)
+        }
 
     @Feature.invoke_callbacks
     @Feature.average_feature
     def __call__(self, x) -> List[torch.FloatTensor]:
+        x = self.inverse_transform(x)
         out = self.model(x)
-        for i in range(out):
-            out[i] = out[i].mean(1)  # - ref_value
+        for i in range(len(out)):
+            out[i] = out[i].mean(0).squeeze()  # - ref_value
 
         return out
 
