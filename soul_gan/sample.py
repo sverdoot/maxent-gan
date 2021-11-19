@@ -22,10 +22,11 @@ def ula(
     for it in range(n_steps):
         energy, grad = grad_energy(z, target)
         noise = torch.randn(z.shape, dtype=torch.float).to(device)
-        noise_scale = (step_size) ** 0.5
+        noise_scale = (2 * step_size) ** 0.5
         z = z - step_size * grad + noise_scale * noise
         z = z.data
         z.requires_grad_(True)
+        #if it == n_steps - 1:
         zs.append(z.data)
 
     return zs
@@ -53,13 +54,14 @@ def soul(
     # ne = 0  # number of epochs
 
     # feature.weight = params.weight
-    feature(gen(z))
+    #feature(gen(z))
 
     def target(z):
         f = feature(gen(z))
         radnic_logp = feature.log_prob(f)
-        ref_logp = ref_dist(z).sum()
+        ref_logp = ref_dist(z)
         logp = radnic_logp + ref_logp
+        print(radnic_logp.mean(), ref_dist.dis(gen(z)).mean())
         return logp
 
     # store initialization
@@ -71,8 +73,10 @@ def soul(
         z.requires_grad_()
 
         with torch.no_grad():
-            feature.weight_up(feature.avg_feature.data, weight_step)
             condition_avg = it > burn_in_steps or it == 0
+            condition_upd = it > burn_in_steps or it == 0
+            if condition_upd:
+                feature.weight_up(feature.avg_feature.data, weight_step)            
 
             if condition_avg:
                 # n_avg = max(it - burn_in_steps, 0)

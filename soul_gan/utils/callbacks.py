@@ -84,29 +84,41 @@ class WandbCallback(Callback):
         self.cnt += 1
 
 
+@CallbackRegistry.register()
 class InceptionScoreCallback(Callback):
     def __init__(
         self,
         invoke_every: int = 1,
         device: Union[str, int, torch.device] = "cuda",
+        update_input=True,
     ):
-        self.model = torchvision.models.inception_v3(
+        self.device = device
+        self.model = torchvision.models.inception.inception_v3(
             pretrained=True, transform_input=False
         ).to(device)
         self.model.eval()
         self.transform = transforms.Normalize(
             mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
         )
+        self.update_input = update_input
+        self.invoke_every = invoke_every
 
     def invoke(self, info: Dict[str, Union[float, np.ndarray]]):
-        imgs = torch.from_numpy(info["imgs"]).to(self.device)
-        imgs = self.transform(imgs)
-        pis = batch_inception(imgs, self.model, resize=True)
-        score = (
-            (pis * (torch.log(pis) - torch.log(pis.mean(0)[None, :])))
-            .sum(1)
-            .mean(0)
-        )
+        score = None
+        if self.cnt % self.invoke_every == 0:
+            imgs = torch.from_numpy(info["imgs"]).to(self.device)
+            imgs = self.transform(imgs)
+            pis = batch_inception(imgs, self.model, resize=True)
+            score = (
+                (pis * (torch.log(pis) - torch.log(pis.mean(0)[None, :])))
+                .sum(1)
+                .mean(0)
+            )
+            score = torch.exp(score)
+
+            if self.update_input:
+                info['inception score'] = score
+        self.cnt += 1
         return score
 
 

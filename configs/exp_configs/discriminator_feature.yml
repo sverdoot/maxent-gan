@@ -1,8 +1,8 @@
 dir: &dir log
-n_steps: &n_steps 500
+n_steps: &n_steps 5000
 every: &every 10
 seed: null
-device: &device 0
+device: &device 'cuda'
 
 sample: &sample_params
   save_dir: *dir
@@ -23,10 +23,11 @@ sample: &sample_params
     save_every: *every
     burn_in_steps: 0
 
-    n_sampling_steps: &n_sampling_steps 10 #10
-    weight_step: 0.1
-    step_size: 0.01 #0.01
+    n_sampling_steps: &n_sampling_steps 1
+    weight_step: 0.01 #0.1
+    step_size: 0.001 #0.01
     save_every: *n_sampling_steps
+
 
 compute_fid:
 
@@ -43,7 +44,13 @@ wandb_init_params: &wandb_init_params
 
 callbacks:
   feature_callbacks:
-    #{}
+    inception_score:
+      name: InceptionScoreCallback
+      params:
+        invoke_every: *n_sampling_steps
+        device: *device
+        update_input: true
+
     wandb:
       name: WandbCallback
       params:
@@ -51,6 +58,19 @@ callbacks:
           <<: *wandb_init_params
           reinit: False
         invoke_every: *n_sampling_steps
+        keys:
+          - "inception score"
+          - weight
+          - D(G(z))
+    wandb_imgs:
+      name: WandbCallback
+      params:
+        init_params:
+          <<: *wandb_init_params
+          reinit: False
+        invoke_every: 50
+        keys:
+          - imgs
 
 logging:
   wandb: null

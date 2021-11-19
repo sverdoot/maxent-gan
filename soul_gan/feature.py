@@ -24,9 +24,9 @@ class AvgHolder(object):
         alpha = 1.0 / self.cnt
         if isinstance(self.val, list):
             for i in range(len(self.val)):
-                self.val[i] = self.val[i] * (1.0 - alpha) + new_val[i]
+                self.val[i] = self.val[i] * (1.0 - alpha) + new_val[i] * alpha
         else:
-            self.val = self.val * (1.0 - alpha) + new_val
+            self.val = self.val * (1.0 - alpha) + new_val * alpha
 
     def reset(self):
         if isinstance(self.val, list):
@@ -58,22 +58,23 @@ class Feature(ABC):
 
     def log_prob(self, out: List[torch.FloatTensor]) -> torch.FloatTensor:
         lik_f = 0
-        # out_lik = out.copy()
         for feature_id in range(len(out)):
-            lik_f -= torch.dot(self.weight[feature_id], out[feature_id])
+            #lik_f -= torch.dot(self.weight[feature_id], out[feature_id])
+            lik_f -= out[feature_id] @ self.weight[feature_id]
 
         return lik_f
 
     def weight_up(self, out: List[torch.FloatTensor], step: float):
         for i in range(len(self.weight)):
             self.weight[i] += step * (out[i] - self.ref_feature[i])
+            self.project_weight()
 
     @staticmethod
     def average_feature(feature_method: Callable) -> Callable:
         # @wraps
         def with_avg(self, *args, **kwargs):
             out = feature_method(self, *args, **kwargs)
-            self.avg_feature.upd(out)
+            self.avg_feature.upd([x.mean(0) for x in out])
             return out
 
         return with_avg
@@ -95,7 +96,6 @@ class Feature(ABC):
             info = self.get_useful_info(x, out)
             for callback in self.callbacks:
                 callback.invoke(info)
-            self.avg_feature.upd(out)
             return out
 
         return with_callbacks
@@ -103,6 +103,10 @@ class Feature(ABC):
     @abstractmethod
     def __call__(self, x: torch.FloatTensor):
         raise NotImplementedError
+
+    def project_weight(self):
+        for i in range(len(self.weight)):
+            self.weight[i] = torch.clip(self.weight[i], -1e4, 1e4)
 
 
 class FeatureRegistry:
@@ -172,42 +176,41 @@ class InceptionScoreFeature(Feature):
         x = self.transform(x)
         pis = batch_inception(x, self.model, resize=True)
         score = (
-            (pis * (torch.log(pis) - torch.log(pis.mean(0)[None, :])))
-            .sum(1)
-            .mean(0)
+            (pis * (torch.log(pis) - torch.log(pis.mean(0).detach()[None, :])))
+            .sum(1).reshape(-1, 1)
+            #.mean(0)
             # torch.kl_div(pis, torch.log(pis.mean(0)[None, :]), reduction=None).sum(1).mean(0)
         )
         score -= self.ref_feature[0]
-        return [score[None]]
+        return [score]
 
 
 @FeatureRegistry.register()
 class DiscriminatorFeature(Feature):
-    def __init__(self, dis, callbacks=None, **kwargs):
-        super().__init__(n_features=1, callbacks=callbacks)
+    def __init__(self, dis, inverse_transform=None, callbacks=None, **kwargs):
+        super().__init__(n_features=1, inverse_transform=inverse_transform, callbacks=callbacks)
         self.device = kwargs.get("device", 0)
         self.dis = dis
-        self.ref_feature = kwargs.get("ref_score", [0.0])
+        self.ref_feature = kwargs.get("ref_score", [np.log(0.75/(1-0.75))])
 
         self.weight = [torch.zeros(1).to(self.device)]
 
-    # @staticmethod
     def get_useful_info(
         self, x: torch.FloatTensor, feature_out: List[torch.FloatTensor]
     ) -> Dict:
         return {
-            "D(G(z))": torch.mean(feature_out[0] + self.ref_feature[0]).item(),
+            "D(G(z))": torch.mean(torch.sigmoid(feature_out[0] + self.ref_feature[0])).item(),
             "weight": self.weight[0],
             "imgs": self.inverse_transform(x).detach().cpu().numpy()
-            # for i, val in enumerate(feature_out)
         }
 
     @Feature.invoke_callbacks
     @Feature.average_feature
     def __call__(self, x) -> List[torch.FloatTensor]:
-        score = self.dis(x).mean()
+        score = self.dis(x).reshape(-1, 1)
         score -= self.ref_feature[0]
-        return [score[None]]
+
+        return [score]
 
 
 @FeatureRegistry.register()

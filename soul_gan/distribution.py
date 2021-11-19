@@ -5,8 +5,6 @@ import torch
 from torch import nn
 from torch.distributions import Distribution as torchDist
 
-# from tqdm import tqdm, trange
-
 
 class Distribution(ABC):
     """Abstract class for distribution"""
