@@ -26,7 +26,7 @@ def ula(
         z = z - step_size * grad + noise_scale * noise
         z = z.data
         z.requires_grad_(True)
-        #if it == n_steps - 1:
+        # if it == n_steps - 1:
         zs.append(z.data)
 
     return zs
@@ -54,7 +54,7 @@ def soul(
     # ne = 0  # number of epochs
 
     # feature.weight = params.weight
-    #feature(gen(z))
+    # feature(gen(z))
 
     def target(z):
         f = feature(gen(z))
@@ -76,7 +76,7 @@ def soul(
             condition_avg = it > burn_in_steps or it == 0
             condition_upd = it > burn_in_steps or it == 0
             if condition_upd:
-                feature.weight_up(feature.avg_feature.data, weight_step)            
+                feature.weight_up(feature.avg_feature.data, weight_step)
 
             if condition_avg:
                 # n_avg = max(it - burn_in_steps, 0)

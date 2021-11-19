@@ -59,7 +59,7 @@ class Feature(ABC):
     def log_prob(self, out: List[torch.FloatTensor]) -> torch.FloatTensor:
         lik_f = 0
         for feature_id in range(len(out)):
-            #lik_f -= torch.dot(self.weight[feature_id], out[feature_id])
+            # lik_f -= torch.dot(self.weight[feature_id], out[feature_id])
             lik_f -= out[feature_id] @ self.weight[feature_id]
 
         return lik_f
@@ -177,8 +177,9 @@ class InceptionScoreFeature(Feature):
         pis = batch_inception(x, self.model, resize=True)
         score = (
             (pis * (torch.log(pis) - torch.log(pis.mean(0).detach()[None, :])))
-            .sum(1).reshape(-1, 1)
-            #.mean(0)
+            .sum(1)
+            .reshape(-1, 1)
+            # .mean(0)
             # torch.kl_div(pis, torch.log(pis.mean(0)[None, :]), reduction=None).sum(1).mean(0)
         )
         score -= self.ref_feature[0]
@@ -188,10 +189,14 @@ class InceptionScoreFeature(Feature):
 @FeatureRegistry.register()
 class DiscriminatorFeature(Feature):
     def __init__(self, dis, inverse_transform=None, callbacks=None, **kwargs):
-        super().__init__(n_features=1, inverse_transform=inverse_transform, callbacks=callbacks)
+        super().__init__(
+            n_features=1,
+            inverse_transform=inverse_transform,
+            callbacks=callbacks,
+        )
         self.device = kwargs.get("device", 0)
         self.dis = dis
-        self.ref_feature = kwargs.get("ref_score", [np.log(0.75/(1-0.75))])
+        self.ref_feature = kwargs.get("ref_score", [np.log(0.75 / (1 - 0.75))])
 
         self.weight = [torch.zeros(1).to(self.device)]
 
@@ -199,9 +204,11 @@ class DiscriminatorFeature(Feature):
         self, x: torch.FloatTensor, feature_out: List[torch.FloatTensor]
     ) -> Dict:
         return {
-            "D(G(z))": torch.mean(torch.sigmoid(feature_out[0] + self.ref_feature[0])).item(),
+            "D(G(z))": torch.mean(
+                torch.sigmoid(feature_out[0] + self.ref_feature[0])
+            ).item(),
             "weight": self.weight[0],
-            "imgs": self.inverse_transform(x).detach().cpu().numpy()
+            "imgs": self.inverse_transform(x).detach().cpu().numpy(),
         }
 
     @Feature.invoke_callbacks

@@ -117,7 +117,7 @@ class InceptionScoreCallback(Callback):
             score = torch.exp(score)
 
             if self.update_input:
-                info['inception score'] = score
+                info["inception score"] = score
         self.cnt += 1
         return score
 
