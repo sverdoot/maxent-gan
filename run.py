@@ -51,10 +51,11 @@ def main(config, gan_config, device):
         if config.callbacks and config.callbacks.feature_callbacks:
 
             for _, callback in config.callbacks.feature_callbacks.items():
+                params = callback.params.dict
+                if "dis" in params:
+                    params["dis"] = dis
                 feature_callbacks.append(
-                    CallbackRegistry.create_callback(
-                        callback.name, **callback.params
-                    )
+                    CallbackRegistry.create_callback(callback.name, **params)
                 )
 
         feature_kwargs = config.sample.feature.params.dict

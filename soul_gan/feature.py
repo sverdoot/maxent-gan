@@ -1,10 +1,12 @@
 from abc import ABC, abstractmethod
+from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
 import numpy as np
 import torch
 import torchvision
 from pytorch_fid.inception import InceptionV3
+from torch.nn.functional import adaptive_avg_pool2d
 from torchvision import transforms
 
 from soul_gan.utils.metrics import batch_inception
@@ -69,14 +71,12 @@ class Feature(ABC):
 
     def weight_up(self, out: List[torch.FloatTensor], step: float):
         for i in range(len(self.weight)):
-            # print(out[i] - self.ref_feature[i])
-            # print(torch.sigmoid(out[i]), torch.sigmoid(self.ref_feature[i]))
             if isinstance(out[i], torch.FloatTensor):
                 grad = out[i].mean(0)
             else:
                 grad = out[i]
-            print(grad)
-            self.weight[i] += step * grad  # - self.ref_feature[i])
+            # print(grad)
+            self.weight[i] += step * grad
             self.project_weight()
 
     @staticmethod
@@ -175,8 +175,7 @@ class InceptionScoreFeature(Feature):
                 feature_out[0].mean().item() + self.ref_feature[0]
             ),
             "weight": self.weight[0],
-            "imgs": self.inverse_transform(x).detach().cpu().numpy()
-            # for i, val in enumerate(feature_out)
+            "imgs": self.inverse_transform(x).detach().cpu().numpy(),
         }
 
     @Feature.invoke_callbacks
@@ -189,7 +188,6 @@ class InceptionScoreFeature(Feature):
             (pis * (torch.log(pis) - torch.log(pis.mean(0).detach()[None, :])))
             .sum(1)
             .reshape(-1, 1)
-            # .mean(0)
             # torch.kl_div(pis, torch.log(pis.mean(0)[None, :]), reduction=None).sum(1).mean(0)
         )
         score -= self.ref_feature[0]
@@ -234,45 +232,61 @@ class DiscriminatorFeature(Feature):
 class InceptionV3MeanFeature(Feature):
     IDX_TO_DIM = {0: 64, 1: 192, 2: 768, 3: 2048}
 
-    def __init__(self, **kwargs):
-        super().__init__()
+    def __init__(self, inverse_transform=None, callbacks=None, **kwargs):
+        super().__init__(
+            n_features=1,
+            inverse_transform=inverse_transform,
+            callbacks=callbacks,
+        )
         self.device = kwargs.get("device", 0)
         self.block_ids = kwargs.get("block_ids", [3])
+        self.data_stat_path = kwargs.get("data_stat_path")
+
+        mean = torch.from_numpy(np.load(Path(self.data_stat_path))["mu"]).to(
+            self.device
+        )
 
         self.model = InceptionV3(self.block_ids).to(self.device)
         self.model.eval()
 
-        # self.transform = transforms.Compose(
-        #     [
-        #         transforms.Scale(32),
-        #         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
-        #     ]
-        # )
+        # HACK
+        self.callbacks[2].model = self.model
+
         feature_dims = [self.IDX_TO_DIM[idx] for idx in self.block_ids]
 
         self.ref_feature = [
             torch.zeros(dim, device=self.device) for dim in feature_dims
         ]
 
+        self.ref_feature = [mean]
+
         self.weight = [
             torch.zeros(dim, device=self.device) for dim in feature_dims
         ]
 
-    def get_useful_info(self, feature_out: List[torch.FloatTensor]) -> Dict:
+    def get_useful_info(
+        self, x: torch.FloatTensor, feature_out: List[torch.FloatTensor]
+    ) -> Dict:
         return {
             "feature": feature_out[0].mean().item()
             + self.ref_feature[0].mean().item(),  # noqa: W503
-            "weight": self.weight[0].mean().item()
-            # for i, val in enumerate(feature_out)
+            "weight": self.weight[0].mean().item(),
+            "imgs": self.inverse_transform(x).detach().cpu().numpy(),
         }
 
     @Feature.invoke_callbacks
     @Feature.average_feature
     def __call__(self, x) -> List[torch.FloatTensor]:
         x = self.inverse_transform(x)
-        out = self.model(x)
+        pred = self.model(x)[0]
+
+        if pred.size(2) != 1 or pred.size(3) != 1:
+            pred = adaptive_avg_pool2d(pred, output_size=(1, 1))
+
+        out = [pred.squeeze(3).squeeze(2)]
+
         for i in range(len(out)):
-            out[i] = out[i].mean(0).squeeze()  # - ref_value
+            out[i] = (out[i] - self.ref_feature[i][None, :]).float()
 
         return out
 

@@ -85,6 +85,7 @@ class WandbCallback(Callback):
         self.cnt += 1
 
 
+@CallbackRegistry.register()
 class SaveImagesCallback(Callback):
     def __init__(
         self,
@@ -105,3 +106,26 @@ class SaveImagesCallback(Callback):
 
 # class SaveImagesCallback(Callback):
 #     pass
+
+
+@CallbackRegistry.register()
+class DiscriminatorCallback(Callback):
+    def __init__(self, dis, invoke_every=1, update_input=True, device="cuda"):
+        self.invoke_every = invoke_every
+        self.dis = dis
+        self.transform = dis.transform
+        self.update_input = update_input
+        self.device = device
+
+    @torch.no_grad()
+    def invoke(self, info: Dict[str, Union[float, np.ndarray]]):
+        dgz = None
+        if self.cnt % self.invoke_every == 0:
+            imgs = info["imgs"]
+            x = self.transform(torch.from_numpy(imgs).to(self.device))
+            dgz = torch.sigmoid(self.dis(x)).mean().item()
+            if self.update_input:
+                info["D(G(z))"] = dgz
+        self.cnt += 1
+
+        return dgz

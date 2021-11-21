@@ -84,6 +84,7 @@ class FIDCallback(Callback):
 
         self.dims = dims
 
+    @torch.no_grad()
     def invoke(self, info: Dict[str, Union[float, np.ndarray]]):
         score = None
         if self.cnt % self.invoke_every == 0:

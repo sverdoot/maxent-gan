@@ -34,6 +34,7 @@ class GANTarget(Distribution):
         proposal: Union[Distribution, torchDist],
     ) -> Tuple[torch.FloatTensor, torch.FloatTensor, torch.FloatTensor]:
         dgz = dis(gen(z))
+        print(torch.sigmoid(dgz).mean().item())
         logp_z = proposal.log_prob(z)
         log_prob = logp_z + dgz
         return log_prob, logp_z, dgz

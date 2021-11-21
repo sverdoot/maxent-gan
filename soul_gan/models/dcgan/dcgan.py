@@ -1,4 +1,5 @@
 from torch import nn
+from torchvision import transforms
 
 from soul_gan.models import ModelRegistry
 from soul_gan.models.utils import NormalizeInverse
@@ -57,7 +58,14 @@ class DCGANGenerator(nn.Module):
 
 @ModelRegistry.register()
 class DCGANDiscriminator(nn.Module):
-    def __init__(self, ngpu=1, nc=3, ndf=64):
+    def __init__(
+        self,
+        ngpu=1,
+        nc=3,
+        ndf=64,
+        mean=(0.5, 0.5, 0.5),
+        std=(0.5, 0.5, 0.5),
+    ):
         super().__init__()
         self.ngpu = ngpu
         self.main = nn.Sequential(
@@ -80,6 +88,8 @@ class DCGANDiscriminator(nn.Module):
             nn.Conv2d(ndf * 8, 1, 2, 2, 0, bias=False),
             # nn.Sigmoid(),
         )
+
+        self.transform = transforms.Normalize(mean, std)
 
     def forward(self, input):
         if input.is_cuda and self.ngpu > 1:
