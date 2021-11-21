@@ -64,3 +64,14 @@ def random_seed(seed):
     torch.cuda.manual_seed(seed)
     np.random.seed(seed)
     random.seed(seed)
+
+
+class IgnoreLabelDataset(torch.utils.data.Dataset):
+    def __init__(self, orig):
+        self.orig = orig
+
+    def __getitem__(self, index):
+        return self.orig[index][0]
+
+    def __len__(self):
+        return len(self.orig)

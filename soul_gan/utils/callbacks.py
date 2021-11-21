@@ -1,13 +1,11 @@
 from abc import ABC, abstractmethod
+from pathlib import Path
 from typing import Dict, List, Optional, Union
 
 import numpy as np
 import torch
-import torchvision
 from torchvision import transforms
 from torchvision.utils import make_grid
-
-from soul_gan.utils.metrics.inception_score import batch_inception
 
 
 class Callback(ABC):
@@ -68,6 +66,8 @@ class WandbCallback(Callback):
                 self.keys = info.keys()
             log = dict()
             for key in self.keys:
+                if key not in info:
+                    continue
                 if isinstance(info[key], np.ndarray):
                     log[key] = wandb.Image(
                         make_grid(
@@ -80,55 +80,28 @@ class WandbCallback(Callback):
                     )
                 else:
                     log[key] = info[key]
+            log["step"] = self.cnt
             wandb.log(log)
         self.cnt += 1
 
 
-@CallbackRegistry.register()
-class InceptionScoreCallback(Callback):
+class SaveImagesCallback(Callback):
     def __init__(
         self,
+        save_dir: Union[Path, str],
         invoke_every: int = 1,
-        device: Union[str, int, torch.device] = "cuda",
-        update_input=True,
     ):
-        self.device = device
-        self.model = torchvision.models.inception.inception_v3(
-            pretrained=True, transform_input=False
-        ).to(device)
-        self.model.eval()
-        self.transform = transforms.Normalize(
-            mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
-        )
-        self.update_input = update_input
         self.invoke_every = invoke_every
+        self.save_dir = save_dir
 
     def invoke(self, info: Dict[str, Union[float, np.ndarray]]):
-        score = None
         if self.cnt % self.invoke_every == 0:
-            imgs = torch.from_numpy(info["imgs"]).to(self.device)
-            imgs = self.transform(imgs)
-            pis = batch_inception(imgs, self.model, resize=True)
-            score = (
-                (pis * (torch.log(pis) - torch.log(pis.mean(0)[None, :])))
-                .sum(1)
-                .mean(0)
-            )
-            score = torch.exp(score)
+            imgs = info["imgs"]
+            savepath = Path(self.save_dir, f"imgs_{self.cnt}.npy")
+            np.save(savepath, imgs)
 
-            if self.update_input:
-                info["inception score"] = score
         self.cnt += 1
-        return score
 
 
-class SaveLatentsCallback(Callback):
-    pass
-
-
-class FIDCallback(Callback):
-    pass
-
-
-class SaveImagesCallback(Callback):
-    pass
+# class SaveImagesCallback(Callback):
+#     pass

@@ -4,7 +4,7 @@ import torch
 from torch import nn
 from tqdm import trange
 
-from .distribution import Distribution, grad_energy, torchDist
+from .distribution import Distribution, grad_log_prob, torchDist
 from .feature import Feature
 from .utils import time_comp
 
@@ -20,13 +20,12 @@ def ula(
     device = z.device
 
     for it in range(n_steps):
-        energy, grad = grad_energy(z, target)
+        energy, grad = grad_log_prob(z, target)
         noise = torch.randn(z.shape, dtype=torch.float).to(device)
         noise_scale = (2 * step_size) ** 0.5
-        z = z - step_size * grad + noise_scale * noise
+        z = z + step_size * grad + noise_scale * noise
         z = z.data
         z.requires_grad_(True)
-        # if it == n_steps - 1:
         zs.append(z.data)
 
     return zs
@@ -60,8 +59,8 @@ def soul(
         f = feature(gen(z))
         radnic_logp = feature.log_prob(f)
         ref_logp = ref_dist(z)
+        # print(ref_logp.mean(), radnic_logp.mean())
         logp = radnic_logp + ref_logp
-        print(radnic_logp.mean(), ref_dist.dis(gen(z)).mean())
         return logp
 
     # store initialization
@@ -91,6 +90,6 @@ def soul(
         z = inter_zs[-1]
 
         if it > burn_in_steps and it % save_every == 0:
-            zs.append(z)
+            zs.append(z.data)
 
     return zs

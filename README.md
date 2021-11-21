@@ -37,6 +37,9 @@ import torchvision.datasets as dset
 cifar = dset.CIFAR10(root='data/cifar10', download=True)
 ```
 
+```zsh
+chmod +x run_scripts/*
+```
 
 ## Usage 
 

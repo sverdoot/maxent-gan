@@ -13,7 +13,6 @@ from soul_gan.models.utils import load_gan
 from soul_gan.sample import soul
 from soul_gan.utils.callbacks import CallbackRegistry
 from soul_gan.utils.general_utils import DotConfig, random_seed
-from soul_gan.utils.metrics.compute_fid import compute_fid_for_latents
 
 
 def parse_arguments():
@@ -92,18 +91,18 @@ def main(config, gan_config, device):
         for slice_id, slice in enumerate(total_sample):
             np.save(
                 Path(
-                    latents_dir,
-                    f"{slice_id * config.sample.save_every}.npy",
-                    slice.numpy(),
-                )
+                    latents_dir, f"{slice_id * config.sample.save_every}.npy"
+                ),
+                slice.cpu().numpy(),
             )
 
     if config.compute_fid:
-        results_dir = config.compute_fid.results_dir
-        if config.compute_fid.sub_dir == "latest":
-            results_dir = filter(Path(results_dir).glob("*"))[-1]
-        assert Path(results_dir).exists()
-        compute_fid_for_latents
+        # results_dir = config.compute_fid.results_dir
+        # if config.compute_fid.sub_dir == "latest":
+        #     results_dir = filter(Path(results_dir).glob("*"))[-1]
+        # assert Path(results_dir).exists()
+        # compute_fid_for_latents
+        pass
 
     if config.compute_is:
         pass

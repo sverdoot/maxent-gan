@@ -1,15 +1,16 @@
-dir: &dir log/discriminator_feature
+dir: &dir log/dumb_feature
 n_steps: &n_steps 2000
 every: &every 10
 seed: null
 device: &device 'cuda'
+
 
 sample: &sample_params
   save_dir: *dir
   sub_dir: test
   
   feature:
-    name: DiscriminatorFeature
+    name: DumbFeature
     params: 
       device: *device
       dis: null
@@ -21,7 +22,7 @@ sample: &sample_params
   params:
     n_steps: *n_steps
     save_every: *every
-    burn_in_steps: 10
+    burn_in_steps: 0
 
     n_sampling_steps: &n_sampling_steps 1
     weight_step: 0.01 #0.1
@@ -35,12 +36,12 @@ compute_fid:
 compute_is:
 
 
-
 wandb_init_params: &wandb_init_params
   project: &wandb_project soul_gan
   entity: &wandb_account sverdoot
-  name: &name discriminator_feature
+  name: &name dumb_feature
   config: *sample_params
+
 
 callbacks:
   feature_callbacks:
@@ -67,8 +68,6 @@ callbacks:
         invoke_every: 50
         keys:
           - "inception score"
-          - weight
-          - D(G(z))
           - fid
     wandb_imgs:
       name: WandbCallback

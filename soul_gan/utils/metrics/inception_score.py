@@ -1,14 +1,15 @@
 """
-Code is borrowed from repository https://github.com/sbarratt/inception-score-pytorch/blob/master/inception_score.py # noqa: E501
+Code is partially borrowed from repository https://github.com/sbarratt/inception-score-pytorch/blob/master/inception_score.py # noqa: E501
 """
 
 import argparse
 from pathlib import Path
-from typing import Iterable, Optional, Tuple, Union
+from typing import Dict, Iterable, Optional, Tuple, Union
 
 import numpy as np
 import torch
 import torch.utils.data
+import torchvision
 import torchvision.datasets as dset
 import torchvision.transforms as transforms
 import yaml
@@ -18,11 +19,50 @@ from torchvision.models.inception import inception_v3
 from yaml import Loader
 
 from soul_gan.models.utils import load_gan
+from soul_gan.utils.callbacks import Callback, CallbackRegistry
 from soul_gan.utils.general_utils import DotConfig
 
 N_INCEPTION_CLASSES = 1000
 MEAN_TRASFORM = [0.485, 0.456, 0.406]
 STD_TRANSFORM = [0.229, 0.224, 0.225]
+
+
+@CallbackRegistry.register()
+class InceptionScoreCallback(Callback):
+    def __init__(
+        self,
+        invoke_every: int = 1,
+        device: Union[str, int, torch.device] = "cuda",
+        update_input=True,
+    ):
+        self.device = device
+        self.model = torchvision.models.inception.inception_v3(
+            pretrained=True, transform_input=False
+        ).to(device)
+        self.model.eval()
+        self.transform = transforms.Normalize(
+            mean=MEAN_TRASFORM, std=STD_TRANSFORM
+        )
+        self.update_input = update_input
+        self.invoke_every = invoke_every
+
+    def invoke(self, info: Dict[str, Union[float, np.ndarray]]):
+        score = None
+        if self.cnt % self.invoke_every == 0:
+            imgs = torch.from_numpy(info["imgs"]).to(self.device)
+            imgs = self.transform(imgs)
+            pis = batch_inception(imgs, self.model, resize=True)
+            score = (
+                (pis * (torch.log(pis) - torch.log(pis.mean(0)[None, :])))
+                .sum(1)
+                .mean(0)
+            )
+            score = torch.exp(score)
+
+            if self.update_input:
+                info["inception score"] = score
+        self.cnt += 1
+        return score
 
 
 def batch_inception(

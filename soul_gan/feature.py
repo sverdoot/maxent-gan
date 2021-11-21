@@ -33,6 +33,7 @@ class AvgHolder(object):
             self.val = [0] * len(self.val)
         else:
             self.val = 0
+        self.cnt = 0
 
     @property
     def data(self) -> Any:
@@ -45,7 +46,9 @@ class Feature(ABC):
         n_features: int = 1,
         callbacks: Optional[List] = None,
         inverse_transform=None,
+        device="cuda",
     ):
+        self.device = device
         self.avg_weight = AvgHolder([0] * n_features)
         self.avg_feature = AvgHolder([0] * n_features)
 
@@ -66,7 +69,14 @@ class Feature(ABC):
 
     def weight_up(self, out: List[torch.FloatTensor], step: float):
         for i in range(len(self.weight)):
-            self.weight[i] += step * (out[i] - self.ref_feature[i])
+            # print(out[i] - self.ref_feature[i])
+            # print(torch.sigmoid(out[i]), torch.sigmoid(self.ref_feature[i]))
+            if isinstance(out[i], torch.FloatTensor):
+                grad = out[i].mean(0)
+            else:
+                grad = out[i]
+            print(grad)
+            self.weight[i] += step * grad  # - self.ref_feature[i])
             self.project_weight()
 
     @staticmethod
@@ -196,7 +206,7 @@ class DiscriminatorFeature(Feature):
         )
         self.device = kwargs.get("device", 0)
         self.dis = dis
-        self.ref_feature = kwargs.get("ref_score", [np.log(0.75 / (1 - 0.75))])
+        self.ref_feature = kwargs.get("ref_score", [np.log(0.5 / (1 - 0.5))])
 
         self.weight = [torch.zeros(1).to(self.device)]
 
@@ -265,6 +275,66 @@ class InceptionV3MeanFeature(Feature):
             out[i] = out[i].mean(0).squeeze()  # - ref_value
 
         return out
+
+
+@FeatureRegistry.register()
+class DumbFeature(Feature):
+    def __init__(
+        self,
+        n_features: int = 1,
+        callbacks: Optional[List] = None,
+        inverse_transform=None,
+        **kwargs,
+    ):
+        super().__init__(
+            n_features=n_features,
+            callbacks=callbacks,
+            inverse_transform=inverse_transform,
+        )
+
+        self.avg_weight = AvgHolder([] * n_features)
+        self.avg_feature = AvgHolder([] * n_features)
+
+        self.ref_feature = []
+        self.weight = []
+
+    def get_useful_info(
+        self, x: torch.FloatTensor, feature_out: List[torch.FloatTensor]
+    ) -> Dict:
+        return {
+            "imgs": self.inverse_transform(x).detach().cpu().numpy(),
+        }
+
+    @Feature.invoke_callbacks
+    @Feature.average_feature
+    def __call__(self, x) -> List[torch.FloatTensor]:
+        return []
+
+
+@FeatureRegistry.register()
+class SumFeature(Feature):
+    def __init__(self, *features):
+        self.features = features
+
+    @Feature.invoke_callbacks
+    def __call__(self, x: torch.FloatTensor):
+        outs = []
+        for feature in self.features:
+            outs.extend(feature(x))
+        return outs
+
+    def get_useful_info(
+        self, x: torch.FloatTensor, feature_out: List[torch.FloatTensor]
+    ) -> Dict:
+        info = {}
+        for feature in self.features:
+            info.update(feature.get_useful_info(x, feature_out))
+
+        return info
+
+    def weight_up(self, out: List[torch.FloatTensor], step: float):
+        for feature in self.features:
+            feature.weight_upd(out, step)
 
 
 # class CNNFeature(Feature):
