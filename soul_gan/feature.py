@@ -50,6 +50,7 @@ class Feature(ABC):
         inverse_transform=None,
         device="cuda",
     ):
+        self.n_features = n_features
         self.device = device
         self.avg_weight = AvgHolder([0] * n_features)
         self.avg_feature = AvgHolder([0] * n_features)
@@ -57,7 +58,9 @@ class Feature(ABC):
         self.callbacks = callbacks if callbacks else []
 
         if not inverse_transform:
-            self.inverse_transform = transforms.Normalize((0, 0, 0), (1, 1, 1))
+            self.inverse_transform = (
+                None  # transforms.Normalize((0, 0, 0), (1, 1, 1))
+            )
         else:
             self.inverse_transform = inverse_transform
 
@@ -75,7 +78,6 @@ class Feature(ABC):
                 grad = out[i].mean(0)
             else:
                 grad = out[i]
-            # print(grad)
             self.weight[i] += step * grad
             self.project_weight()
 
@@ -103,9 +105,10 @@ class Feature(ABC):
         # @wraps
         def with_callbacks(self, x, *args, **kwargs):
             out = feature_method(self, x, *args, **kwargs)
-            info = self.get_useful_info(x, out)
-            for callback in self.callbacks:
-                callback.invoke(info)
+            if self.callbacks:
+                info = self.get_useful_info(x, out)
+                for callback in self.callbacks:
+                    callback.invoke(info)
             return out
 
         return with_callbacks
@@ -163,8 +166,11 @@ class InceptionScoreFeature(Feature):
         self.model.eval()
         self.transform = transforms.Normalize(mean, std)
 
-        self.ref_feature = kwargs.get("ref_score", [np.log(9.5)])
+        self.ref_feature = kwargs.get("ref_score", [np.log(9.0)])
         self.weight = [torch.zeros(1).to(self.device)]
+
+        self.pis_mean = torch.zeros(1000).to(self.device)
+        self.exp_avg_coef = 0.1
 
     # @staticmethod
     def get_useful_info(
@@ -174,7 +180,9 @@ class InceptionScoreFeature(Feature):
             "inception score": np.exp(
                 feature_out[0].mean().item() + self.ref_feature[0]
             ),
-            "weight": self.weight[0],
+            f"weight_{self.__class__.__name__}": torch.norm(
+                self.weight[0]
+            ).item(),
             "imgs": self.inverse_transform(x).detach().cpu().numpy(),
         }
 
@@ -184,11 +192,14 @@ class InceptionScoreFeature(Feature):
         x = self.inverse_transform(x)
         x = self.transform(x)
         pis = batch_inception(x, self.model, resize=True)
+
+        self.pis_mean = (
+            1.0 - self.exp_avg_coef
+        ) * self.pis_mean + self.exp_avg_coef * pis.mean(0).detach()
         score = (
-            (pis * (torch.log(pis) - torch.log(pis.mean(0).detach()[None, :])))
+            (pis * (torch.log(pis) - torch.log(self.pis_mean[None, :])))
             .sum(1)
             .reshape(-1, 1)
-            # torch.kl_div(pis, torch.log(pis.mean(0)[None, :]), reduction=None).sum(1).mean(0)
         )
         score -= self.ref_feature[0]
         return [score]
@@ -215,7 +226,9 @@ class DiscriminatorFeature(Feature):
             "D(G(z))": torch.mean(
                 torch.sigmoid(feature_out[0] + self.ref_feature[0])
             ).item(),
-            "weight": self.weight[0],
+            f"weight_{self.__class__.__name__}": torch.norm(
+                self.weight[0]
+            ).item(),
             "imgs": self.inverse_transform(x).detach().cpu().numpy(),
         }
 
@@ -232,7 +245,9 @@ class DiscriminatorFeature(Feature):
 class InceptionV3MeanFeature(Feature):
     IDX_TO_DIM = {0: 64, 1: 192, 2: 768, 3: 2048}
 
-    def __init__(self, inverse_transform=None, callbacks=None, **kwargs):
+    def __init__(
+        self, inverse_transform=None, callbacks=None, dp=False, **kwargs
+    ):
         super().__init__(
             n_features=1,
             inverse_transform=inverse_transform,
@@ -247,10 +262,9 @@ class InceptionV3MeanFeature(Feature):
         )
 
         self.model = InceptionV3(self.block_ids).to(self.device)
+        if dp:
+            self.model = torch.nn.DataParallel(self.model)
         self.model.eval()
-
-        # HACK
-        self.callbacks[2].model = self.model
 
         feature_dims = [self.IDX_TO_DIM[idx] for idx in self.block_ids]
 
@@ -270,7 +284,9 @@ class InceptionV3MeanFeature(Feature):
         return {
             "feature": feature_out[0].mean().item()
             + self.ref_feature[0].mean().item(),  # noqa: W503
-            "weight": self.weight[0].mean().item(),
+            f"weight_{self.__class__.__name__}": torch.norm(
+                self.weight[0]
+            ).item(),
             "imgs": self.inverse_transform(x).detach().cpu().numpy(),
         }
 
@@ -327,10 +343,42 @@ class DumbFeature(Feature):
 
 @FeatureRegistry.register()
 class SumFeature(Feature):
-    def __init__(self, *features):
-        self.features = features
+    def __init__(
+        self,
+        callbacks: Optional[List] = None,
+        inverse_transform=None,
+        **kwargs,
+    ):
+        super().__init__(
+            n_features=0,
+            callbacks=callbacks,
+            inverse_transform=inverse_transform,
+        )
+        self.features = []
+
+        for feature in kwargs["features"]:
+            feature_kwargs = feature["params"]
+            if "dis" in feature["params"]:
+                feature_kwargs["dis"] = kwargs.get("dis")
+            feature = FeatureRegistry.create_feature(
+                feature["name"],
+                inverse_transform=inverse_transform,
+                **feature_kwargs,
+            )
+            self.features.append(feature)
+            self.n_features += feature.n_features
+
+        self.avg_feature = AvgHolder([0] * self.n_features)
+
+    @property
+    def weight(self):
+        weight = []
+        for feature in self.features:
+            weight.extend(feature.weight)
+        return weight
 
     @Feature.invoke_callbacks
+    @Feature.average_feature
     def __call__(self, x: torch.FloatTensor):
         outs = []
         for feature in self.features:
@@ -341,101 +389,18 @@ class SumFeature(Feature):
         self, x: torch.FloatTensor, feature_out: List[torch.FloatTensor]
     ) -> Dict:
         info = {}
+        k = 0
         for feature in self.features:
-            info.update(feature.get_useful_info(x, feature_out))
-
+            info.update(
+                feature.get_useful_info(
+                    x, feature_out[k : k + feature.n_features]
+                )
+            )
+            k += feature.n_features
         return info
 
     def weight_up(self, out: List[torch.FloatTensor], step: float):
+        k = 0
         for feature in self.features:
-            feature.weight_upd(out, step)
-
-
-# class CNNFeature(Feature):
-#     """
-#     Construct CNN feature methods.
-
-#     Attributes
-#     ----------
-#     name : str
-#         Name of the class, here 'CNNFeature'.
-#     layer : tuple
-#         A tuple corresponding to the layers to be considered in the log-likelihood.
-#     nb_layer : int
-#         The number of layers, corresponding to len(self.layer).
-#     model_cnn : str
-#         Name of the neural network architecture to be used.
-#     network : instance of a class
-#         The instance of the class is given by CNN, see nnclass.py for more details.
-#     beta : float
-#         The features are divided by this value.
-#         Be careful, the algorithm is sensitive with respect to this value.
-#     forward : a function
-#         A function taking a tensor as an input and returning the tensor
-#           of the output at given layers.
-#         See self.forward in nnclass for more details.
-#     x0 : torch.tensor
-#         4d torch tensor, the examplar image.
-#         First dimension is one.
-#         Second and third dimension correspond to the width and the height of the image.
-#         Fourth dimension is set to 3.
-#     feature_init : list
-#         A list of length self.nb_layer. Each element of feature_init is a tensor.
-#     weight : list
-#         Same structure as feature_init and contains weight to compute log-likelihood.
-#     regularization : float
-#         Inverse of the variance in the a priori white noise (or regularization parameter).
-
-#     Methods
-#     -------
-#     feature_fun(x)
-#         Compute features of x.
-#     log_likelihood(out, x)
-#         Compute log-likelihood associated with x and features out.
-#     weight_up(weight, out, step, weight_old, n_it)
-#         Update weight.
-#     weight_avg(weight, step, weight_mv_avg, sum_step)
-#         Update moving average on weights.
-#     save_image(params, x, x_grad, n_it, folder_name, im_number=None)
-#         Save images.
-#     save_weight(params, feat, w, w_avg, n_it, n_epoch, folder_name)
-#         Save weight statistics.
-#     """
-
-#     def __init__(self, cnn, params):
-#         super().__init__()
-#         self.layer = params["layer"]
-#         self.nb_layer = len(params["layer"])
-#         self.model_cnn = params["model_cnn"]
-#         params_CNN = dict()
-#         params_CNN["layers"] = params["layer"]
-#         params_CNN["model_str"] = params["model_cnn"]
-#         self.beta = params["beta"]
-#         self.cnn = cnn(params_CNN)
-#         self.x0 = params["x0"]
-#         self.ref_feature = self(params["x_real"])
-#         self.weight = params["weight"]
-
-#     @Feature.average_feature
-#     def __call__(self, x):
-#         feat = self.cnn(x)
-#         x0 = self.x0
-#         out = []
-#         size_x = x.shape[-2] * x.shape[-1]
-#         size_x0 = x0.shape[-2] * x0.shape[-1]
-#         ratio_size = size_x0 / size_x
-#         for feat_l in feat:
-#             ratio_layer = feat_l.shape[-2] * feat_l.shape[-1]
-#             ratio_layer = size_x / ratio_layer
-#             ratio = ratio_layer * ratio_size / self.beta
-#             out.append(feat_l[0].sum((1, 2)) * ratio)
-#         return out
-
-# def save_image(self, params, x, x_grad, n_it, folder_name, im_number=None):
-
-#     save_image_general(params, x, x_grad, n_it,
-#                        folder_name, im_number)
-
-# def save_weight(self, params, feat, w, w_avg, n_it, n_epoch, fd_name):
-#     save_weight_vgg_feature(self, params, feat, w,
-#                             w_avg, n_it, n_epoch, fd_name)
+            feature.weight_up(out[k : k + feature.n_features], step)
+            k += feature.n_features

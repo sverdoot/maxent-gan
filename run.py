@@ -19,6 +19,7 @@ def parse_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument("config", type=str)
     parser.add_argument("gan_config", type=str)
+    parser.add_argument("--seed", type=int)
 
     args = parser.parse_args()
     return args
@@ -59,7 +60,8 @@ def main(config, gan_config, device):
                 )
 
         feature_kwargs = config.sample.feature.params.dict
-        # hardcoded
+
+        # HACK
         if "dis" in config.sample.feature.params:
             feature_kwargs["dis"] = dis
 
@@ -69,6 +71,15 @@ def main(config, gan_config, device):
             inverse_transform=gen.inverse_transform,
             **feature_kwargs,
         )
+
+        # HACK
+        if (
+            "FIDCallback" in config.callbacks
+            and config.sample.feature.name  # noqa: W503
+            == "InceptionV3MeanFeature"  # noqa: W503
+        ):
+            idx = config.callbacks.keys().index("FIDCallback")
+            feature.callbacks[idx].model = feature.model
 
         z_dim = gen.z_dim
         proposal = torch.distributions.multivariate_normal.MultivariateNormal(
@@ -111,6 +122,9 @@ def main(config, gan_config, device):
 
 if __name__ == "__main__":
     args = parse_arguments()
+    if args.seed:
+        random_seed(args.seed)
+
     config = DotConfig(yaml.load(Path(args.config).open("r"), Loader))
     config.file_name = Path(args.config).name  # stem
     gan_config = DotConfig(yaml.load(Path(args.gan_config).open("r"), Loader))

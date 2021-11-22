@@ -4,7 +4,6 @@ every: &every 10
 seed: null
 device: &device cuda
 
-
 sample: &sample_params
   save_dir: *dir
   sub_dir: test
@@ -13,10 +12,11 @@ sample: &sample_params
     name: InceptionV3MeanFeature
     params: 
       device: *device
-      data_stat_path: stats/fid_stats_cifar10.npz
+      data_stat_path: stats/fid_stats_cifar10_test.npz
+      dp: true
 
-  total_n: 50
-  batch_size: 50
+  total_n: 100
+  batch_size: 100
   save_every: *every
 
   params:
@@ -25,8 +25,8 @@ sample: &sample_params
     burn_in_steps: 10
 
     n_sampling_steps: &n_sampling_steps 1 #10
-    weight_step: 0.01 #0.1 #0.01
-    step_size: 0.005 #0.01
+    weight_step: 0.1 #0.1 #0.01
+    step_size: 0.001 #0.01
     save_every: *n_sampling_steps
 
 compute_fid:
@@ -56,6 +56,7 @@ callbacks:
         invoke_every: 50
         device: *device
         update_input: true
+        dp: true
     fid:
       name: FIDCallback
       params:
@@ -73,7 +74,7 @@ callbacks:
         invoke_every: 50
         keys:
           - "inception score"
-          - weight
+          - weight_InceptionV3MeanFeature
           - fid
           - D(G(z))
     wandb_imgs:

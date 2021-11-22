@@ -18,9 +18,7 @@ from torch.nn import functional as F
 from torchvision.models.inception import inception_v3
 from yaml import Loader
 
-from soul_gan.models.utils import load_gan
 from soul_gan.utils.callbacks import Callback, CallbackRegistry
-from soul_gan.utils.general_utils import DotConfig
 
 N_INCEPTION_CLASSES = 1000
 MEAN_TRASFORM = [0.485, 0.456, 0.406]
@@ -34,11 +32,16 @@ class InceptionScoreCallback(Callback):
         invoke_every: int = 1,
         device: Union[str, int, torch.device] = "cuda",
         update_input=True,
+        dp=False,
+        ddp=False,
     ):
         self.device = device
         self.model = torchvision.models.inception.inception_v3(
             pretrained=True, transform_input=False
         ).to(device)
+        if dp:
+            self.model = nn.DataParallel(self.model)
+
         self.model.eval()
         self.transform = transforms.Normalize(
             mean=MEAN_TRASFORM, std=STD_TRANSFORM
@@ -187,6 +190,9 @@ if __name__ == "__main__":
     device = torch.device(args.device)
 
     if args.gan_config:
+        from soul_gan.models.utils import load_gan
+        from soul_gan.utils.general_utils import DotConfig
+
         gan_config = DotConfig(
             yaml.load(Path(args.gan_config).open("r"), Loader)
         )

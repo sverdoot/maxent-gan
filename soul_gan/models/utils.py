@@ -27,6 +27,13 @@ def load_gan(
     )
     dis.load_state_dict(state_dict)
 
+    if config.dp:
+        gen = torch.nn.DataParallel(gen)
+        dis = torch.nn.DataParallel(dis)
+        dis.transform = dis.module.transform
+        gen.inverse_transform = gen.module.inverse_transform
+        gen.z_dim = gen.module.z_dim
+
     gen.eval()
     dis.eval()
 
@@ -41,7 +48,7 @@ class NormalizeInverse(transforms.Normalize):
     def __init__(self, mean, std):
         mean = torch.as_tensor(mean)
         std = torch.as_tensor(std)
-        std_inv = 1 / (std + 1e-7)
+        std_inv = 1 / (std + 1e-9)
         mean_inv = -mean * std_inv
         super().__init__(mean=mean_inv, std=std_inv)
 

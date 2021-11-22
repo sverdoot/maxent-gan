@@ -20,7 +20,7 @@ def ula(
     device = z.device
 
     for it in range(n_steps):
-        energy, grad = grad_log_prob(z, target)
+        _, grad = grad_log_prob(z, target)
         noise = torch.randn(z.shape, dtype=torch.float).to(device)
         noise_scale = (2 * step_size) ** 0.5
         z = z + step_size * grad + noise_scale * noise
@@ -51,9 +51,6 @@ def soul(
     # n_stride_curve = params['stride_save_curve']
     # n_stride = min(n_stride_im, n_stride_curve)
     # ne = 0  # number of epochs
-
-    # feature.weight = params.weight
-    # feature(gen(z))
 
     def target(z):
         f = feature(gen(z))
@@ -90,6 +87,6 @@ def soul(
         z = inter_zs[-1]
 
         if it > burn_in_steps and it % save_every == 0:
-            zs.append(z.data)
+            zs.append(z.data.cpu())
 
     return zs

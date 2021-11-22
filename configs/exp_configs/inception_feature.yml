@@ -26,8 +26,8 @@ sample: &sample_params
     burn_in_steps: 10
 
     n_sampling_steps: &n_sampling_steps 1 #10
-    weight_step: 0.01 #0.1 #0.01
-    step_size: 0.005 #0.01
+    weight_step: 0.1 #0.1 #0.01
+    step_size: 0.001 #0.01
     save_every: *n_sampling_steps
 
 compute_fid:
@@ -44,6 +44,13 @@ wandb_init_params: &wandb_init_params
 
 callbacks:
   feature_callbacks:
+    discriminator:
+      name: DiscriminatorCallback
+      params:
+        dis: null
+        invoke_every: 50
+        device: *device
+        update_input: true
     inception_score:
       name: InceptionScoreCallback
       params:
@@ -67,8 +74,9 @@ callbacks:
         invoke_every: 50
         keys:
           - "inception score"
-          - weight
+          - weight_InceptionScoreFeature
           - fid
+          - D(G(z))
     wandb_imgs:
       name: WandbCallback
       params:

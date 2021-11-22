@@ -25,7 +25,7 @@ sample: &sample_params
 
     n_sampling_steps: &n_sampling_steps 1
     weight_step: 0.01 #0.1
-    step_size: 0.005 #0.01
+    step_size: 0.001 #0.01
     save_every: *n_sampling_steps
 
 
@@ -67,7 +67,7 @@ callbacks:
         invoke_every: 50
         keys:
           - "inception score"
-          - weight
+          - weight_DiscriminatorFeature
           - D(G(z))
           - fid
     wandb_imgs:

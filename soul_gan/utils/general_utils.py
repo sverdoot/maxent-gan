@@ -20,7 +20,7 @@ class DotConfig(Mapping):
     """
 
     def __init__(self, yaml):
-        self._dict = dict(yaml)
+        self._dict = yaml
 
     def __getattr__(self, key):
         if key in self.__dict__:
@@ -35,6 +35,9 @@ class DotConfig(Mapping):
 
     def items(self):
         return [(k, DotConfig(v)) for k, v in self._dict.items()]
+
+    def keys(self):
+        return self._dict.keys()
 
     def __len__(self):
         return len(self._dict)
