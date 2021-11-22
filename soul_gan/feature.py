@@ -275,9 +275,9 @@ class InceptionV3MeanFeature(Feature):
 
         feature_dims = [self.IDX_TO_DIM[idx] for idx in self.block_ids]
 
-        self.ref_feature = [
-            torch.zeros(dim, device=self.device) for dim in feature_dims
-        ]
+        # self.ref_feature = [
+        #     torch.zeros(dim, device=self.device) for dim in feature_dims
+        # ]
 
         self.ref_feature = [mean]
 
@@ -411,3 +411,69 @@ class SumFeature(Feature):
         for feature in self.features:
             feature.weight_up(out[k : k + feature.n_features], step)
             k += feature.n_features
+
+
+@FeatureRegistry.register()
+class EfficientNetFeature(Feature):
+    def __init__(
+        self, inverse_transform=None, callbacks=None, dp=False, **kwargs
+    ):
+        super().__init__(
+            n_features=1,
+            callbacks=callbacks,
+            inverse_transform=inverse_transform,
+        )
+        self.device = kwargs.get("device", 0)
+
+        self.data_stat_path = kwargs.get("data_stat_path")
+
+        mean = torch.from_numpy(np.load(Path(self.data_stat_path))["mu"]).to(
+            self.device
+        )
+
+        self.model = torchvision.models.efficientnet_b3(pretrained=True).to(
+            self.device
+        )
+        self.activation = None
+
+        def get_activation(name):
+            def hook(model, input, output):
+                self.activation = output.detach()
+
+            return hook
+
+        self.model.avgpool.register_forward_hook(get_activation("avgpool"))
+        if dp:
+            self.model = torch.nn.DataParallel(self.model)
+        self.model.eval()
+
+        self.ref_feature = [mean]
+
+        self.weight = [torch.zeros(mean.shape[0], device=self.device)]
+
+    def get_useful_info(
+        self, x: torch.FloatTensor, feature_out: List[torch.FloatTensor]
+    ) -> Dict:
+        return {
+            "feature": feature_out[0].mean().item()
+            + self.ref_feature[0].mean().item(),  # noqa: W503
+            f"weight_{self.__class__.__name__}": torch.norm(
+                self.weight[0]
+            ).item(),
+            "imgs": self.inverse_transform(x).detach().cpu().numpy(),
+        }
+
+    @Feature.invoke_callbacks
+    @Feature.average_feature
+    def __call__(self, x) -> List[torch.FloatTensor]:
+        x = self.inverse_transform(x)
+        self.model(x)
+        out = self.activation
+        self.activation = None
+
+        out = [out.squeeze(3).squeeze(2)]
+
+        for i in range(len(out)):
+            out[i] = (out[i] - self.ref_feature[i][None, :]).float()
+
+        return out

@@ -15,7 +15,7 @@ from soul_gan.utils.callbacks import Callback, CallbackRegistry
 def get_activation_statistics(
     dataset,
     model,
-    dims=2024,
+    dims=2048,
     batch_size=100,
     num_workers=4,
     device=0,
