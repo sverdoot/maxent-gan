@@ -56,6 +56,7 @@ class InceptionScoreCallback(Callback):
             imgs = torch.from_numpy(info["imgs"]).to(self.device)
             imgs = self.transform(imgs)
             pis = batch_inception(imgs, self.model, resize=True)
+            pis = pis.data
             score = (
                 (pis * (torch.log(pis) - torch.log(pis.mean(0)[None, :])))
                 .sum(1)
@@ -82,7 +83,7 @@ def batch_inception(
         if resize:
             x = up(x)
         x = inception_model(x)
-        return F.softmax(x, -1).data
+        return F.softmax(x, -1)
 
     preds = get_pred(imgs)
     return preds

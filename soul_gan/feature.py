@@ -152,6 +152,7 @@ class InceptionScoreFeature(Feature):
         inverse_transform=None,
         mean=(0.485, 0.456, 0.406),
         std=(0.229, 0.224, 0.225),
+        dp=False,
         **kwargs,
     ):
         super().__init__(
@@ -163,7 +164,10 @@ class InceptionScoreFeature(Feature):
         self.model = torchvision.models.inception.inception_v3(
             pretrained=True, transform_input=False
         ).to(self.device)
+        if dp:
+            self.model = torch.nn.DataParallel(self.model)
         self.model.eval()
+
         self.transform = transforms.Normalize(mean, std)
 
         self.ref_feature = kwargs.get("ref_score", [np.log(9.0)])
@@ -193,7 +197,7 @@ class InceptionScoreFeature(Feature):
         x = self.transform(x)
         pis = batch_inception(x, self.model, resize=True)
 
-        if not self.pis_mean:
+        if self.pis_mean is None:
             self.pis_mean = pis.mean(0).detach()
         else:
             self.pis_mean = (

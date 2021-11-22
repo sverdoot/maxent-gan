@@ -15,6 +15,7 @@ sample: &sample_params
       device: *device
       mean: [0.485, 0.456, 0.406]
       std: [0.229, 0.224, 0.225]
+      dp: true
 
   total_n: 100
   batch_size: 100
@@ -51,12 +52,12 @@ callbacks:
         invoke_every: 50
         device: *device
         update_input: true
-    inception_score:
-      name: InceptionScoreCallback
-      params:
-        invoke_every: 50
-        device: *device
-        update_input: true
+    # inception_score:
+    #   name: InceptionScoreCallback
+    #   params:
+    #     invoke_every: 50
+    #     device: *device
+    #     update_input: true
     fid:
       name: FIDCallback
       params:
@@ -64,6 +65,7 @@ callbacks:
         device: *device
         update_input: true
         data_stat_path: stats/fid_stats_cifar10.npz
+        dp: true
 
     wandb:
       name: WandbCallback

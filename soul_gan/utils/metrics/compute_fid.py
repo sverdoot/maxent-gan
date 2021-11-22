@@ -71,6 +71,7 @@ class FIDCallback(Callback):
         update_input=True,
         device: Union[str, int, torch.device] = "cuda",
         dims=2048,
+        dp=False,
     ):
         self.invoke_every = invoke_every
         self.update_input = update_input
@@ -80,6 +81,8 @@ class FIDCallback(Callback):
 
         block_idx = InceptionV3.BLOCK_INDEX_BY_DIM[dims]
         self.model = InceptionV3([block_idx]).to(device)
+        if dp:
+            self.model = torch.nn.DataParallel(self.model)
         self.model.eval()
 
         self.dims = dims
