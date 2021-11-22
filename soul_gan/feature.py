@@ -169,7 +169,7 @@ class InceptionScoreFeature(Feature):
         self.ref_feature = kwargs.get("ref_score", [np.log(9.0)])
         self.weight = [torch.zeros(1).to(self.device)]
 
-        self.pis_mean = torch.zeros(1000).to(self.device)
+        self.pis_mean = None  # torch.zeros(1000).to(self.device)
         self.exp_avg_coef = 0.1
 
     # @staticmethod
@@ -186,16 +186,19 @@ class InceptionScoreFeature(Feature):
             "imgs": self.inverse_transform(x).detach().cpu().numpy(),
         }
 
-    @Feature.invoke_callbacks
     @Feature.average_feature
+    @Feature.invoke_callbacks
     def __call__(self, x) -> List[torch.FloatTensor]:
         x = self.inverse_transform(x)
         x = self.transform(x)
         pis = batch_inception(x, self.model, resize=True)
 
-        self.pis_mean = (
-            1.0 - self.exp_avg_coef
-        ) * self.pis_mean + self.exp_avg_coef * pis.mean(0).detach()
+        if not self.pis_mean:
+            self.pis_mean = pis.mean(0).detach()
+        else:
+            self.pis_mean = (
+                1.0 - self.exp_avg_coef
+            ) * self.pis_mean + self.exp_avg_coef * pis.mean(0).detach()
         score = (
             (pis * (torch.log(pis) - torch.log(self.pis_mean[None, :])))
             .sum(1)
@@ -232,8 +235,8 @@ class DiscriminatorFeature(Feature):
             "imgs": self.inverse_transform(x).detach().cpu().numpy(),
         }
 
-    @Feature.invoke_callbacks
     @Feature.average_feature
+    @Feature.invoke_callbacks
     def __call__(self, x) -> List[torch.FloatTensor]:
         score = self.dis(x).reshape(-1, 1)
         score -= self.ref_feature[0]

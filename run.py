@@ -87,6 +87,8 @@ def main(config, gan_config, device):
         )
         ref_dist = GANTarget(gen, dis, proposal)
 
+        if config.seed is not None:
+            random_seed(config.seed)
         total_sample = []
         for i in range(0, config.sample.total_n, config.sample.batch_size):
             z = torch.randn(config.sample.batch_size, z_dim).to(device)
@@ -122,16 +124,13 @@ def main(config, gan_config, device):
 
 if __name__ == "__main__":
     args = parse_arguments()
-    if args.seed:
-        random_seed(args.seed)
 
     config = DotConfig(yaml.load(Path(args.config).open("r"), Loader))
+    if args.seed:
+        config.seed = args.seed
     config.file_name = Path(args.config).name  # stem
     gan_config = DotConfig(yaml.load(Path(args.gan_config).open("r"), Loader))
     gan_config.file_name = Path(args.gan_config).name  # stem
-
-    if config.seed is not None:
-        random_seed(config.seed)
 
     device = torch.device(
         config.device if torch.cuda.is_available() else "cpu"

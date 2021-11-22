@@ -49,7 +49,7 @@ class InceptionScoreCallback(Callback):
         self.update_input = update_input
         self.invoke_every = invoke_every
 
-    # @torch.no_grad()
+    @torch.no_grad()
     def invoke(self, info: Dict[str, Union[float, np.ndarray]]):
         score = None
         if self.cnt % self.invoke_every == 0:
