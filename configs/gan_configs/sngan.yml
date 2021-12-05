@@ -1,0 +1,19 @@
+train_transform:
+  Normalize:
+    mean: &mean [0.5, 0.5, 0.5]
+    std: &std [0.5, 0.5, 0.5]
+
+
+generator:
+  name: SNGANGenerator
+  params:
+      ngpu: 1
+      mean: *mean
+      std: *std
+  ckpt_path: "checkpoints/sngan/checkpoint_best.pth"
+
+discriminator:
+  name: SNGANDiscriminator
+  params:
+      ngpu: 1
+  ckpt_path: "checkpoints/sngan/checkpoint_best.pth"
