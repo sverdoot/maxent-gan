@@ -15,7 +15,7 @@ from soul_gan.utils.callbacks import CallbackRegistry
 from soul_gan.utils.general_utils import DotConfig, random_seed
 from soul_gan.models.sngan.sngan_cifar10 import Discriminator
 from soul_gan.models.sngan.sngan_cifar10 import Generator
-
+from soul_gan.models.utils import NormalizeInverse
 
 def parse_arguments():
     parser = argparse.ArgumentParser()
@@ -44,8 +44,8 @@ def load_sngan():
 
     gen_net = Generator(args).eval().cuda()
     dis_net=Discriminator(args).eval().cuda()
-
-
+    
+    gen_net.inverse_transform = NormalizeInverse((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
     print(f'=> resuming from {args.load_path}')
     assert os.path.exists(args.load_path)
     checkpoint_file = args.load_path
