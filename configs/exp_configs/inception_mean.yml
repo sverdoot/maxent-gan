@@ -1,0 +1,99 @@
+dir: &dir log/inception_mean_feature
+sub_dir: &sub_dir test 
+n_steps: &n_steps 1000
+every: &every 10
+seed: null
+device: &device cuda
+
+sample: &sample_params
+  save_dir: *dir
+  sub_dir: *sub_dir
+  
+  feature:
+    name: InceptionV3MeanFeature
+    params: 
+      device: *device
+      data_stat_path: stats/fid_stats_cifar10_test.npz
+      dp: true
+
+  total_n: 100
+  batch_size: 100
+  save_every: *every
+
+  params:
+    n_steps: *n_steps
+    save_every: *every
+    burn_in_steps: 10
+
+    n_sampling_steps: &n_sampling_steps 1 #10
+    weight_step: 0.1
+    step_size: 0.01
+    save_every: *n_sampling_steps
+
+compute_fid:
+  results_dir: *dir
+  sub_dir: *sub_dir
+
+compute_is: {}
+
+params: &params
+    sample_params: *sample_params
+    name: &name inception_mean
+    feature:
+      name: inception_mean
+
+wandb_init_params: &wandb_init_params
+  project: &wandb_project soul_gan
+  entity: &wandb_account sverdoot
+  name: *name
+  params: *params
+
+callbacks:
+  feature_callbacks:
+    discriminator:
+      name: DiscriminatorCallback
+      params:
+        dis: null
+        invoke_every: 50
+        device: *device
+        update_input: true
+    inception_score:
+      name: InceptionScoreCallback
+      params:
+        invoke_every: 50
+        device: *device
+        update_input: true
+        dp: true
+    fid:
+      name: FIDCallback
+      params:
+        invoke_every: 50
+        device: *device
+        update_input: true
+        data_stat_path: stats/fid_stats_cifar10.npz
+
+    wandb:
+      name: WandbCallback
+      params:
+        init_params:
+          <<: *wandb_init_params
+          reinit: True
+        invoke_every: 50
+        keys:
+          - "inception score"
+          - weight_InceptionV3MeanFeature
+          - fid
+          - D(G(z))
+    wandb_imgs:
+      name: WandbCallback
+      params:
+        init_params:
+          <<: *wandb_init_params
+          reinit: False
+        invoke_every: 50
+        keys:
+          - imgs
+
+logging:
+  wandb: null
+

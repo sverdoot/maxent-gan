@@ -5,17 +5,17 @@ train_transform:
 
 
 generator:
-  name: DCGANGenerator
+  name: SN_ResNet_Generator32
   params:
       ngpu: 1
       mean: *mean
       std: *std
-  ckpt_path: "checkpoints/dcgan/netG_epoch_199.pth"
+  ckpt_path: "checkpoints/sngan/ResNet_G_CIFAR_SNGAN_Hinge_150001.pth"
 
 discriminator:
-  name: DCGANDiscriminator
+  name: SN_DCGAN_Discriminator
   params:
       ngpu: 1
       mean: *mean
       std: *std
-  ckpt_path: "checkpoints/dcgan/netD_epoch_199.pth"
+  ckpt_path: "checkpoints/sngan/DCGAN_D_CIFAR_SNGAN_NonSaturating_150001.npz"

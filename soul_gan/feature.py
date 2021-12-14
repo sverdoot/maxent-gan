@@ -11,9 +11,6 @@ from torchvision import transforms
 
 from soul_gan.utils.metrics import batch_inception
 
-# from main.nnclass import CNN
-# from main.util.save_util import save_image_general, save_weight_vgg_feature
-
 
 class AvgHolder(object):
     cnt: int = 0
@@ -64,6 +61,11 @@ class Feature(ABC):
         else:
             self.inverse_transform = inverse_transform
 
+        self.init_weight()
+
+    def init_weight(self):
+        self.weight = [0]
+
     def log_prob(self, out: List[torch.FloatTensor]) -> torch.FloatTensor:
         lik_f = 0
         for feature_id in range(len(out)):
@@ -80,6 +82,13 @@ class Feature(ABC):
                 grad = out[i]
             self.weight[i] += step * grad
             self.project_weight()
+
+    def reset(self):
+        for callback in self.callbacks:
+            callback.reset()
+        self.avg_weight.reset()
+        self.avg_feature.reset()
+        self.init_weight()
 
     @staticmethod
     def average_feature(feature_method: Callable) -> Callable:
@@ -155,12 +164,12 @@ class InceptionScoreFeature(Feature):
         dp=False,
         **kwargs,
     ):
+        self.device = kwargs.get("device", 0)
         super().__init__(
             n_features=1,
             callbacks=callbacks,
             inverse_transform=inverse_transform,
         )
-        self.device = kwargs.get("device", 0)
         self.model = torchvision.models.inception.inception_v3(
             pretrained=True, transform_input=False
         ).to(self.device)
@@ -171,10 +180,12 @@ class InceptionScoreFeature(Feature):
         self.transform = transforms.Normalize(mean, std)
 
         self.ref_feature = kwargs.get("ref_score", [np.log(9.0)])
-        self.weight = [torch.zeros(1).to(self.device)]
 
         self.pis_mean = None  # torch.zeros(1000).to(self.device)
         self.exp_avg_coef = 0.1
+
+    def init_weight(self):
+        self.weight = [torch.zeros(1).to(self.device)]
 
     # @staticmethod
     def get_useful_info(
@@ -215,15 +226,16 @@ class InceptionScoreFeature(Feature):
 @FeatureRegistry.register()
 class DiscriminatorFeature(Feature):
     def __init__(self, dis, inverse_transform=None, callbacks=None, **kwargs):
+        self.device = kwargs.get("device", 0)
         super().__init__(
             n_features=1,
             inverse_transform=inverse_transform,
             callbacks=callbacks,
         )
-        self.device = kwargs.get("device", 0)
         self.dis = dis
         self.ref_feature = kwargs.get("ref_score", [np.log(0.5 / (1 - 0.5))])
 
+    def init_weight(self):
         self.weight = [torch.zeros(1).to(self.device)]
 
     def get_useful_info(
@@ -255,12 +267,13 @@ class InceptionV3MeanFeature(Feature):
     def __init__(
         self, inverse_transform=None, callbacks=None, dp=False, **kwargs
     ):
+        self.feature_dims = [self.IDX_TO_DIM[idx] for idx in self.block_ids]
+        self.device = kwargs.get("device", 0)
         super().__init__(
             n_features=1,
             inverse_transform=inverse_transform,
             callbacks=callbacks,
         )
-        self.device = kwargs.get("device", 0)
         self.block_ids = kwargs.get("block_ids", [3])
         self.data_stat_path = kwargs.get("data_stat_path")
 
@@ -273,16 +286,15 @@ class InceptionV3MeanFeature(Feature):
             self.model = torch.nn.DataParallel(self.model)
         self.model.eval()
 
-        feature_dims = [self.IDX_TO_DIM[idx] for idx in self.block_ids]
-
         # self.ref_feature = [
         #     torch.zeros(dim, device=self.device) for dim in feature_dims
         # ]
 
         self.ref_feature = [mean]
 
+    def init_weight(self):
         self.weight = [
-            torch.zeros(dim, device=self.device) for dim in feature_dims
+            torch.zeros(dim, device=self.device) for dim in self.feature_dims
         ]
 
     def get_useful_info(
@@ -333,6 +345,8 @@ class DumbFeature(Feature):
         self.avg_feature = AvgHolder([] * n_features)
 
         self.ref_feature = []
+
+    def init_weight(self):
         self.weight = []
 
     def get_useful_info(
@@ -384,6 +398,10 @@ class SumFeature(Feature):
             weight.extend(feature.weight)
         return weight
 
+    def init_weight(self):
+        for feature in self.features:
+            feature.init_weight()
+
     @Feature.invoke_callbacks
     @Feature.average_feature
     def __call__(self, x: torch.FloatTensor):
@@ -418,19 +436,17 @@ class EfficientNetFeature(Feature):
     def __init__(
         self, inverse_transform=None, callbacks=None, dp=False, **kwargs
     ):
+        self.data_stat_path = kwargs.get("data_stat_path")
+        mean = torch.from_numpy(np.load(Path(self.data_stat_path))["mu"]).to(
+            self.device
+        )
+        self.feature_dim = mean.shape[0]
+        self.device = kwargs.get("device", 0)
         super().__init__(
             n_features=1,
             callbacks=callbacks,
             inverse_transform=inverse_transform,
         )
-        self.device = kwargs.get("device", 0)
-
-        self.data_stat_path = kwargs.get("data_stat_path")
-
-        mean = torch.from_numpy(np.load(Path(self.data_stat_path))["mu"]).to(
-            self.device
-        )
-
         self.model = torchvision.models.efficientnet_b3(pretrained=True).to(
             self.device
         )
@@ -438,18 +454,20 @@ class EfficientNetFeature(Feature):
 
         def get_activation(name):
             def hook(model, input, output):
-                self.activation = output.detach()
+                self.activation = output
 
             return hook
 
         self.model.avgpool.register_forward_hook(get_activation("avgpool"))
-        if dp:
-            self.model = torch.nn.DataParallel(self.model)
+        # if dp:
+        #     self.model = torch.nn.DataParallel(self.model)
         self.model.eval()
+        self.transform = transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
 
         self.ref_feature = [mean]
 
-        self.weight = [torch.zeros(mean.shape[0], device=self.device)]
+    def init_weight(self):
+        self.weight = [torch.zeros(self.feature_dim, device=self.device)]
 
     def get_useful_info(
         self, x: torch.FloatTensor, feature_out: List[torch.FloatTensor]
@@ -467,8 +485,84 @@ class EfficientNetFeature(Feature):
     @Feature.average_feature
     def __call__(self, x) -> List[torch.FloatTensor]:
         x = self.inverse_transform(x)
+        x = self.transform(x)
         self.model(x)
-        out = self.activation
+        out = self.activation.to(self.device)
+        self.activation = None
+
+        out = [out.squeeze(3).squeeze(2)]
+
+        for i in range(len(out)):
+            out[i] = (out[i] - self.ref_feature[i][None, :]).float()
+
+        return out
+
+
+@FeatureRegistry.register()
+class ResnetFeature(Feature):
+    def __init__(
+        self, inverse_transform=None, callbacks=None, dp=False, **kwargs
+    ):
+        self.device = kwargs.get("device", 0)
+        self.data_stat_path = kwargs.get("data_stat_path")
+        self.resnet_version = kwargs.get("resnet_version", 34)
+        mean = torch.from_numpy(np.load(Path(self.data_stat_path))["mu"]).to(
+            self.device
+        )
+        self.feature_dim = mean.shape[0]
+        super().__init__(
+            n_features=1,
+            callbacks=callbacks,
+            inverse_transform=inverse_transform,
+        )
+        if self.resnet_version == 34:
+            model = torchvision.models.resnet34
+        elif self.resnet_version == 50:
+            model = torchvision.models.resnet50
+        elif self.resnet_version == 101:
+            model = torchvision.models.resnet101
+        else:
+            raise ValueError(f"Version {self.resnet_version} is not available")
+
+        self.model = model(pretrained=True).to(self.device)
+        self.activation = None
+
+        def get_activation(name):
+            def hook(model, input, output):
+                self.activation = output
+
+            return hook
+
+        self.model.avgpool.register_forward_hook(get_activation("avgpool"))
+        # if dp:
+        #     self.model = torch.nn.DataParallel(self.model)
+        self.model.eval()
+        self.transform = transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+
+        self.ref_feature = [mean]
+
+    def init_weight(self):
+        self.weight = [torch.zeros(self.feature_dim, device=self.device)]
+
+    def get_useful_info(
+        self, x: torch.FloatTensor, feature_out: List[torch.FloatTensor]
+    ) -> Dict:
+        return {
+            "feature": feature_out[0].mean().item()
+            + self.ref_feature[0].mean().item(),  # noqa: W503
+            f"weight_{self.__class__.__name__}": torch.norm(
+                self.weight[0]
+            ).item(),
+            "imgs": self.inverse_transform(x).detach().cpu().numpy(),
+        }
+
+    @Feature.invoke_callbacks
+    @Feature.average_feature
+    def __call__(self, x) -> List[torch.FloatTensor]:
+        x = self.inverse_transform(x)
+        x = self.transform(x)
+        self.model(x)
+        out = self.activation.to(self.device)
         self.activation = None
 
         out = [out.squeeze(3).squeeze(2)]

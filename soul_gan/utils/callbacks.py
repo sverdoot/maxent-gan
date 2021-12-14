@@ -15,6 +15,9 @@ class Callback(ABC):
     def invoke(self):
         pass
 
+    def reset(self):
+        self.cnt = 0
+
 
 class CallbackRegistry:
     registry = {}
@@ -46,11 +49,11 @@ class WandbCallback(Callback):
         init_params: Optional[Dict] = None,
         keys: Optional[List[str]] = None,
     ):
-        init_params = init_params if init_params else {}
+        self.init_params = init_params if init_params else {}
         import wandb
 
         self.wandb = wandb
-        wandb.init(**init_params)
+        wandb.init(**self.init_params)
 
         self.invoke_every = invoke_every
         self.keys = keys
@@ -84,6 +87,10 @@ class WandbCallback(Callback):
             wandb.log(log)
         self.cnt += 1
 
+    def reset(self):
+        super().reset()
+        self.wandb.init(**self.init_params)
+
 
 @CallbackRegistry.register()
 class SaveImagesCallback(Callback):
@@ -102,10 +109,6 @@ class SaveImagesCallback(Callback):
             np.save(savepath, imgs)
 
         self.cnt += 1
-
-
-# class SaveImagesCallback(Callback):
-#     pass
 
 
 @CallbackRegistry.register()

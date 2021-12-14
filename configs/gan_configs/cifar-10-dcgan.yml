@@ -10,7 +10,7 @@ generator:
       ngpu: 1
       mean: *mean
       std: *std
-  ckpt_path: "checkpoints/dcgan/netG_epoch_199.pth"
+  ckpt_path: "checkpoints/dcgan/DCGAN_G_CIFAR_199.pth"
 
 discriminator:
   name: DCGANDiscriminator
@@ -18,4 +18,4 @@ discriminator:
       ngpu: 1
       mean: *mean
       std: *std
-  ckpt_path: "checkpoints/dcgan/netD_epoch_199.pth"
+  ckpt_path: "checkpoints/dcgan/DCGAN_D_CIFAR_199.pth.pth"

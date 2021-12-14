@@ -44,13 +44,12 @@ def soul(
     step_size: float = 0.01,
     save_every: int = 10,
 ) -> List[torch.FloatTensor]:
-    zs = []
+    zs = [z.data.cpu()]
 
     # saving parameter initialization
     # n_stride_im = params['stride_save_image']
     # n_stride_curve = params['stride_save_curve']
     # n_stride = min(n_stride_im, n_stride_curve)
-    # ne = 0  # number of epochs
 
     def target(z):
         f = feature(gen(z))
