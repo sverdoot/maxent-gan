@@ -1,4 +1,4 @@
-from typing import List, Union
+from typing import Callable, List, Optional, Union
 
 import torch
 from torch import nn
@@ -15,6 +15,7 @@ def ula(
     proposal: Union[Distribution, torchDist],
     step_size: float,
     n_steps: int = 1,
+    project: Optional[Callable] = None,
 ) -> List[torch.FloatTensor]:
     zs = []
     device = z.device
@@ -22,8 +23,9 @@ def ula(
     for it in range(n_steps):
         _, grad = grad_log_prob(z, target)
         noise = torch.randn(z.shape, dtype=torch.float).to(device)
-        noise_scale = (2 * step_size) ** 0.5
+        noise_scale = (2.0 * step_size) ** 0.5
         z = z + step_size * grad + noise_scale * noise
+        z = project(z)
         z = z.data
         z.requires_grad_(True)
         zs.append(z.data)
@@ -82,7 +84,14 @@ def soul(
             #    feature.save_weight(params, f_avg, w, w_avg, it, ne, fd)
         feature.avg_feature.reset()
 
-        inter_zs = ula(z, target, None, step_size, n_steps=n_sampling_steps)
+        inter_zs = ula(
+            z,
+            target,
+            None,
+            step_size,
+            n_steps=n_sampling_steps,
+            project=ref_dist.project,
+        )
         z = inter_zs[-1]
 
         if it > burn_in_steps and it % save_every == 0:

@@ -20,11 +20,11 @@ class GANTarget(Distribution):
         self,
         gen: nn.Module,
         dis: nn.Module,
-        proposal: Union[Distribution, torchDist],
+        # proposal: Union[Distribution, torchDist],
     ):
         self.gen = gen
         self.dis = dis
-        self.proposal = proposal
+        self.proposal = gen.prior
 
     @staticmethod
     def latent_target(
@@ -42,6 +42,9 @@ class GANTarget(Distribution):
     def __call__(self, z: torch.FloatTensor) -> torch.FloatTensor:
         logp = self.latent_target(z, self.gen, self.dis, self.proposal)[0]
         return logp
+
+    def project(self, z):
+        return self.proposal.project(z)
 
 
 def grad_log_prob(

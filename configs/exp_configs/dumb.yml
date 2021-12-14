@@ -1,5 +1,5 @@
 dir: &dir log/dumb_feature
-sub_dir: &sub_dir test3
+sub_dir: &sub_dir test
 n_steps: &n_steps 1000
 every: &every 10
 seed: null
@@ -27,7 +27,7 @@ sample: &sample_params
 
     n_sampling_steps: &n_sampling_steps 1
     weight_step: 0.0
-    step_size: 0.01
+    step_size: 0.001
 
 
 compute_fid:

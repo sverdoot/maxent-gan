@@ -189,6 +189,7 @@ class SN_ResNet_Generator32(nn.Module):
         std=(0.5, 0.5, 0.5),
     ):
         super().__init__()
+        self.z_dim = nz
         self.nz = nz
         self.bottom_width = bottom_width
         self.activation = activation

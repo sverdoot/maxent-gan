@@ -1,21 +1,21 @@
 import argparse
 import datetime
+import os
 from pathlib import Path
 
 import numpy as np
 import torch
 import yaml
 from yaml import Dumper, Loader
-import os
+
 from soul_gan.distribution import GANTarget
 from soul_gan.feature import FeatureRegistry
-from soul_gan.models.utils import load_gan
+from soul_gan.models.sngan.sngan_cifar10 import Discriminator, Generator
+from soul_gan.models.utils import NormalizeInverse, load_gan
 from soul_gan.sample import soul
 from soul_gan.utils.callbacks import CallbackRegistry
 from soul_gan.utils.general_utils import DotConfig, random_seed
-from soul_gan.models.sngan.sngan_cifar10 import Discriminator
-from soul_gan.models.sngan.sngan_cifar10 import Generator
-from soul_gan.models.utils import NormalizeInverse
+
 
 def parse_arguments():
     parser = argparse.ArgumentParser()
@@ -28,32 +28,43 @@ def parse_arguments():
 
 
 def load_sngan():
-    class Args():
-        def __init__(self, img_size=32, df_dim=128, latent_dim = 128, gf_dim=256, g_spectral_norm = False, 
-      d_spectral_norm=False ,load_path= 'checkpoints/sngan/checkpoint_best.pth',
-      bottom_width=4):
-            self.img_size=img_size
-            self.latent_dim=latent_dim
+    class Args:
+        def __init__(
+            self,
+            img_size=32,
+            df_dim=128,
+            latent_dim=128,
+            gf_dim=256,
+            g_spectral_norm=False,
+            d_spectral_norm=False,
+            load_path="checkpoints/sngan/checkpoint_best.pth",
+            bottom_width=4,
+        ):
+            self.img_size = img_size
+            self.latent_dim = latent_dim
             self.gf_dim = gf_dim
             self.g_spectral_norm = False
-            self.bottom_width = bottom_width 
-            self.df_dim=df_dim
+            self.bottom_width = bottom_width
+            self.df_dim = df_dim
             self.d_spectral_norm = d_spectral_norm
-            self.load_path=load_path
-    args=Args()
+            self.load_path = load_path
+
+    args = Args()
 
     gen_net = Generator(args).eval().cuda()
-    dis_net=Discriminator(args).eval().cuda()
-    
-    gen_net.inverse_transform = NormalizeInverse((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
-    print(f'=> resuming from {args.load_path}')
+    dis_net = Discriminator(args).eval().cuda()
+
+    gen_net.inverse_transform = NormalizeInverse(
+        (0.5, 0.5, 0.5), (0.5, 0.5, 0.5)
+    )
+    print(f"=> resuming from {args.load_path}")
     assert os.path.exists(args.load_path)
     checkpoint_file = args.load_path
     assert os.path.exists(checkpoint_file)
     checkpoint = torch.load(checkpoint_file)
-    
-    gen_net.load_state_dict(checkpoint['gen_state_dict'])
-    dis_net.load_state_dict(checkpoint['dis_state_dict'],strict=False)
+
+    gen_net.load_state_dict(checkpoint["gen_state_dict"])
+    dis_net.load_state_dict(checkpoint["dis_state_dict"], strict=False)
     return gen_net, dis_net
 
 

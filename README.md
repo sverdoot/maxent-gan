@@ -62,11 +62,8 @@ pre-commit run -a
 
 ## TODO:
 
-* add FID computation
 * rewrite loop in run
-* write callbacks (IS, saving latents, ...)
 * add more features and test
-* add reset method to Feature and Callbacks
 * add parallelism...
 
 

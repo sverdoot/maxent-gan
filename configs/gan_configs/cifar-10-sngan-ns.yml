@@ -3,6 +3,7 @@ train_transform:
     mean: &mean [0.5, 0.5, 0.5]
     std: &std [0.5, 0.5, 0.5]
 
+prior: uniform
 
 generator:
   name: SN_DCGAN_Generator
@@ -16,4 +17,5 @@ discriminator:
   params:
       mean: *mean
       std: *std
-  ckpt_path: "checkpoints/sngan/DCGAN_D_CIFAR_SNGAN_NonSaturating_150001.npz"
+  thermalize: true
+  ckpt_path: "checkpoints/sngan/DCGAN_D_CIFAR_SNGAN_NonSaturating_150001.pth"
