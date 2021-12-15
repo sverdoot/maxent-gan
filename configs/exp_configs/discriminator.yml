@@ -5,7 +5,8 @@ every: &every 10
 seed: null
 device: &device 'cuda'
 
-sample: &sample_params
+sample_params: &sample_params
+  sample: true
   save_dir: *dir
   sub_dir: *sub_dir
   
@@ -15,7 +16,7 @@ sample: &sample_params
       device: *device
       dis: null
 
-  total_n: 100
+  total_n: 500
   batch_size: 100
   save_every: *every
 

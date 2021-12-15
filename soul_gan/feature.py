@@ -267,6 +267,7 @@ class InceptionV3MeanFeature(Feature):
     def __init__(
         self, inverse_transform=None, callbacks=None, dp=False, **kwargs
     ):
+        self.block_ids = kwargs.get("block_ids", [3])
         self.feature_dims = [self.IDX_TO_DIM[idx] for idx in self.block_ids]
         self.device = kwargs.get("device", 0)
         super().__init__(
@@ -274,7 +275,6 @@ class InceptionV3MeanFeature(Feature):
             inverse_transform=inverse_transform,
             callbacks=callbacks,
         )
-        self.block_ids = kwargs.get("block_ids", [3])
         self.data_stat_path = kwargs.get("data_stat_path")
 
         mean = torch.from_numpy(np.load(Path(self.data_stat_path))["mu"]).to(

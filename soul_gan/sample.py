@@ -46,7 +46,7 @@ def soul(
     step_size: float = 0.01,
     save_every: int = 10,
 ) -> List[torch.FloatTensor]:
-    zs = [z.data.cpu()]
+    zs = [gen.inverse_transform(gen(z)).detach().cpu()]
 
     # saving parameter initialization
     # n_stride_im = params['stride_save_image']
@@ -65,13 +65,13 @@ def soul(
     # saving folder initialization
     # fd = save_init(params, feature)
 
-    for it in trange(n_steps):
+    for it in trange(1, n_steps + 2):
         # cond = params['save'] == 'all' and (np.mod(it, n_stride) == 0)
         z.requires_grad_()
 
         with torch.no_grad():
-            condition_avg = it > burn_in_steps or it == 0
-            condition_upd = it > burn_in_steps or it == 0
+            condition_avg = it > burn_in_steps or it == 1
+            condition_upd = it > burn_in_steps or it == 1
             if condition_upd:
                 feature.weight_up(feature.avg_feature.data, weight_step)
 
@@ -94,7 +94,7 @@ def soul(
         )
         z = inter_zs[-1]
 
-        if it > burn_in_steps and it % save_every == 0:
-            zs.append(z.data.cpu())
+        if it % save_every == 0:
+            zs.append(gen.inverse_transform(gen(z)).detach().cpu())
 
     return zs

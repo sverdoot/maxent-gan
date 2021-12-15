@@ -1,12 +1,13 @@
 dir: &dir log/dumb_feature
 sub_dir: &sub_dir test
-n_steps: &n_steps 1000
+n_steps: &n_steps 300
 every: &every 10
 seed: null
 device: &device 'cuda'
 
 
-sample: &sample_params
+sample_params: &sample_params
+  sample: true
   save_dir: *dir
   sub_dir: *sub_dir
   
@@ -16,8 +17,8 @@ sample: &sample_params
       device: *device
       dis: null
 
-  total_n: 100 #5000
-  batch_size: 100 #250
+  total_n: 5000
+  batch_size: 500
   save_every: *every
 
   params:
@@ -29,13 +30,12 @@ sample: &sample_params
     weight_step: 0.0
     step_size: 0.001
 
-
 compute_fid:
   results_dir: *dir
   sub_dir: *sub_dir
+  init_wandb: true
 
 compute_is: {}
-
 
 params: &params
     sample_params: *sample_params
@@ -51,48 +51,48 @@ wandb_init_params: &wandb_init_params
 
 
 callbacks:
-  feature_callbacks:
-    discriminator:
-      name: DiscriminatorCallback
-      params:
-        dis: null
-        invoke_every: 50
-        device: *device
-        update_input: true
-    inception_score:
-      name: InceptionScoreCallback
-      params:
-        invoke_every: 50
-        device: *device
-        update_input: true
-    fid:
-      name: FIDCallback
-      params:
-        invoke_every: 50
-        device: *device
-        update_input: true
-        data_stat_path: stats/fid_stats_cifar10.npz
+  feature_callbacks: {}
+    # discriminator:
+    #   name: DiscriminatorCallback
+    #   params:
+    #     dis: null
+    #     invoke_every: 50
+    #     device: *device
+    #     update_input: true
+    # inception_score:
+    #   name: InceptionScoreCallback
+    #   params:
+    #     invoke_every: 50
+    #     device: *device
+    #     update_input: true
+    # fid:
+    #   name: FIDCallback
+    #   params:
+    #     invoke_every: 50
+    #     device: *device
+    #     update_input: true
+    #     data_stat_path: stats/fid_stats_cifar10.npz
 
-    wandb:
-      name: WandbCallback
-      params:
-        init_params:
-          <<: *wandb_init_params
-          reinit: True
-        invoke_every: 50
-        keys:
-          - "inception score"
-          - fid
-          - D(G(z))
-    wandb_imgs:
-      name: WandbCallback
-      params:
-        init_params:
-          <<: *wandb_init_params
-          reinit: False
-        invoke_every: 50
-        keys:
-          - imgs
+    # wandb:
+    #   name: WandbCallback
+    #   params:
+    #     init_params:
+    #       <<: *wandb_init_params
+    #       reinit: True
+    #     invoke_every: 50
+    #     keys:
+    #       - "inception score"
+    #       - fid
+    #       - D(G(z))
+    # wandb_imgs:
+    #   name: WandbCallback
+    #   params:
+    #     init_params:
+    #       <<: *wandb_init_params
+    #       reinit: False
+    #     invoke_every: 50
+    #     keys:
+    #       - imgs
 
 logging:
   wandb: null

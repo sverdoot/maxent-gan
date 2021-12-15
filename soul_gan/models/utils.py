@@ -9,10 +9,16 @@ from soul_gan.models import ModelRegistry
 from soul_gan.utils.general_utils import ROOT_DIR, DotConfig
 
 
-def stabilize_sn(dis, im_size=32, iters=5000, device=0):
+def stabilize_dis(dis, im_size=32, iters=5000, device=0):
     for _ in trange(iters):
         x = torch.rand(10, 3, im_size, im_size, device=device)
         _ = dis(x)
+
+
+def stabilize_gen(gen, iters=500):
+    for _ in trange(iters):
+        x = gen.prior.sample((100,))
+        _ = gen(x)
 
 
 def load_gan(
@@ -56,8 +62,9 @@ def load_gan(
         raise KeyError
     gen.prior = prior
 
-    if config.discriminator.thermalize:
-        stabilize_sn(dis, device=device)
+    # if True: #config.discriminator.thermalize:
+    stabilize_dis(dis, device=device)
+    stabilize_gen(gen)
 
     # gen.eval()
     # dis.eval()
@@ -73,7 +80,7 @@ class NormalizeInverse(transforms.Normalize):
     def __init__(self, mean, std):
         mean = torch.as_tensor(mean)
         std = torch.as_tensor(std)
-        std_inv = 1 / (std + 1e-9)
+        std_inv = 1 / (std + 1e-10)
         mean_inv = -mean * std_inv
         super().__init__(mean=mean_inv, std=std_inv)
 

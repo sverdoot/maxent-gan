@@ -35,7 +35,7 @@ class GANTarget(Distribution):
     ) -> Tuple[torch.FloatTensor, torch.FloatTensor, torch.FloatTensor]:
         dgz = dis(gen(z))
         logp_z = proposal.log_prob(z)
-        log_prob = logp_z + dgz
+        log_prob = (logp_z + dgz) / 1.0
 
         return log_prob, logp_z, dgz
 

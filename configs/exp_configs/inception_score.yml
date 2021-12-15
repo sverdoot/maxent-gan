@@ -6,7 +6,8 @@ seed: null
 device: &device cuda
 
 
-sample: &sample_params
+sample_params: &sample_params
+  sample: true
   save_dir: *dir
   sub_dir: *sub_dir
   
@@ -18,7 +19,7 @@ sample: &sample_params
       std: [0.229, 0.224, 0.225]
       dp: true
 
-  total_n: 100
+  total_n: 500
   batch_size: 100
   save_every: *every
 
@@ -29,7 +30,7 @@ sample: &sample_params
 
     n_sampling_steps: &n_sampling_steps 1 #10
     weight_step: 0.1
-    step_size: 0.01
+    step_size: 0.001
     save_every: *n_sampling_steps
 
 compute_fid:
@@ -48,7 +49,7 @@ wandb_init_params: &wandb_init_params
   project: &wandb_project soul_gan
   entity: &wandb_account sverdoot
   name: *name
-  params: *params
+  config: *params
 
 callbacks:
   feature_callbacks:

@@ -11,7 +11,7 @@ from yaml import Dumper, Loader
 from soul_gan.distribution import GANTarget
 from soul_gan.feature import FeatureRegistry
 from soul_gan.models.sngan.sngan_cifar10 import Discriminator, Generator
-from soul_gan.models.utils import NormalizeInverse, load_gan
+from soul_gan.models.utils import NormalizeInverse
 from soul_gan.sample import soul
 from soul_gan.utils.callbacks import CallbackRegistry
 from soul_gan.utils.general_utils import DotConfig, random_seed
