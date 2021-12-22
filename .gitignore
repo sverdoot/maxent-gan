@@ -8,6 +8,9 @@ data/*
 thirdparty/*
 !thirdparty/.gitkeep
 
+stats/*
+!stats/.gitkeep
+
 # notebooks/**
 # !notebooks/.gitkeep
 
