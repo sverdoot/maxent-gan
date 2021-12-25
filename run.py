@@ -6,7 +6,6 @@ import numpy as np
 import torch
 import torchvision
 import yaml
-
 # from pytorch_fid.fid_score import calculate_frechet_distance
 # from pytorch_fid.inception import InceptionV3
 from yaml import Dumper, Loader
@@ -20,19 +19,15 @@ from soul_gan.sample import soul
 from soul_gan.utils.callbacks import CallbackRegistry
 from soul_gan.utils.general_utils import DotConfig  # isort:block
 from soul_gan.utils.general_utils import IgnoreLabelDataset, random_seed
-
 # from soul_gan.utils.metrics.compute_fid_tf import calculate_fid_given_paths
-from soul_gan.utils.metrics.inception_score import (
-    MEAN_TRASFORM,
-    STD_TRANSFORM,
-    get_inception_score,
-)
+from soul_gan.utils.metrics.inception_score import (MEAN_TRASFORM,
+                                                    STD_TRANSFORM,
+                                                    get_inception_score)
 
 
 def parse_arguments():
     parser = argparse.ArgumentParser()
-    parser.add_argument("config", type=str)
-    parser.add_argument("gan_config", type=str)
+    parser.add_argument("configs", type=str, nargs="+")
     parser.add_argument("--group", type=str)
     parser.add_argument("--seed", type=int)
 
@@ -40,10 +35,8 @@ def parse_arguments():
     return args
 
 
-def main(
-    config: DotConfig, gan_config: DotConfig, device: torch.device, group: str
-):
-    gen, dis = load_gan(gan_config, device)
+def main(config: DotConfig, device: torch.device, group: str):
+    gen, dis = load_gan(config.gan_config, device)
 
     # sample
     if config.sample_params.sample:
@@ -63,8 +56,8 @@ def main(
             config.dict, Path(save_dir, config.file_name).open("w"), Dumper
         )
         yaml.dump(
-            gan_config.dict,
-            Path(save_dir, gan_config.file_name).open("w"),
+            dict(gan_config=config.gan_config.dict),
+            Path(save_dir, "gan_config.yml").open("w"),
             Dumper,
         )
 
@@ -214,7 +207,7 @@ def main(
             )
 
             inception_score = get_inception_score(
-                dataset, model, resize=True, device=device, batch_size=50
+                dataset, model, resize=True, device=device, batch_size=100
             )[0]
 
             print(f"Iter: {step}\t IS: {inception_score}")
@@ -232,9 +225,8 @@ def main(
             )
 
     if config.afterall_params.compute_fid:
-        from soul_gan.utils.metrics.compute_fid_tf import (
-            calculate_fid_given_paths,
-        )
+        from soul_gan.utils.metrics.compute_fid_tf import \
+            calculate_fid_given_paths
 
         # model = InceptionV3().to(device)
         # model.eval()
@@ -321,21 +313,23 @@ def main(
 
 if __name__ == "__main__":
     args = parse_arguments()
+    import subprocess
 
-    config = DotConfig(yaml.load(Path(args.config).open("r"), Loader))
+    proc = subprocess.Popen(["cat", *args.configs], stdout=subprocess.PIPE)
+    config = yaml.safe_load(proc.stdout.read())
+
+    config = DotConfig(
+        config
+    )  # yaml.load(Path(args.config).open("r"), Loader))
     if args.seed:
         config.seed = args.seed
-    config.file_name = Path(args.config).name  # stem
-    gan_config = DotConfig(yaml.load(Path(args.gan_config).open("r"), Loader))
-    gan_config.file_name = Path(args.gan_config).name  # stem
+    config.file_name = Path(args.configs[0]).name  # stem
+    # gan_config = DotConfig(yaml.load(Path(args.gan_config).open("r"), Loader))
+    # gan_config.file_name = Path(args.gan_config).name  # stem
 
     device = torch.device(
         config.device if torch.cuda.is_available() else "cpu"
     )
 
-    group = (
-        args.group
-        if args.group
-        else f"{Path(args.gan_config).stem}_{Path(args.config).stem}"
-    )
-    main(config, gan_config, device, group)
+    group = args.group if args.group else f"{Path(args.configs[0]).stem}"
+    main(config, device, group)

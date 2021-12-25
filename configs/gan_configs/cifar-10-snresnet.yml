@@ -19,3 +19,4 @@ discriminator:
       std: *std
   thermalize: true
   ckpt_path: "checkpoints/sngan/DCGAN_D_CIFAR_SNGAN_NonSaturating_150001.pth"
+

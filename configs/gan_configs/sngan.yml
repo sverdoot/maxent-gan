@@ -17,3 +17,4 @@ discriminator:
   params:
       ngpu: 1
   ckpt_path: "checkpoints/sngan/checkpoint_best.pth"
+

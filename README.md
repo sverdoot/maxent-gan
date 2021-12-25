@@ -29,30 +29,6 @@ pip install poetry
 poetry config virtualenvs.create false --local
 ```
 
-```zsh
-poetry install
-```
-
-<!-- To compute FID in TF fashion:
-
-```zsh
-wget  "https://raw.githubusercontent.com/bioinf-jku/TTUR/master/fid.py"  -P thirdparty/TTUR
-``` -->
-
-
-Put CIFAR-10 into directory ```data/cifar10```  using this script
-
-```python
-import torchvision.datasets as dset
-
-cifar = dset.CIFAR10(root='data/cifar10', download=True)
-```
-
-Make bash scripts runable 
-
-```zsh
-chmod +x run_scripts/*.sh
-```
 
 ### StudioGAN:
 
@@ -89,6 +65,32 @@ from pathlib import Path
 from soul_gan.utils.general_utils import ROOT_DIR
 
 sys.path.append(Path(ROOT_DIR, 'thirdparty/studiogan/studiogan'))
+```
+------------
+
+```zsh
+poetry install
+```
+
+<!-- To compute FID in TF fashion:
+
+```zsh
+wget  "https://raw.githubusercontent.com/bioinf-jku/TTUR/master/fid.py"  -P thirdparty/TTUR
+``` -->
+
+
+Put CIFAR-10 into directory ```data/cifar10```  using this script
+
+```python
+import torchvision.datasets as dset
+
+cifar = dset.CIFAR10(root='data/cifar10', download=True)
+```
+
+Make bash scripts runable 
+
+```zsh
+chmod +x run_scripts/*.sh
 ```
 
 ## Usage 
