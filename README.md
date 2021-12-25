@@ -11,6 +11,7 @@
 
 ## Getting started
 
+Create environment and set dependencies:
 ```zsh
 conda create -n constrained_gan python=3.8
 conda activate constrained_gan
@@ -22,11 +23,21 @@ poetry config virtualenvs.create false --local
 ```
 
 ```zsh
-poetry install
+conda activate soul
 ```
 
 ```zsh
-conda activate soul
+poetry install
+```
+
+To compute FID in TF fashion:
+
+```zsh
+wget  "https://raw.githubusercontent.com/bioinf-jku/TTUR/master/fid.py"  -P thirdparty/TTUR
+```
+
+```zsh
+conda install tensorflow-gpu
 ```
 
 Put CIFAR-10 into directory ```data/cifar10```  using this script
@@ -37,8 +48,10 @@ import torchvision.datasets as dset
 cifar = dset.CIFAR10(root='data/cifar10', download=True)
 ```
 
+Make bash scripts runable 
+
 ```zsh
-chmod +x run_scripts/*
+chmod +x run_scripts/*.sh
 ```
 
 ## Usage 

@@ -4,11 +4,13 @@ from pathlib import Path
 
 import numpy as np
 import torch
+import torchvision
 import yaml
-from pytorch_fid.fid_score import calculate_frechet_distance
-from pytorch_fid.inception import InceptionV3
+# from pytorch_fid.fid_score import calculate_frechet_distance
+# from pytorch_fid.inception import InceptionV3
 from yaml import Dumper, Loader
 
+import soul_gan.models
 import wandb
 from soul_gan.distribution import GANTarget
 from soul_gan.feature import FeatureRegistry
@@ -17,7 +19,10 @@ from soul_gan.sample import soul
 from soul_gan.utils.callbacks import CallbackRegistry
 from soul_gan.utils.general_utils import DotConfig  # isort:block
 from soul_gan.utils.general_utils import IgnoreLabelDataset, random_seed
-from soul_gan.utils.metrics.compute_fid import get_activation_statistics
+# from soul_gan.utils.metrics.compute_fid_tf import calculate_fid_given_paths
+from soul_gan.utils.metrics.inception_score import (MEAN_TRASFORM,
+                                                    STD_TRANSFORM,
+                                                    get_inception_score)
 
 
 def parse_arguments():
@@ -34,8 +39,10 @@ def parse_arguments():
 def main(
     config: DotConfig, gan_config: DotConfig, device: torch.device, group: str
 ):
+    gen, dis = load_gan(gan_config, device)
+
+    # sample
     if config.sample_params.sample:
-        gen, dis = load_gan(gan_config, device)
 
         if config.sample_params.sub_dir:
             save_dir = Path(
@@ -59,13 +66,16 @@ def main(
 
         feature_callbacks = []
 
-        if config.callbacks and config.callbacks.feature_callbacks:
+        callbacks = config.callbacks.feature_callbacks
 
-            for _, callback in config.callbacks.feature_callbacks.items():
+        if callbacks:
+            for _, callback in callbacks.items():
                 params = callback.params.dict
                 # HACK
                 if "dis" in params:
                     params["dis"] = dis
+                if "gen" in params:
+                    params["gen"] = gen
                 feature_callbacks.append(
                     CallbackRegistry.create_callback(callback.name, **params)
                 )
@@ -85,11 +95,11 @@ def main(
 
         # HACK
         if (
-            "fid" in config.callbacks
+            "fid" in callbacks
             and config.sample_params.feature.name  # noqa: W503
             == "InceptionV3MeanFeature"  # noqa: W503
         ):
-            idx = config.callbacks.keys().index("fid")
+            idx = callbacks.keys().index("fid")
             feature.callbacks[idx].model = feature.model
 
         # # HACK
@@ -105,7 +115,8 @@ def main(
 
         if config.seed is not None:
             random_seed(config.seed)
-        total_sample = []
+        total_sample_z = []
+        total_sample_x = []
         for i in range(
             0, config.sample_params.total_n, config.sample_params.batch_size
         ):
@@ -123,79 +134,136 @@ def main(
             z = torch.randn((config.sample_params.batch_size, gen.z_dim)).to(
                 device
             )
-            zs = soul(z, gen, ref_dist, feature, **config.sample_params.params)
+            zs, xs = soul(
+                z, gen, ref_dist, feature, **config.sample_params.params
+            )
             zs = torch.stack(zs, 0)
+            xs = torch.stack(xs, 0)
             print(zs.shape)
-            total_sample.append(zs)
+            total_sample_z.append(zs)
+            total_sample_x.append(xs)
 
-        total_sample = torch.cat(
-            total_sample, 1
+        total_sample_z = torch.cat(
+            total_sample_z, 1
         )  # (number_of_steps / every) x total_n x latent_dim
+        total_sample_x = torch.cat(
+            total_sample_x, 1
+        )  # (number_of_steps / every) x total_n x 32 x 32
 
-        # latents_dir = Path(save_dir, "latents")
-        # latents_dir.mkdir(exist_ok=True)
-        # for slice_id, slice in enumerate(total_sample):
-        #     np.save(
-        #         Path(
-        #             latents_dir, f"{slice_id * config.sample.save_every}.npy"
-        #         ),
-        #         slice.cpu().numpy(),
-        #     )
         imgs_dir = Path(save_dir, "images")
         imgs_dir.mkdir(exist_ok=True)
-        for slice_id in range(total_sample.shape[0]):
+        for slice_id in range(total_sample_x.shape[0]):
             np.save(
                 Path(
                     imgs_dir,
                     f"{slice_id * config.sample_params.save_every}.npy",
                 ),
-                total_sample[slice_id].cpu().numpy(),
+                total_sample_x[slice_id].cpu().numpy(),
             )
 
-    if config.compute_fid:
-        results_dir = config.compute_fid.results_dir
-        if config.compute_fid.sub_dir == "latest":
-            results_dir = filter(Path(results_dir).glob("*"))[-1]
-        assert Path(results_dir).exists()
+        latents_dir = Path(save_dir, "latents")
+        latents_dir.mkdir(exist_ok=True)
+        for slice_id, slice in enumerate(total_sample_z):
+            np.save(
+                Path(
+                    latents_dir,
+                    f"{slice_id * config.sample_params.save_every}.npy",
+                ),
+                slice.cpu().numpy(),
+            )
 
-        model = InceptionV3().to(device)
+    # afterall
+
+    results_dir = config.afterall_params.results_dir
+    if config.afterall_params.sub_dir == "latest":
+        results_dir = filter(Path(results_dir).glob("*"))[-1]
+    assert Path(results_dir).exists()
+
+    if config.afterall_params.init_wandb:
+        wandb.init(**config.wandb_init_params, group=group)
+        wandb.run.config.update({"group": f"{group}"})
+
+    if config.afterall_params.compute_is:
+        transform = torchvision.transforms.Normalize(
+            MEAN_TRASFORM, STD_TRANSFORM
+        )
+        model = torchvision.models.inception_v3(
+            pretrained=True, transform_input=False
+        ).to(device)
         model.eval()
 
-        stats = np.load("stats/fid_stats_cifar10_train.npz")
+        is_values = []
+        for step in range(0, config.n_steps, config.every):
+            file = Path(
+                results_dir,
+                config.afterall_params.sub_dir,
+                "images",
+                f"{step}.npy",
+            )
+            print(file)
 
-        if config.compute_fid.init_wandb:
-            wandb.init(**config.wandb_init_params, group=group)
-            wandb.run.config.update({"group": f"{group}"})
+            images = np.load(file)
+            dataset = transform(torch.from_numpy(images))
+            print(dataset.shape)
+            dataset = IgnoreLabelDataset(
+                torch.utils.data.TensorDataset(dataset)
+            )
+
+            inception_score = get_inception_score(
+                dataset, model, resize=True, device=device, batch_size=50
+            )[0]
+
+            print(f"Iter: {step}\t IS: {inception_score}")
+            if wandb.run is not None:
+                wandb.run.log({"step": step, "overall IS": inception_score})
+
+            is_values.append(inception_score)
+            np.savetxt(
+                Path(
+                    results_dir,
+                    config.afterall_params.sub_dir,
+                    "is_values.txt",
+                ),
+                is_values,
+            )
+
+    if config.afterall_params.compute_fid:
+        from soul_gan.utils.metrics.compute_fid_tf import \
+            calculate_fid_given_paths
+
+        # model = InceptionV3().to(device)
+        # model.eval()
+        # stats = np.load("stats/fid_stats_cifar10_train.npz")
 
         fid_values = []
         for step in range(0, config.n_steps, config.every):
             file = Path(
                 results_dir,
-                config.compute_fid.sub_dir,
+                config.afterall_params.sub_dir,
                 "images",
                 f"{step}.npy",
             )
             print(file)
-            # latents = np.load(file)
-            # dataset = (
-            #     gen.inverse_transform(
-            #         gen(torch.from_numpy(latents).to(device))
-            #     )
-            #     .detach()
-            #     .cpu()
-            # )
             images = np.load(file)
             dataset = torch.from_numpy(images)
             print(dataset.shape)
             dataset = IgnoreLabelDataset(
                 torch.utils.data.TensorDataset(dataset)
             )
-            mu, sigma, _ = get_activation_statistics(
-                dataset, model, batch_size=100, device=device, verbose=True
+
+            # tf version
+            fid = calculate_fid_given_paths(
+                ("stats/fid_stats_cifar10_train.npz", file.as_posix()),
+                inception_path="thirdparty/TTUR/inception_model",
             )
-            fid = calculate_frechet_distance(
-                mu, sigma, stats["mu"], stats["sigma"]
-            )
+
+            # torch version
+            # mu, sigma, _ = get_activation_statistics(
+            #     dataset, model, batch_size=100, device=device, verbose=True
+            # )
+            # fid = calculate_frechet_distance(
+            #     mu, sigma, stats["mu"], stats["sigma"]
+            # )
             print(f"Iter: {step}\t Fid: {fid}")
             if wandb.run is not None:
                 wandb.run.log({"step": step, "overall fid": fid})
@@ -203,13 +271,47 @@ def main(
             fid_values.append(fid)
             np.savetxt(
                 Path(
-                    results_dir, config.compute_fid.sub_dir, "fid_values.txt"
+                    results_dir,
+                    config.afterall_params.sub_dir,
+                    "fid_values.txt",
                 ),
                 fid_values,
             )
 
-    if config.compute_is:
-        pass
+    if config.callbacks.afterall_callbacks:
+        afterall_callbacks = []
+        callbacks = config.callbacks.afterall_callbacks
+        for _, callback in callbacks.items():
+            params = callback.params.dict
+            # HACK
+            if "dis" in params:
+                params["dis"] = dis
+            if "gen" in params:
+                params["gen"] = gen
+            afterall_callbacks.append(
+                CallbackRegistry.create_callback(callback.name, **params)
+            )
+        for step in range(0, config.n_steps, config.every):
+            x_file = Path(
+                results_dir,
+                config.afterall_params.sub_dir,
+                "images",
+                f"{step}.npy",
+            )
+            z_file = Path(
+                results_dir,
+                config.afterall_params.sub_dir,
+                "latents",
+                f"{step}.npy",
+            )
+            print(x_file)
+
+            images = np.load(x_file)
+            zs = np.load(z_file)
+            info = dict(imgs=images, zs=zs)
+
+            for callback in afterall_callbacks:
+                callback.invoke(info)
 
 
 if __name__ == "__main__":

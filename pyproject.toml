@@ -53,3 +53,4 @@ pre-commit = "^2.15.0"
 # use_parentheses = true
 # line_length = 100
 # lines_after_imports = 2
+imageio = "^2.13.5"

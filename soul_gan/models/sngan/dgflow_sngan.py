@@ -1,14 +1,14 @@
 import torch.nn as nn
-from torch.nn.utils import spectral_norm
-from torchvision import transforms
+from torch.nn import functional as F
+from torch.nn.utils.spectral_norm import spectral_norm
 
-from soul_gan.models import ModelRegistry
-from soul_gan.models.utils import NormalizeInverse
+from soul_gan.models.base import (BaseDiscriminator, BaseGenerator,
+                                  ModelRegistry)
 
 
 def _upsample(x):
     h, w = x.shape[2:]
-    return nn.functional.interpolate(x, size=(h * 2, w * 2), mode="nearest")
+    return F.interpolate(x, size=(h * 2, w * 2), mode="nearest")
 
 
 def upsample_conv(x, conv):
@@ -16,7 +16,7 @@ def upsample_conv(x, conv):
 
 
 @ModelRegistry.register()
-class SN_DCGAN_Generator(nn.Module):
+class SN_DCGAN_Generator(BaseGenerator):
     def __init__(
         self,
         n_hidden=128,
@@ -26,7 +26,7 @@ class SN_DCGAN_Generator(nn.Module):
         mean=(0.5, 0.5, 0.5),
         std=(0.5, 0.5, 0.5),
     ):
-        super().__init__()
+        super().__init__(mean, std)
         self.z_dim = nz
         self.ch = ch
         self.bw = bw
@@ -42,8 +42,6 @@ class SN_DCGAN_Generator(nn.Module):
         self.bn2 = nn.BatchNorm2d(ch // 4, eps=2e-5, momentum=0.1)
         self.bn3 = nn.BatchNorm2d(ch // 8, eps=2e-5, momentum=0.1)
 
-        self.inverse_transform = NormalizeInverse(mean, std)
-
     def forward(self, z, **kwargs):
         h = self.l0(z)
         h = h.view(-1, self.ch * self.bw * self.bw, 1, 1)
@@ -57,7 +55,7 @@ class SN_DCGAN_Generator(nn.Module):
 
 
 @ModelRegistry.register()
-class SN_DCGAN_Discriminator(nn.Module):
+class SN_DCGAN_Discriminator(BaseDiscriminator):
     def __init__(
         self,
         bw=4,
@@ -65,8 +63,9 @@ class SN_DCGAN_Discriminator(nn.Module):
         output_dim=1,
         mean=(0.5, 0.5, 0.5),
         std=(0.5, 0.5, 0.5),
+        output_layer="identity",
     ):
-        super().__init__()
+        super().__init__(mean, std, output_layer)
         c0_0 = nn.Conv2d(3, ch // 8, 3, 1, 1)
         self.c0_0 = spectral_norm(c0_0)
 
@@ -92,8 +91,6 @@ class SN_DCGAN_Discriminator(nn.Module):
         self.l4 = spectral_norm(l4)
 
         self.lrelu = nn.LeakyReLU(negative_slope=0.2, inplace=True)
-
-        self.transform = transforms.Normalize(mean, std)
 
     def forward(self, x):
         h = self.lrelu(self.c0_0(x))
@@ -176,7 +173,7 @@ class ResidualBlock(nn.Module):
 
 
 @ModelRegistry.register()
-class SN_ResNet_Generator32(nn.Module):
+class SN_ResNet_Generator32(BaseGenerator):
     def __init__(
         self,
         ch=256,
@@ -188,7 +185,7 @@ class SN_ResNet_Generator32(nn.Module):
         mean=(0.5, 0.5, 0.5),
         std=(0.5, 0.5, 0.5),
     ):
-        super().__init__()
+        super().__init__(mean, std)
         self.z_dim = nz
         self.nz = nz
         self.bottom_width = bottom_width
@@ -209,8 +206,6 @@ class SN_ResNet_Generator32(nn.Module):
         self.c5 = nn.Conv2d(ch, 3, 3, padding=1)
         self.tanh = nn.Tanh()
 
-        self.inverse_transform = NormalizeInverse(mean, std)
-
     def forward(self, z, y=None, **kwargs):
         h = z
         h = self.l1(h)
@@ -222,99 +217,3 @@ class SN_ResNet_Generator32(nn.Module):
         h = self.activation(h)
         h = self.tanh(self.c5(h))
         return h
-
-
-# class ResNetGenerator128(nn.Module):
-#     def __init__(self, G, ch=64, dim_z=128, bottom_width=4,
-#                  activation=nn.ReLU(), n_classes=0):
-#         super().__init__()
-#         self.bottom_width = bottom_width
-#         self.activation = activation
-#         self.dim_z = dim_z
-#         self.n_classes = n_classes
-#         self.l1 = nn.Linear(dim_z, (bottom_width ** 2) * ch * 16)
-#         copy_Linear(self.l1, G.l1)
-#         self.block2 = ResidualBlock(G.block2, ch * 16, ch * 16,
-#                                     activation=activation,
-#                                     upsample=True,
-#                                     n_classes=n_classes)
-#         self.block3 = ResidualBlock(G.block3, ch * 16, ch * 8,
-#                                     activation=activation,
-#                                     upsample=True,
-#                                     n_classes=n_classes)
-#         self.block4 = ResidualBlock(G.block4, ch * 8, ch * 4,
-#                                     activation=activation,
-#                                     upsample=True,
-#                                     n_classes=n_classes)
-#         self.block5 = ResidualBlock(G.block5, ch * 4, ch * 2,
-#                                     activation=activation,
-#                                     upsample=True,
-#                                     n_classes=n_classes)
-#         self.block6 = ResidualBlock(G.block6, ch * 2, ch * 1,
-#                                     activation=activation,
-#                                     upsample=True,
-#                                     n_classes=n_classes)
-#         self.b7 = nn.BatchNorm2d(ch, eps=2e-5, momentum=0.1)
-#         copy_BatchNorm2d(self.b7, G.b7)
-#         self.l7 = nn.Conv2d(ch, 3, 3, padding=1)
-#         copy_Conv2d(self.l7, G.l7)
-#         self.tanh = nn.Tanh()
-
-#     def forward(self, z, y=None, **kwargs):
-#         h = z
-#         h = self.l1(h)
-#         h = h.view((h.shape[0], -1, self.bottom_width, self.bottom_width))
-#         h = self.block2(h, y, **kwargs)
-#         h = self.block3(h, y, **kwargs)
-#         h = self.block4(h, y, **kwargs)
-#         h = self.block5(h, y, **kwargs)
-#         h = self.block6(h, y, **kwargs)
-#         h = self.b7(h)
-#         h = self.activation(h)
-#         h = self.tanh(self.l7(h))
-#         return h
-
-# class ResNetGenerator64(nn.Module):
-#     def __init__(self, G, ch=64, dim_z=128, bottom_width=4,
-#                  activation=nn.ReLU(), n_classes=0):
-#         super().__init__()
-#         self.bottom_width = bottom_width
-#         self.activation = activation
-#         self.dim_z = dim_z
-#         self.n_classes = n_classes
-#         self.l1 = nn.Linear(dim_z, (bottom_width ** 2) * ch * 16)
-#         copy_Linear(self.l1, G.l1)
-#         self.block2 = ResidualBlock(G.block2, ch * 16, ch * 8,
-#                                     activation=activation,
-#                                     upsample=True,
-#                                     n_classes=n_classes)
-#         self.block3 = ResidualBlock(G.block3, ch * 8, ch * 4,
-#                                     activation=activation,
-#                                     upsample=True,
-#                                     n_classes=n_classes)
-#         self.block4 = ResidualBlock(G.block4, ch * 4, ch * 2,
-#                                     activation=activation,
-#                                     upsample=True,
-#                                     n_classes=n_classes)
-#         self.block5 = ResidualBlock(G.block5, ch * 2, ch * 1,
-#                                     activation=activation,
-#                                     upsample=True,
-#                                     n_classes=n_classes)
-#         self.b6 = nn.BatchNorm2d(ch, eps=2e-5, momentum=0.1)
-#         copy_BatchNorm2d(self.b6, G.b6)
-#         self.l6 = nn.Conv2d(ch, 3, 3, padding=1)
-#         copy_Conv2d(self.l6, G.l6)
-#         self.tanh = nn.Tanh()
-
-#     def forward(self, z, y=None, **kwargs):
-#         h = z
-#         h = self.l1(h)
-#         h = h.view((h.shape[0], -1, self.bottom_width, self.bottom_width))
-#         h = self.block2(h, y, **kwargs)
-#         h = self.block3(h, y, **kwargs)
-#         h = self.block4(h, y, **kwargs)
-#         h = self.block5(h, y, **kwargs)
-#         h = self.b6(h)
-#         h = self.activation(h)
-#         h = self.tanh(self.l6(h))
-#         return h

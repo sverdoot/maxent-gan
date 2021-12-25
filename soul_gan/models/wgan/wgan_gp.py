@@ -1,11 +1,12 @@
 import torch.nn as nn
 from torchvision import transforms
 
-from soul_gan.models import ModelRegistry
+from soul_gan.models.base import (BaseDiscriminator, BaseGenerator,
+                                  ModelRegistry)
 
 
 @ModelRegistry.register()
-class WGANDiscriminator(nn.Module):
+class WGANDiscriminator(BaseDiscriminator):
     def __init__(
         self,
         bw=4,
@@ -14,7 +15,7 @@ class WGANDiscriminator(nn.Module):
         mean=(0.5, 0.5, 0.5),
         std=(0.5, 0.5, 0.5),
     ):
-        super().__init__()
+        super().__init__(mean, std, output_layer="identity")
         self.c0 = nn.Conv2d(3, ch // 8, 3, 1, 1)
         self.c1 = nn.Conv2d(ch // 8, ch // 4, 4, 2, 1)
         self.c1_0 = nn.Conv2d(ch // 4, ch // 4, 3, 1, 1)
@@ -26,8 +27,6 @@ class WGANDiscriminator(nn.Module):
         self.l4 = nn.Linear(bw * bw * ch, output_dim)
 
         self.lrelu = nn.LeakyReLU(negative_slope=0.2, inplace=True)
-
-        self.transform = transforms.Normalize(mean, std)
 
     def forward(self, x):
         h = self.lrelu(self.c0(x))

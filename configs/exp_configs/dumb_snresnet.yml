@@ -28,7 +28,7 @@ sample_params: &sample_params
 
     n_sampling_steps: &n_sampling_steps 1
     weight_step: 0.0
-    step_size: 0.001
+    step_size: 0.0001
 
 # afterall
 afterall_params:
@@ -59,33 +59,6 @@ logging:
 callbacks:
   feature_callbacks: &feature_callbacks
     {}
-    # discriminator:
-    #   name: DiscriminatorCallback
-    #   params:
-    #     dis: null
-    #     invoke_every: 10
-    #     device: *device
-    #     update_input: true
-    # wandb:
-    #   name: WandbCallback
-    #   params:
-    #     init_params:
-    #       <<: *wandb_init_params
-    #       reinit: True
-    #     invoke_every: 50
-    #     keys:
-    #       - "inception score"
-    #       - fid
-    #       - D(G(z))
-    # wandb_imgs:
-    #   name: WandbCallback
-    #   params:
-    #     init_params:
-    #       <<: *wandb_init_params
-    #       reinit: False
-    #     invoke_every: 50
-    #     keys:
-    #       - imgs
 
   afterall_callbacks: &afterall_callbacks
     discriminator:

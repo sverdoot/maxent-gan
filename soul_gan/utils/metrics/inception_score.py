@@ -111,16 +111,6 @@ def get_inception_score(
     assert batch_size > 0
     assert N >= batch_size
 
-    # Set up dtype
-    # if cuda:
-    #     dtype = torch.cuda.FloatTensor
-    # else:
-    #     if torch.cuda.is_available():
-    #         print(
-    #             "WARNING: You have a CUDA device, so you should probably set cuda=True"
-    #         )
-    #     dtype = torch.FloatTensor
-
     # Set up dataloader
     if not isinstance(imgs, torch.utils.data.Dataset):
         imgs = torch.utils.data.TensorDataset(imgs)
@@ -132,28 +122,22 @@ def get_inception_score(
         inception_model = inception_v3(
             pretrained=True,
             transform_input=False,  # False
-        ).to(
-            device
-        )  # type(dtype)
+        ).to(device)
         inception_model.eval()
 
-    up = nn.Upsample(size=(299, 299), mode="bilinear").to(
-        device
-    )  # type(dtype)
+    up = nn.Upsample(size=(299, 299), mode="bilinear").to(device)
 
     def get_pred(x):
         if resize:
             x = up(x)
         x = inception_model(x)
-        return F.softmax(x, -1).data.cpu()  # .numpy()
+        return F.softmax(x, -1).data.cpu()
 
     # Get predictions
     preds = torch.zeros((N, N_INCEPTION_CLASSES))
 
     for i, batch in enumerate(dataloader):
-        # print(batch)
-        batch = batch[0].to(device)  # type(dtype)
-        # batchv = Variable(batch)
+        batch = batch.to(device)
         if generate_from_latents:
             batch = gen(batch)
         batch_size_i = batch.size()[0]

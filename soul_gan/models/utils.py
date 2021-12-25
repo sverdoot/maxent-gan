@@ -2,11 +2,11 @@ from pathlib import Path
 from typing import Tuple
 
 import torch
-from torchvision import transforms
 from tqdm import trange
 
-from soul_gan.models import ModelRegistry
 from soul_gan.utils.general_utils import ROOT_DIR, DotConfig
+
+from .base import ModelRegistry
 
 
 def stabilize_dis(dis, im_size=32, iters=5000, device=0):
@@ -70,19 +70,3 @@ def load_gan(
     # dis.eval()
 
     return gen, dis
-
-
-class NormalizeInverse(transforms.Normalize):
-    """
-    Undoes the normalization and returns the reconstructed images in the input domain.
-    """
-
-    def __init__(self, mean, std):
-        mean = torch.as_tensor(mean)
-        std = torch.as_tensor(std)
-        std_inv = 1 / (std + 1e-10)
-        mean_inv = -mean * std_inv
-        super().__init__(mean=mean_inv, std=std_inv)
-
-    def __call__(self, tensor):
-        return super().__call__(tensor.clone())

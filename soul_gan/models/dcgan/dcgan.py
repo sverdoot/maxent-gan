@@ -1,12 +1,11 @@
 from torch import nn
-from torchvision import transforms
 
-from soul_gan.models import ModelRegistry
-from soul_gan.models.utils import NormalizeInverse
+from soul_gan.models.base import (BaseDiscriminator, BaseGenerator,
+                                  ModelRegistry)
 
 
 @ModelRegistry.register()
-class DCGANGenerator(nn.Module):
+class DCGANGenerator(BaseGenerator):
     def __init__(
         self,
         ngpu=1,
@@ -16,7 +15,7 @@ class DCGANGenerator(nn.Module):
         mean=(0.5, 0.5, 0.5),
         std=(0.5, 0.5, 0.5),
     ):
-        super().__init__()
+        super().__init__(mean, std)
         self.z_dim = nz
         self.ngpu = ngpu
         self.main = nn.Sequential(
@@ -42,8 +41,6 @@ class DCGANGenerator(nn.Module):
             nn.Tanh(),
         )
 
-        self.inverse_transform = NormalizeInverse(mean, std)
-
     def forward(self, input):
         if input.ndim == 2:
             input = input[..., None, None]
@@ -57,7 +54,7 @@ class DCGANGenerator(nn.Module):
 
 
 @ModelRegistry.register()
-class DCGANDiscriminator(nn.Module):
+class DCGANDiscriminator(BaseDiscriminator):
     def __init__(
         self,
         ngpu=1,
@@ -65,8 +62,9 @@ class DCGANDiscriminator(nn.Module):
         ndf=64,
         mean=(0.5, 0.5, 0.5),
         std=(0.5, 0.5, 0.5),
+        output_layer="sigmoid",
     ):
-        super().__init__()
+        super().__init__(mean, std, output_layer)
         self.ngpu = ngpu
         self.main = nn.Sequential(
             # input is (nc) x 64 x 64
@@ -88,8 +86,6 @@ class DCGANDiscriminator(nn.Module):
             nn.Conv2d(ndf * 8, 1, 2, 2, 0, bias=False),
             # nn.Sigmoid(),
         )
-
-        self.transform = transforms.Normalize(mean, std)
 
     def forward(self, input):
         if input.is_cuda and self.ngpu > 1:

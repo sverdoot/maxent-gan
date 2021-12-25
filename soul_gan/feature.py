@@ -243,7 +243,7 @@ class DiscriminatorFeature(Feature):
     ) -> Dict:
         return {
             "D(G(z))": torch.mean(
-                torch.sigmoid(feature_out[0] + self.ref_feature[0])
+                self.dis.output_layer(feature_out[0] + self.ref_feature[0])
             ).item(),
             f"weight_{self.__class__.__name__}": torch.norm(
                 self.weight[0]

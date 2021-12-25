@@ -63,6 +63,7 @@ class WandbCallback(Callback):
         )
 
     def invoke(self, info: Dict[str, Union[float, np.ndarray]]):
+        print(self.cnt)
         if self.cnt % self.invoke_every == 0:
             wandb = self.wandb
             if not self.keys:
@@ -121,14 +122,71 @@ class DiscriminatorCallback(Callback):
         self.device = device
 
     @torch.no_grad()
-    def invoke(self, info: Dict[str, Union[float, np.ndarray]]):
+    def invoke(
+        self,
+        info: Dict[str, Union[float, np.ndarray]],
+        batch_size: Optional[int] = None,
+    ):
         dgz = None
         if self.cnt % self.invoke_every == 0:
             imgs = info["imgs"]
+            if not batch_size:
+                batch_size = len(imgs)
             x = self.transform(torch.from_numpy(imgs).to(self.device))
-            dgz = torch.sigmoid(self.dis(x)).mean().item()
+            dgz = 0
+            for x_batch in torch.split(x, batch_size):
+                dgz += self.dis.output_layer(self.dis(x_batch)).sum().item()
+            dgz /= len(imgs)
+
             if self.update_input:
                 info["D(G(z))"] = dgz
         self.cnt += 1
 
         return dgz
+
+
+@CallbackRegistry.register()
+class EnergyCallback(Callback):
+    def __init__(
+        self,
+        dis,
+        gen,
+        invoke_every=1,
+        update_input=True,
+        device="cuda",
+        batch_size: Optional[int] = None,
+    ):
+        self.invoke_every = invoke_every
+        self.dis = dis
+        self.gen = gen
+        self.transform = dis.transform
+        self.update_input = update_input
+        self.device = device
+        self.batch_size = batch_size
+
+    @torch.no_grad()
+    def invoke(
+        self,
+        info: Dict[str, Union[float, np.ndarray]],
+        batch_size: Optional[int] = None,
+    ):
+        energy = None
+        if self.cnt % self.invoke_every == 0:
+            zs = torch.FloatTensor(info["zs"]).to(self.device)
+            if not batch_size:
+                batch_size = (
+                    len(zs) if not self.batch_size else self.batch_size
+                )
+            energy = 0
+            for z_batch in torch.split(zs, batch_size):
+                dgz = self.dis(self.gen(z_batch))
+                energy += -(
+                    self.gen.prior.log_prob(z_batch).sum() + dgz.sum()
+                ).item()
+            energy /= len(zs)
+
+            if self.update_input:
+                info["Energy"] = energy
+        self.cnt += 1
+
+        return energy

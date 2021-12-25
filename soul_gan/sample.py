@@ -1,4 +1,4 @@
-from typing import Callable, List, Optional, Union
+from typing import Callable, List, Optional, Tuple, Union
 
 import torch
 from torch import nn
@@ -45,8 +45,9 @@ def soul(
     weight_step: float = 0.1,
     step_size: float = 0.01,
     save_every: int = 10,
-) -> List[torch.FloatTensor]:
-    zs = [gen.inverse_transform(gen(z)).detach().cpu()]
+) -> Tuple[List[torch.FloatTensor], List[torch.FloatTensor]]:
+    zs = [z.cpu()]
+    xs = [gen.inverse_transform(gen(z)).detach().cpu()]
 
     # saving parameter initialization
     # n_stride_im = params['stride_save_image']
@@ -95,6 +96,7 @@ def soul(
         z = inter_zs[-1]
 
         if it % save_every == 0:
-            zs.append(gen.inverse_transform(gen(z)).detach().cpu())
+            zs.append(z.detach().cpu())
+            xs.append(gen.inverse_transform(gen(z)).detach().cpu())
 
-    return zs
+    return zs, xs
