@@ -7,26 +7,6 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-<<<<<<< HEAD
-import utils.misc as misc
-import utils.ops as ops
-
-
-class GenBlock(nn.Module):
-    def __init__(
-        self, in_channels, out_channels, g_cond_mtd, num_classes, MODULES
-    ):
-        super(GenBlock, self).__init__()
-        self.g_cond_mtd = g_cond_mtd
-
-        self.deconv0 = MODULES.g_deconv2d(
-            in_channels=in_channels,
-            out_channels=out_channels,
-            kernel_size=4,
-            stride=2,
-            padding=1,
-        )
-=======
 
 import utils.ops as ops
 import utils.misc as misc
@@ -38,7 +18,6 @@ class GenBlock(nn.Module):
         self.g_cond_mtd = g_cond_mtd
 
         self.deconv0 = MODULES.g_deconv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=4, stride=2, padding=1)
->>>>>>> 133bf5716dd66f668d0e5c85cfee8c01a7150ace
 
         if self.g_cond_mtd == "W/O":
             self.bn0 = MODULES.g_bn(in_features=out_channels)
@@ -62,26 +41,8 @@ class GenBlock(nn.Module):
 
 
 class Generator(nn.Module):
-<<<<<<< HEAD
-    def __init__(
-        self,
-        z_dim,
-        g_shared_dim,
-        img_size,
-        g_conv_dim,
-        apply_attn,
-        attn_g_loc,
-        g_cond_mtd,
-        num_classes,
-        g_init,
-        g_depth,
-        mixed_precision,
-        MODULES,
-    ):
-=======
     def __init__(self, z_dim, g_shared_dim, img_size, g_conv_dim, apply_attn, attn_g_loc, g_cond_mtd, num_classes, g_init, g_depth,
                  mixed_precision, MODULES):
->>>>>>> 133bf5716dd66f668d0e5c85cfee8c01a7150ace
         super(Generator, self).__init__()
         self.in_dims = [512, 256, 128]
         self.out_dims = [256, 128, 64]
@@ -90,50 +51,6 @@ class Generator(nn.Module):
         self.num_classes = num_classes
         self.mixed_precision = mixed_precision
 
-<<<<<<< HEAD
-        self.linear0 = MODULES.g_linear(
-            in_features=self.z_dim,
-            out_features=self.in_dims[0] * 4 * 4,
-            bias=True,
-        )
-
-        self.blocks = []
-        for index in range(len(self.in_dims)):
-            self.blocks += [
-                [
-                    GenBlock(
-                        in_channels=self.in_dims[index],
-                        out_channels=self.out_dims[index],
-                        g_cond_mtd=g_cond_mtd,
-                        num_classes=self.num_classes,
-                        MODULES=MODULES,
-                    )
-                ]
-            ]
-
-            if index + 1 in attn_g_loc and apply_attn:
-                self.blocks += [
-                    [
-                        ops.SelfAttention(
-                            self.out_dims[index],
-                            is_generator=True,
-                            MODULES=MODULES,
-                        )
-                    ]
-                ]
-
-        self.blocks = nn.ModuleList(
-            [nn.ModuleList(block) for block in self.blocks]
-        )
-
-        self.conv4 = MODULES.g_conv2d(
-            in_channels=self.out_dims[-1],
-            out_channels=3,
-            kernel_size=3,
-            stride=1,
-            padding=1,
-        )
-=======
         self.linear0 = MODULES.g_linear(in_features=self.z_dim, out_features=self.in_dims[0] * 4 * 4, bias=True)
 
         self.blocks = []
@@ -152,7 +69,6 @@ class Generator(nn.Module):
         self.blocks = nn.ModuleList([nn.ModuleList(block) for block in self.blocks])
 
         self.conv4 = MODULES.g_conv2d(in_channels=self.out_dims[-1], out_channels=3, kernel_size=3, stride=1, padding=1)
->>>>>>> 133bf5716dd66f668d0e5c85cfee8c01a7150ace
         self.tanh = nn.Tanh()
 
         ops.init_weights(self.modules, g_init)
@@ -178,25 +94,8 @@ class DiscBlock(nn.Module):
         super(DiscBlock, self).__init__()
         self.apply_d_sn = apply_d_sn
 
-<<<<<<< HEAD
-        self.conv0 = MODULES.d_conv2d(
-            in_channels=in_channels,
-            out_channels=out_channels,
-            kernel_size=3,
-            stride=1,
-            padding=1,
-        )
-        self.conv1 = MODULES.d_conv2d(
-            in_channels=out_channels,
-            out_channels=out_channels,
-            kernel_size=4,
-            stride=2,
-            padding=1,
-        )
-=======
         self.conv0 = MODULES.d_conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=3, stride=1, padding=1)
         self.conv1 = MODULES.d_conv2d(in_channels=out_channels, out_channels=out_channels, kernel_size=4, stride=2, padding=1)
->>>>>>> 133bf5716dd66f668d0e5c85cfee8c01a7150ace
 
         if not apply_d_sn:
             self.bn0 = MODULES.d_bn(in_features=out_channels)
@@ -218,28 +117,8 @@ class DiscBlock(nn.Module):
 
 
 class Discriminator(nn.Module):
-<<<<<<< HEAD
-    def __init__(
-        self,
-        img_size,
-        d_conv_dim,
-        apply_d_sn,
-        apply_attn,
-        attn_d_loc,
-        d_cond_mtd,
-        aux_cls_type,
-        d_embed_dim,
-        normalize_d_embed,
-        num_classes,
-        d_init,
-        d_depth,
-        mixed_precision,
-        MODULES,
-    ):
-=======
     def __init__(self, img_size, d_conv_dim, apply_d_sn, apply_attn, attn_d_loc, d_cond_mtd, aux_cls_type, d_embed_dim, normalize_d_embed,
                  num_classes, d_init, d_depth, mixed_precision, MODULES):
->>>>>>> 133bf5716dd66f668d0e5c85cfee8c01a7150ace
         super(Discriminator, self).__init__()
         self.in_dims = [3] + [64, 128]
         self.out_dims = [64, 128, 256]
@@ -253,42 +132,6 @@ class Discriminator(nn.Module):
 
         self.blocks = []
         for index in range(len(self.in_dims)):
-<<<<<<< HEAD
-            self.blocks += [
-                [
-                    DiscBlock(
-                        in_channels=self.in_dims[index],
-                        out_channels=self.out_dims[index],
-                        apply_d_sn=self.apply_d_sn,
-                        MODULES=MODULES,
-                    )
-                ]
-            ]
-
-            if index + 1 in attn_d_loc and apply_attn:
-                self.blocks += [
-                    [
-                        ops.SelfAttention(
-                            self.out_dims[index],
-                            is_generator=False,
-                            MODULES=MODULES,
-                        )
-                    ]
-                ]
-
-        self.blocks = nn.ModuleList(
-            [nn.ModuleList(block) for block in self.blocks]
-        )
-
-        self.activation = MODULES.d_act_fn
-        self.conv1 = MODULES.d_conv2d(
-            in_channels=256,
-            out_channels=512,
-            kernel_size=3,
-            stride=1,
-            padding=1,
-        )
-=======
             self.blocks += [[
                 DiscBlock(in_channels=self.in_dims[index], out_channels=self.out_dims[index], apply_d_sn=self.apply_d_sn, MODULES=MODULES)
             ]]
@@ -300,32 +143,17 @@ class Discriminator(nn.Module):
 
         self.activation = MODULES.d_act_fn
         self.conv1 = MODULES.d_conv2d(in_channels=256, out_channels=512, kernel_size=3, stride=1, padding=1)
->>>>>>> 133bf5716dd66f668d0e5c85cfee8c01a7150ace
 
         if not self.apply_d_sn:
             self.bn1 = MODULES.d_bn(in_features=512)
 
         # linear layer for adversarial training
         if self.d_cond_mtd == "MH":
-<<<<<<< HEAD
-            self.linear1 = MODULES.d_linear(
-                in_features=512, out_features=1 + num_classes, bias=True
-            )
-        elif self.d_cond_mtd == "MD":
-            self.linear1 = MODULES.d_linear(
-                in_features=512, out_features=num_classes, bias=True
-            )
-        else:
-            self.linear1 = MODULES.d_linear(
-                in_features=512, out_features=1, bias=True
-            )
-=======
             self.linear1 = MODULES.d_linear(in_features=512, out_features=1 + num_classes, bias=True)
         elif self.d_cond_mtd == "MD":
             self.linear1 = MODULES.d_linear(in_features=512, out_features=num_classes, bias=True)
         else:
             self.linear1 = MODULES.d_linear(in_features=512, out_features=1, bias=True)
->>>>>>> 133bf5716dd66f668d0e5c85cfee8c01a7150ace
 
         # double num_classes for Auxiliary Discriminative Classifier
         if self.aux_cls_type == "ADC":
@@ -333,29 +161,11 @@ class Discriminator(nn.Module):
 
         # linear and embedding layers for discriminator conditioning
         if self.d_cond_mtd == "AC":
-<<<<<<< HEAD
-            self.linear2 = MODULES.d_linear(
-                in_features=self.out_dims[-1],
-                out_features=num_classes,
-                bias=False,
-            )
-        elif self.d_cond_mtd == "PD":
-            self.embedding = MODULES.d_embedding(
-                num_classes, self.out_dims[-1]
-            )
-        elif self.d_cond_mtd in ["2C", "D2DCE"]:
-            self.linear2 = MODULES.d_linear(
-                in_features=self.out_dims[-1],
-                out_features=d_embed_dim,
-                bias=True,
-            )
-=======
             self.linear2 = MODULES.d_linear(in_features=self.out_dims[-1], out_features=num_classes, bias=False)
         elif self.d_cond_mtd == "PD":
             self.embedding = MODULES.d_embedding(num_classes, self.out_dims[-1])
         elif self.d_cond_mtd in ["2C", "D2DCE"]:
             self.linear2 = MODULES.d_linear(in_features=self.out_dims[-1], out_features=d_embed_dim, bias=True)
->>>>>>> 133bf5716dd66f668d0e5c85cfee8c01a7150ace
             self.embedding = MODULES.d_embedding(num_classes, d_embed_dim)
         else:
             pass
@@ -363,27 +173,10 @@ class Discriminator(nn.Module):
         # linear and embedding layers for evolved classifier-based GAN
         if self.aux_cls_type == "TAC":
             if self.d_cond_mtd == "AC":
-<<<<<<< HEAD
-                self.linear_mi = MODULES.d_linear(
-                    in_features=self.out_dims[-1],
-                    out_features=num_classes,
-                    bias=False,
-                )
-            elif self.d_cond_mtd in ["2C", "D2DCE"]:
-                self.linear_mi = MODULES.d_linear(
-                    in_features=self.out_dims[-1],
-                    out_features=d_embed_dim,
-                    bias=True,
-                )
-                self.embedding_mi = MODULES.d_embedding(
-                    num_classes, d_embed_dim
-                )
-=======
                 self.linear_mi = MODULES.d_linear(in_features=self.out_dims[-1], out_features=num_classes, bias=False)
             elif self.d_cond_mtd in ["2C", "D2DCE"]:
                 self.linear_mi = MODULES.d_linear(in_features=self.out_dims[-1], out_features=d_embed_dim, bias=True)
                 self.embedding_mi = MODULES.d_embedding(num_classes, d_embed_dim)
->>>>>>> 133bf5716dd66f668d0e5c85cfee8c01a7150ace
             else:
                 raise NotImplementedError
 
@@ -410,15 +203,9 @@ class Discriminator(nn.Module):
             # make class labels odd (for fake) or even (for real) for ADC
             if self.aux_cls_type == "ADC":
                 if adc_fake:
-<<<<<<< HEAD
-                    label = label * 2 + 1
-                else:
-                    label = label * 2
-=======
                     label = label*2 + 1
                 else:
                     label = label*2
->>>>>>> 133bf5716dd66f668d0e5c85cfee8c01a7150ace
 
             # class conditioning
             if self.d_cond_mtd == "AC":
@@ -428,13 +215,7 @@ class Discriminator(nn.Module):
                     h = F.normalize(h, dim=1)
                 cls_output = self.linear2(h)
             elif self.d_cond_mtd == "PD":
-<<<<<<< HEAD
-                adv_output = adv_output + torch.sum(
-                    torch.mul(self.embedding(label), h), 1
-                )
-=======
                 adv_output = adv_output + torch.sum(torch.mul(self.embedding(label), h), 1)
->>>>>>> 133bf5716dd66f668d0e5c85cfee8c01a7150ace
             elif self.d_cond_mtd in ["2C", "D2DCE"]:
                 embed = self.linear2(h)
                 proxy = self.embedding(label)
@@ -471,9 +252,5 @@ class Discriminator(nn.Module):
             "label": label,
             "mi_embed": mi_embed,
             "mi_proxy": mi_proxy,
-<<<<<<< HEAD
-            "mi_cls_output": mi_cls_output,
-=======
             "mi_cls_output": mi_cls_output
->>>>>>> 133bf5716dd66f668d0e5c85cfee8c01a7150ace
         }

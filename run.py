@@ -6,6 +6,7 @@ import numpy as np
 import torch
 import torchvision
 import yaml
+
 # from pytorch_fid.fid_score import calculate_frechet_distance
 # from pytorch_fid.inception import InceptionV3
 from yaml import Dumper, Loader
@@ -19,10 +20,13 @@ from soul_gan.sample import soul
 from soul_gan.utils.callbacks import CallbackRegistry
 from soul_gan.utils.general_utils import DotConfig  # isort:block
 from soul_gan.utils.general_utils import IgnoreLabelDataset, random_seed
+
 # from soul_gan.utils.metrics.compute_fid_tf import calculate_fid_given_paths
-from soul_gan.utils.metrics.inception_score import (MEAN_TRASFORM,
-                                                    STD_TRANSFORM,
-                                                    get_inception_score)
+from soul_gan.utils.metrics.inception_score import (
+    MEAN_TRASFORM,
+    STD_TRANSFORM,
+    get_inception_score,
+)
 
 
 def parse_arguments():
@@ -228,8 +232,9 @@ def main(
             )
 
     if config.afterall_params.compute_fid:
-        from soul_gan.utils.metrics.compute_fid_tf import \
-            calculate_fid_given_paths
+        from soul_gan.utils.metrics.compute_fid_tf import (
+            calculate_fid_given_paths,
+        )
 
         # model = InceptionV3().to(device)
         # model.eval()
