@@ -3,6 +3,7 @@
 
 - [Experiments on sampling from GAN with constraints](#experiments-on-sampling-from-gan-with-constraints)
   - [Getting started](#getting-started)
+    - [StudioGAN:](#studiogan)
   - [Usage](#usage)
   - [TODO:](#todo)
 
@@ -17,28 +18,27 @@ conda create -n constrained_gan python=3.8
 conda activate constrained_gan
 ```
 
+To compute FID in TF fashion:
+
+```zsh
+conda install tensorflow-gpu
+```
+
 ```zsh
 pip install poetry
 poetry config virtualenvs.create false --local
 ```
 
 ```zsh
-conda activate soul
-```
-
-```zsh
 poetry install
 ```
 
-To compute FID in TF fashion:
+<!-- To compute FID in TF fashion:
 
 ```zsh
 wget  "https://raw.githubusercontent.com/bioinf-jku/TTUR/master/fid.py"  -P thirdparty/TTUR
-```
+``` -->
 
-```zsh
-conda install tensorflow-gpu
-```
 
 Put CIFAR-10 into directory ```data/cifar10```  using this script
 
@@ -52,6 +52,43 @@ Make bash scripts runable
 
 ```zsh
 chmod +x run_scripts/*.sh
+```
+
+### StudioGAN:
+
+git clone git@github.com:POSTECH-CVLab/PyTorch-StudioGAN.git thirdparty/studiogan && mv thirdparty/studiogan/src thirdparty/studiogan/studiogan
+
+```zsh
+echo \
+"from setuptools import setup, find_packages
+
+setup(name='studiogan',
+      version='1.0',
+      packages=find_packages())" \
+>> thirdparty/studiogan/setup.py
+```
+
+```zsh
+pip install -e thirdparty/studiogan
+```
+
+```zsh
+echo "tqdm ninja h5py kornia matplotlib pandas sklearn scipy seaborn wandb PyYaml click requests pyspng imageio-ffmpeg prdc" >> thirdparty/studiogan/requirements.txt
+```
+
+```zsh 
+poetry add `cat thirdparty/studiogan/requirements.txt`
+```
+
+To use StudioGAN as is following is needed:
+
+```python
+import sys
+from pathlib import Path
+
+from soul_gan.utils.general_utils import ROOT_DIR
+
+sys.path.append(Path(ROOT_DIR, 'thirdparty/studiogan/studiogan'))
 ```
 
 ## Usage 

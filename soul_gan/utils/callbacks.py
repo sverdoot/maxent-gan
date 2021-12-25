@@ -63,7 +63,6 @@ class WandbCallback(Callback):
         )
 
     def invoke(self, info: Dict[str, Union[float, np.ndarray]]):
-        print(self.cnt)
         if self.cnt % self.invoke_every == 0:
             wandb = self.wandb
             if not self.keys:
