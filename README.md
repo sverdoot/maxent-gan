@@ -32,7 +32,10 @@ poetry config virtualenvs.create false --local
 
 ### StudioGAN:
 
+```zsh
 git clone git@github.com:POSTECH-CVLab/PyTorch-StudioGAN.git thirdparty/studiogan && mv thirdparty/studiogan/src thirdparty/studiogan/studiogan
+```
+
 
 ```zsh
 echo \
@@ -94,6 +97,13 @@ chmod +x run_scripts/*.sh
 ```
 
 ## Usage 
+
+Download checkpoints:
+
+```bash
+./runs/get_ckpts.sh
+./runs/get_stats.sh
+```
 
 To use wandb:
 

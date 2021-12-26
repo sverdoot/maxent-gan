@@ -1,5 +1,4 @@
 dir: &dir log/dumb_feature
-sub_dir: &sub_dir test
 n_steps: &n_steps 250
 every: &every 25
 seed: null
@@ -10,4 +9,5 @@ weight_step: &weight_step 0.0
 step_size: &step_size 0.001
 name: &name studio_dcgan_dumb
 burn_in_steps: &burn_in_steps 0
+sub_dir: &sub_dir studio_dcgan
 
