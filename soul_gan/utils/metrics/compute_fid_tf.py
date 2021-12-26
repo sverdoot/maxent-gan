@@ -389,7 +389,7 @@ def calculate_fid_given_paths(paths, inception_path, low_profile=False):
 
 def get_activation_statistics(path, inception_path):
     inception_path = check_or_download_inception(inception_path)
-    
+
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
     create_inception_graph(str(inception_path))

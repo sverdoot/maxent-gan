@@ -1,5 +1,6 @@
 import argparse
 import datetime
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -10,8 +11,7 @@ import yaml
 # from pytorch_fid.inception import InceptionV3
 from yaml import Dumper, Loader
 
-import sys
-sys.path.append('thirdparty/studiogan/studiogan')
+sys.path.append("thirdparty/studiogan/studiogan")
 
 import soul_gan.models
 import wandb

@@ -51,7 +51,7 @@ class GANTarget(Distribution):
 def grad_log_prob(
     point: torch.FloatTensor,
     log_dens: Union[Distribution, Callable],
-    #x: Optional[Any] = None,
+    # x: Optional[Any] = None,
 ) -> Tuple[torch.FloatTensor, torch.FloatTensor]:
     point = point.detach().requires_grad_()
     # if x is not None:
