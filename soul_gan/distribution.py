@@ -35,6 +35,7 @@ class GANTarget(Distribution):
     ) -> Tuple[torch.FloatTensor, torch.FloatTensor, torch.FloatTensor]:
         dgz = dis(gen(z))
         logp_z = proposal.log_prob(z)
+        # print(logp_z.mean(), dgz.mean())
         log_prob = (logp_z + dgz) / 1.0
 
         return log_prob, logp_z, dgz
@@ -50,12 +51,12 @@ class GANTarget(Distribution):
 def grad_log_prob(
     point: torch.FloatTensor,
     log_dens: Union[Distribution, Callable],
-    x: Optional[Any] = None,
+    #x: Optional[Any] = None,
 ) -> Tuple[torch.FloatTensor, torch.FloatTensor]:
     point = point.detach().requires_grad_()
-    if x is not None:
-        log_prob = log_dens(z=point, x=x)
-    else:
-        log_prob = log_dens(point)
+    # if x is not None:
+    #     log_prob = log_dens(z=point, x=x)
+    # else:
+    log_prob = log_dens(point)
     grad = torch.autograd.grad(log_prob.sum(), point)[0]
     return log_prob, grad

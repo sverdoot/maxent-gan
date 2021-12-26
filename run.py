@@ -10,6 +10,9 @@ import yaml
 # from pytorch_fid.inception import InceptionV3
 from yaml import Dumper, Loader
 
+import sys
+sys.path.append('thirdparty/studiogan/studiogan')
+
 import soul_gan.models
 import wandb
 from soul_gan.distribution import GANTarget
@@ -207,7 +210,7 @@ def main(config: DotConfig, device: torch.device, group: str):
             )
 
             inception_score = get_inception_score(
-                dataset, model, resize=True, device=device, batch_size=100
+                dataset, model, resize=True, device=device, batch_size=50
             )[0]
 
             print(f"Iter: {step}\t IS: {inception_score}")
@@ -305,7 +308,7 @@ def main(config: DotConfig, device: torch.device, group: str):
 
             images = np.load(x_file)
             zs = np.load(z_file)
-            info = dict(imgs=images, zs=zs)
+            info = dict(imgs=images, zs=zs, step=step)
 
             for callback in afterall_callbacks:
                 callback.invoke(info)

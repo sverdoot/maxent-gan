@@ -1,0 +1,27 @@
+gan_config:
+  train_transform:
+    Normalize:
+      mean: &mean [0.5, 0.5, 0.5]
+      std: &std [0.5, 0.5, 0.5]
+
+  prior: normal
+  eval: flase #true
+
+
+  generator:
+    name: StudioGen
+    params:
+        mean: *mean
+        std: *std
+        config: DCGAN.yaml
+    ckpt_path: "checkpoints/dcgan/DCGAN_G_CIFAR_studio_best.pth"
+
+  discriminator:
+    name: StudioDis
+    params:
+        mean: *mean
+        std: *std
+        output_layer: 'sigmoid'
+        config: DCGAN.yaml
+    ckpt_path: "checkpoints/dcgan/DCGAN_D_CIFAR_studio_best.pth"
+

@@ -1,7 +1,7 @@
 dir: &dir log/dumb_feature
 sub_dir: &sub_dir test
-n_steps: &n_steps 200 #300
-every: &every 10
+n_steps: &n_steps 250 #300
+every: &every 25
 seed: null
 device: &device 'cuda'
 total_n: &total_n 10000

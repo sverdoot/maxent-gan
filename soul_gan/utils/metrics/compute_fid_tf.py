@@ -387,6 +387,18 @@ def calculate_fid_given_paths(paths, inception_path, low_profile=False):
         return fid_value
 
 
+def get_activation_statistics(path, inception_path):
+    inception_path = check_or_download_inception(inception_path)
+    
+    config = tf.ConfigProto()
+    config.gpu_options.allow_growth = True
+    create_inception_graph(str(inception_path))
+    with tf.Session(config=config) as sess:
+        sess.run(tf.global_variables_initializer())
+        m, s = _handle_path(path, sess)
+    return m, s
+
+
 if __name__ == "__main__":
     from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser
 

@@ -83,7 +83,7 @@ class WandbCallback(Callback):
                     )
                 else:
                     log[key] = info[key]
-            log["step"] = self.cnt
+            log["step"] = self.cnt if "step" not in info else info["step"]
             wandb.log(log)
         self.cnt += 1
 

@@ -1,22 +1,23 @@
-train_transform:
-  Normalize:
-    mean: &mean [0.5, 0.5, 0.5]
-    std: &std [0.5, 0.5, 0.5]
+gan_config:
+  train_transform:
+    Normalize:
+      mean: &mean [0.5, 0.5, 0.5]
+      std: &std [0.5, 0.5, 0.5]
 
-prior: uniform
+  prior: uniform
 
-generator:
-  name: SN_DCGAN_Generator
-  params:
-      mean: *mean
-      std: *std
-  ckpt_path: "checkpoints/sngan/DCGAN_G_CIFAR_SNGAN_NonSaturating_150001.pth"
+  generator:
+    name: SN_DCGAN_Generator
+    params:
+        mean: *mean
+        std: *std
+    ckpt_path: "checkpoints/sngan/DCGAN_G_CIFAR_SNGAN_NonSaturating_150001.pth"
 
-discriminator:
-  name: SN_DCGAN_Discriminator
-  params:
-      mean: *mean
-      std: *std
-  thermalize: true
-  ckpt_path: "checkpoints/sngan/DCGAN_D_CIFAR_SNGAN_NonSaturating_150001.pth"
+  discriminator:
+    name: SN_DCGAN_Discriminator
+    params:
+        mean: *mean
+        std: *std
+    thermalize: true
+    ckpt_path: "checkpoints/sngan/DCGAN_D_CIFAR_SNGAN_NonSaturating_150001.pth"
 

@@ -66,7 +66,8 @@ def load_gan(
     stabilize_dis(dis, device=device)
     stabilize_gen(gen)
 
-    # gen.eval()
-    # dis.eval()
+    if config.eval:
+        gen.eval()
+        dis.eval()
 
     return gen, dis
