@@ -13,15 +13,15 @@ gan_config:
     params:
         mean: *mean
         std: *std
-        config: DCGAN.yaml
-    ckpt_path: "checkpoints/dcgan/DCGAN_G_CIFAR_studio_best.pth"
+        config: WGAN-GP.yaml
+    ckpt_path: "checkpoints/wgan_gp/G_CIFAR_studio_best.pth"
 
   discriminator:
     name: StudioDis
     params:
         mean: *mean
         std: *std
-        output_layer: 'sigmoid'
-        config: DCGAN.yaml
-    ckpt_path: "checkpoints/dcgan/DCGAN_D_CIFAR_studio_best.pth"
+        output_layer: 'identity'
+        config: WGAN-GP.yaml
+    ckpt_path: "checkpoints/wgan_gp/D_CIFAR_studio_best.pth"
 

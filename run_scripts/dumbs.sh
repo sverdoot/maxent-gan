@@ -1,5 +1,7 @@
 # python run.py configs/exp_configs/dcgan-dumb.yml configs/gan_configs/cifar-10-dcgan.yml configs/feature_configs/dumb.yml
 
+python run.py configs/exp_configs/studio-wgan-gp-dumb.yml configs/gan_configs/cifar-10-wgan-gp-studio.yml configs/feature_configs/dumb.yml
+
 python run.py configs/exp_configs/studio-dcgan-dumb.yml configs/gan_configs/cifar-10-dcgan-studio.yml configs/feature_configs/dumb.yml
 
 python run.py configs/exp_configs/wgan-gp-dumb.yml configs/gan_configs/cifar-10-wgan-gp.yml configs/feature_configs/dumb.yml

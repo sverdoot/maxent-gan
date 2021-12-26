@@ -8,7 +8,7 @@
   - [TODO:](#todo)
 
 
-
+link to gdrive with checkpoints and stats: https://drive.google.com/drive/folders/1bgIBVt5JAqb8RsHHDFRVp003YYjBoSXV?usp=sharing
 
 ## Getting started
 

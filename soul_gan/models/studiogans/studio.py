@@ -48,6 +48,7 @@ class StudioGen(BaseGenerator):
 class StudioDis(BaseDiscriminator):
     def __init__(self, mean, std, output_layer, config):
         super().__init__(mean, std, output_layer)
+        self.config_name = config[:-len('yaml')]
         cfg = studiogan.config.Configurations(Path(configs, "CIFAR10", config))
 
         module = __import__(
@@ -72,17 +73,19 @@ class StudioDis(BaseDiscriminator):
         )
 
     def load_state_dict(self, state_dict, strict: bool = True):
-        self.dis.conv = self.dis.conv1
-        del self.dis.conv1
-        self.dis.bn = self.dis.bn1
-        del self.dis.bn1
+        if self.config_name == "DCGAN":
+            self.dis.conv = self.dis.conv1
+            del self.dis.conv1
+            self.dis.bn = self.dis.bn1
+            del self.dis.bn1
 
         out = self.dis.load_state_dict(state_dict["state_dict"], strict=strict)
 
-        self.dis.conv1 = self.dis.conv
-        del self.dis.conv
-        self.dis.bn1 = self.dis.bn
-        del self.dis.bn
+        if self.config_name == "DCGAN":
+            self.dis.conv1 = self.dis.conv
+            del self.dis.conv
+            self.dis.bn1 = self.dis.bn
+            del self.dis.bn
 
         return out
 
