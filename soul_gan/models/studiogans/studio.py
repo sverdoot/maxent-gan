@@ -48,7 +48,7 @@ class StudioGen(BaseGenerator):
 class StudioDis(BaseDiscriminator):
     def __init__(self, mean, std, output_layer, config):
         super().__init__(mean, std, output_layer)
-        self.config_name = config[: -len("yaml")]
+        self.config_name = config[: -len(".yaml")]
         cfg = studiogan.config.Configurations(Path(configs, "CIFAR10", config))
 
         module = __import__(

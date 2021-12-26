@@ -63,11 +63,12 @@ def load_gan(
     gen.prior = prior
 
     # if True: #config.discriminator.thermalize:
-    stabilize_dis(dis, device=device)
-    stabilize_gen(gen)
 
     if config.eval:
         gen.eval()
         dis.eval()
+    else:
+        stabilize_dis(dis, device=device)
+        stabilize_gen(gen)
 
     return gen, dis
