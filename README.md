@@ -101,8 +101,8 @@ chmod +x run_scripts/*.sh
 Download checkpoints:
 
 ```bash
-./runs/get_ckpts.sh
-./runs/get_stats.sh
+./run_scripts/get_ckpts.sh
+./run_scripts/get_stats.sh
 ```
 
 To use wandb:
