@@ -62,9 +62,6 @@ def soul(
         logp = radnic_logp + ref_logp
         return logp
 
-    # store initialization
-    # saving folder initialization
-    # fd = save_init(params, feature)
 
     for it in trange(1, n_steps + 2):
         # cond = params['save'] == 'all' and (np.mod(it, n_stride) == 0)

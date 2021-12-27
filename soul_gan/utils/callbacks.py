@@ -86,6 +86,7 @@ class WandbCallback(Callback):
             log["step"] = self.cnt if "step" not in info else info["step"]
             wandb.log(log)
         self.cnt += 1
+        return 1
 
     def reset(self):
         super().reset()
@@ -113,12 +114,13 @@ class SaveImagesCallback(Callback):
 
 @CallbackRegistry.register()
 class DiscriminatorCallback(Callback):
-    def __init__(self, dis, invoke_every=1, update_input=True, device="cuda"):
+    def __init__(self, dis, invoke_every=1, update_input=True, device="cuda", batch_size: Optional[int] = None):
         self.invoke_every = invoke_every
         self.dis = dis
         self.transform = dis.transform
         self.update_input = update_input
         self.device = device
+        self.batch_size = batch_size
 
     @torch.no_grad()
     def invoke(
@@ -130,11 +132,14 @@ class DiscriminatorCallback(Callback):
         if self.cnt % self.invoke_every == 0:
             imgs = info["imgs"]
             if not batch_size:
-                batch_size = len(imgs)
+                batch_size = (
+                    len(imgs) if not self.batch_size else self.batch_size
+                )
             x = self.transform(torch.from_numpy(imgs).to(self.device))
             dgz = 0
             for x_batch in torch.split(x, batch_size):
-                dgz += self.dis.output_layer(self.dis(x_batch)).sum().item()
+                #dgz += self.dis.output_layer(self.dis(x_batch)).sum().item()
+                dgz += (self.dis(x_batch)).sum().item()
             dgz /= len(imgs)
 
             if self.update_input:

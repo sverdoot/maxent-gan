@@ -33,7 +33,7 @@ poetry config virtualenvs.create false --local
 ### StudioGAN:
 
 ```zsh
-git clone git@github.com:POSTECH-CVLab/PyTorch-StudioGAN.git thirdparty/studiogan && mv thirdparty/studiogan/src thirdparty/studiogan/studiogan
+git clone https://github.com/POSTECH-CVLab/PyTorch-StudioGAN.git thirdparty/studiogan && mv thirdparty/studiogan/src thirdparty/studiogan/studiogan
 ```
 
 

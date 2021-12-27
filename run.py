@@ -22,7 +22,7 @@ from soul_gan.sample import soul
 from soul_gan.utils.callbacks import CallbackRegistry
 from soul_gan.utils.general_utils import DotConfig  # isort:block
 from soul_gan.utils.general_utils import IgnoreLabelDataset, random_seed
-# from soul_gan.utils.metrics.compute_fid_tf import calculate_fid_given_paths
+from soul_gan.utils.metrics.compute_fid_tf import calculate_fid_given_paths
 from soul_gan.utils.metrics.inception_score import (MEAN_TRASFORM,
                                                     STD_TRANSFORM,
                                                     get_inception_score)
@@ -228,9 +228,6 @@ def main(config: DotConfig, device: torch.device, group: str):
             )
 
     if config.afterall_params.compute_fid:
-        from soul_gan.utils.metrics.compute_fid_tf import \
-            calculate_fid_given_paths
-
         # model = InceptionV3().to(device)
         # model.eval()
         # stats = np.load("stats/fid_stats_cifar10_train.npz")
@@ -291,6 +288,7 @@ def main(config: DotConfig, device: torch.device, group: str):
             afterall_callbacks.append(
                 CallbackRegistry.create_callback(callback.name, **params)
             )
+        results = [[] for _ in afterall_callbacks]
         for step in range(0, config.n_steps, config.every):
             x_file = Path(
                 results_dir,
@@ -310,8 +308,18 @@ def main(config: DotConfig, device: torch.device, group: str):
             zs = np.load(z_file)
             info = dict(imgs=images, zs=zs, step=step)
 
-            for callback in afterall_callbacks:
-                callback.invoke(info)
+            for callback_id, callback in enumerate(afterall_callbacks):
+                val = callback.invoke(info)
+                if val is not None:
+                    results[callback_id].append(val)
+        results = np.array(results)
+        np.savetxt(Path(
+                    results_dir,
+                    config.afterall_params.sub_dir,
+                    "callback_results.txt",
+                ),
+                results,
+            )
 
 
 if __name__ == "__main__":
@@ -323,12 +331,10 @@ if __name__ == "__main__":
 
     config = DotConfig(
         config
-    )  # yaml.load(Path(args.config).open("r"), Loader))
+    )
     if args.seed:
         config.seed = args.seed
-    config.file_name = Path(args.configs[0]).name  # stem
-    # gan_config = DotConfig(yaml.load(Path(args.gan_config).open("r"), Loader))
-    # gan_config.file_name = Path(args.gan_config).name  # stem
+    config.file_name = Path(args.configs[0]).name
 
     device = torch.device(
         config.device if torch.cuda.is_available() else "cpu"

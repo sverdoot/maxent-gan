@@ -81,11 +81,19 @@ callbacks:
     #       - imgs
 
   afterall_callbacks: &afterall_callbacks
-    discriminator:
+    energy:
       name: EnergyCallback
       params:
         dis: null
         gen: null
+        invoke_every: 1
+        device: *device
+        update_input: true
+        batch_size: *batch_size
+    discriminator:
+      name: DiscriminatorCallback
+      params:
+        dis: null
         invoke_every: 1
         device: *device
         update_input: true
@@ -99,6 +107,7 @@ callbacks:
         invoke_every: 1
         keys:
           - Energy
+          - D(G(z))
     wandb_imgs:
       name: WandbCallback
       params:
