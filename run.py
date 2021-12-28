@@ -7,13 +7,13 @@ import numpy as np
 import torch
 import torchvision
 import yaml
+
 # from pytorch_fid.fid_score import calculate_frechet_distance
 # from pytorch_fid.inception import InceptionV3
 from yaml import Dumper, Loader
 
 sys.path.append("thirdparty/studiogan/studiogan")
 
-import soul_gan.models
 import wandb
 from soul_gan.distribution import GANTarget
 from soul_gan.feature import FeatureRegistry
@@ -23,9 +23,11 @@ from soul_gan.utils.callbacks import CallbackRegistry
 from soul_gan.utils.general_utils import DotConfig  # isort:block
 from soul_gan.utils.general_utils import IgnoreLabelDataset, random_seed
 from soul_gan.utils.metrics.compute_fid_tf import calculate_fid_given_paths
-from soul_gan.utils.metrics.inception_score import (MEAN_TRASFORM,
-                                                    STD_TRANSFORM,
-                                                    get_inception_score)
+from soul_gan.utils.metrics.inception_score import (
+    MEAN_TRASFORM,
+    STD_TRANSFORM,
+    get_inception_score,
+)
 
 
 def parse_arguments():
@@ -134,6 +136,13 @@ def main(config: DotConfig, device: torch.device, group: str):
             z = torch.randn((config.sample_params.batch_size, gen.z_dim)).to(
                 device
             )
+            # HACK
+            label = torch.LongTensor(np.random.randint(0, 10 - 1, len(z))).to(
+                z.device
+            )
+            gen.label = label
+            dis.label = label
+
             zs, xs = soul(
                 z, gen, ref_dist, feature, **config.sample_params.params
             )
@@ -193,7 +202,7 @@ def main(config: DotConfig, device: torch.device, group: str):
         model.eval()
 
         is_values = []
-        for step in range(0, config.n_steps, config.every):
+        for step in range(0, config.n_steps + 1, config.every):
             file = Path(
                 results_dir,
                 config.afterall_params.sub_dir,
@@ -233,7 +242,7 @@ def main(config: DotConfig, device: torch.device, group: str):
         # stats = np.load("stats/fid_stats_cifar10_train.npz")
 
         fid_values = []
-        for step in range(0, config.n_steps, config.every):
+        for step in range(0, config.n_steps + 1, config.every):
             file = Path(
                 results_dir,
                 config.afterall_params.sub_dir,
@@ -313,13 +322,14 @@ def main(config: DotConfig, device: torch.device, group: str):
                 if val is not None:
                     results[callback_id].append(val)
         results = np.array(results)
-        np.savetxt(Path(
-                    results_dir,
-                    config.afterall_params.sub_dir,
-                    "callback_results.txt",
-                ),
-                results,
-            )
+        np.savetxt(
+            Path(
+                results_dir,
+                config.afterall_params.sub_dir,
+                "callback_results.txt",
+            ),
+            results,
+        )
 
 
 if __name__ == "__main__":
@@ -329,9 +339,7 @@ if __name__ == "__main__":
     proc = subprocess.Popen(["cat", *args.configs], stdout=subprocess.PIPE)
     config = yaml.safe_load(proc.stdout.read())
 
-    config = DotConfig(
-        config
-    )
+    config = DotConfig(config)
     if args.seed:
         config.seed = args.seed
     config.file_name = Path(args.configs[0]).name

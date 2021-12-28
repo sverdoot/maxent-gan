@@ -1,19 +1,25 @@
 from pathlib import Path
 
+import numpy as np
 import studiogan
 import studiogan.configs
+import torch
 
-from soul_gan.models.base import (BaseDiscriminator, BaseGenerator,
-                                  ModelRegistry)
+from soul_gan.models.base import (
+    BaseDiscriminator,
+    BaseGenerator,
+    ModelRegistry,
+)
 
 configs = Path(studiogan.configs.__path__[0])
 
 
 @ModelRegistry.register()
 class StudioGen(BaseGenerator):
-    def __init__(self, mean, std, config):
+    def __init__(self, mean, std, config, label=None):
         super().__init__(mean, std)
         cfg = studiogan.config.Configurations(Path(configs, "CIFAR10", config))
+        self.n_classes = cfg.DATA.num_classes
 
         module = __import__(
             "models.{backbone}".format(backbone=cfg.MODEL.backbone),
@@ -34,6 +40,7 @@ class StudioGen(BaseGenerator):
             MODULES=cfg.MODULES,
         )
         self.z_dim = self.gen.z_dim
+        self.label = label
 
     def load_state_dict(self, state_dict, strict: bool = True):
         return self.gen.load_state_dict(
@@ -41,15 +48,17 @@ class StudioGen(BaseGenerator):
         )
 
     def forward(self, x):
-        return self.gen.forward(x, None)
+        label = self.label
+        return self.gen.forward(x, label)
 
 
 @ModelRegistry.register()
 class StudioDis(BaseDiscriminator):
-    def __init__(self, mean, std, output_layer, config):
+    def __init__(self, mean, std, output_layer, config, label=None):
         super().__init__(mean, std, output_layer)
         self.config_name = config[: -len(".yaml")]
         cfg = studiogan.config.Configurations(Path(configs, "CIFAR10", config))
+        self.n_classes = cfg.DATA.num_classes
 
         module = __import__(
             "models.{backbone}".format(backbone=cfg.MODEL.backbone),
@@ -71,6 +80,7 @@ class StudioDis(BaseDiscriminator):
             mixed_precision=False,  # cfg.RUN.mixed_precision,
             MODULES=cfg.MODULES,
         )
+        self.label = label
 
     def load_state_dict(self, state_dict, strict: bool = True):
         if self.config_name == "DCGAN":
@@ -90,4 +100,5 @@ class StudioDis(BaseDiscriminator):
         return out
 
     def forward(self, x):
-        return self.dis.forward(x, None)["adv_output"]
+        label = self.label
+        return self.dis.forward(x, label)["adv_output"]

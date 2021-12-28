@@ -6,7 +6,7 @@ gan_config:
 
   prior: normal
   eval: true #true
-
+  label: &label true
 
   generator:
     name: StudioGen
@@ -14,6 +14,7 @@ gan_config:
         mean: *mean
         std: *std
         config: SNGAN.yaml
+        label: *label
     ckpt_path: "checkpoints/sngan/G_CIFAR_studio_current.pth"
 
   discriminator:
@@ -23,5 +24,6 @@ gan_config:
         std: *std
         output_layer: 'identity'
         config: SNGAN.yaml
+        label: *label
     ckpt_path: "checkpoints/sngan/D_CIFAR_studio_current.pth"
 

@@ -114,7 +114,14 @@ class SaveImagesCallback(Callback):
 
 @CallbackRegistry.register()
 class DiscriminatorCallback(Callback):
-    def __init__(self, dis, invoke_every=1, update_input=True, device="cuda", batch_size: Optional[int] = None):
+    def __init__(
+        self,
+        dis,
+        invoke_every=1,
+        update_input=True,
+        device="cuda",
+        batch_size: Optional[int] = None,
+    ):
         self.invoke_every = invoke_every
         self.dis = dis
         self.transform = dis.transform
@@ -138,7 +145,7 @@ class DiscriminatorCallback(Callback):
             x = self.transform(torch.from_numpy(imgs).to(self.device))
             dgz = 0
             for x_batch in torch.split(x, batch_size):
-                #dgz += self.dis.output_layer(self.dis(x_batch)).sum().item()
+                # dgz += self.dis.output_layer(self.dis(x_batch)).sum().item()
                 dgz += (self.dis(x_batch)).sum().item()
             dgz /= len(imgs)
 
