@@ -38,6 +38,13 @@ git clone https://github.com/POSTECH-CVLab/PyTorch-StudioGAN.git thirdparty/stud
 
 
 ```zsh
+touch thirdparty/studiogan/studiogan/__init__.py
+
+echo "import sys
+
+sys.path.append('.')
+from . import config, utils" >> thirdparty/studiogan/studiogan/__init__.py
+
 echo \
 "from setuptools import setup, find_packages
 
@@ -124,8 +131,10 @@ pre-commit run -a
 
 ## TODO:
 
-* rewrite loop in run
+* add Runner class to hold all needed inside and pass to all other objects
+* rewrite loop in run (still, looks weird)
 * add more features and test
 * add parallelism...
+* make configs (gan_configs, not exp_configs (?)) for both freezed and non-freezed batch-norms
 
 

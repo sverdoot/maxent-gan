@@ -64,7 +64,7 @@ def soul(
 
     for it in trange(1, n_steps + 2):
         # cond = params['save'] == 'all' and (np.mod(it, n_stride) == 0)
-        z.requires_grad_()
+        z.requires_grad_(True)
 
         with torch.no_grad():
             condition_avg = it > burn_in_steps or it == 1
@@ -92,7 +92,7 @@ def soul(
         z = inter_zs[-1]
 
         if it % save_every == 0:
-            zs.append(z.detach().cpu())
-            xs.append(gen.inverse_transform(gen(z)).detach().cpu())
+            zs.append(z.data.cpu())
+            xs.append(gen.inverse_transform(gen(z)).data.cpu())
 
     return zs, xs

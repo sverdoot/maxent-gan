@@ -3,20 +3,31 @@ gan_config:
     Normalize:
       mean: &mean [0.5, 0.5, 0.5]
       std: &std [0.5, 0.5, 0.5]
-
   prior: uniform
-
   generator:
     name: SN_DCGAN_Generator
     params:
-        mean: *mean
-        std: *std
-    ckpt_path: "checkpoints/wgan_gp/DCGAN_G_CIFAR_WGAN-GP_150001.pth"
-
+      mean: *mean
+      std: *std
+    ckpt_path: checkpoints/wgan_gp/DCGAN_G_CIFAR_WGAN-GP_150001.pth
   discriminator:
     name: WGANDiscriminator
     params:
-        mean: *mean
-        std: *std
-    ckpt_path: "checkpoints/wgan_gp/DCGAN_D_CIFAR_WGAN-GP_150001.pth"
+      mean: *mean
+      std: *std
+    ckpt_path: checkpoints/wgan_gp/DCGAN_D_CIFAR_WGAN-GP_150001.pth
+  thermalize:
+    true:
+      log_norm_const: 1.347715135223855
+      lipschitz_const: 1309.0426531249998
+    false:
+      log_norm_const: 1.9325980039693056
+      lipschitz_const: 1308.7798875
+eval:
+  true:
+    log_norm_const: 12.065319357380908
+    lipschitz_const: 1305.2526406250001
+  false:
+    log_norm_const: 12.061372796077146
+    lipschitz_const: 1311.1438343750003
 

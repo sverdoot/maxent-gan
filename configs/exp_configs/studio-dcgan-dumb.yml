@@ -1,12 +1,12 @@
 dir: &dir log/dumb_feature
-n_steps: &n_steps 500
+n_steps: &n_steps 250 #1000
 every: &every 25
 seed: null
 device: &device 'cuda'
 total_n: &total_n 10000
 batch_size: &batch_size 500
 weight_step: &weight_step 0.0
-step_size: &step_size 0.02
+step_size: &step_size 0.001 #0.02
 name: &name studio_dcgan_dumb
 burn_in_steps: &burn_in_steps 0
 sub_dir: &sub_dir studio_dcgan

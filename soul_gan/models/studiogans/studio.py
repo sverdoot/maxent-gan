@@ -1,8 +1,11 @@
 from pathlib import Path
+from typing import Union
 
 import numpy as np
 import studiogan
 import studiogan.configs
+import studiogan.utils
+import studiogan.utils.misc
 import torch
 
 from soul_gan.models.base import (
@@ -19,6 +22,7 @@ class StudioGen(BaseGenerator):
     def __init__(self, mean, std, config, label=None):
         super().__init__(mean, std)
         cfg = studiogan.config.Configurations(Path(configs, "CIFAR10", config))
+        self.cfg = cfg
         self.n_classes = cfg.DATA.num_classes
 
         module = __import__(
@@ -43,13 +47,23 @@ class StudioGen(BaseGenerator):
         self.label = label
 
     def load_state_dict(self, state_dict, strict: bool = True):
-        return self.gen.load_state_dict(
+        out = self.gen.load_state_dict(
             state_dict["state_dict"], strict=strict
         )
+
+        if False:#self.cfg.RUN.batch_statistics:
+            self.gen.apply(studiogan.utils.misc.set_bn_trainable)
+            self.gen.apply(studiogan.utils.misc.untrack_bn_statistics)
+        self.gen.apply(studiogan.utils.misc.set_deterministic_op_trainable)
+
+        return out
 
     def forward(self, x):
         label = self.label
         return self.gen.forward(x, label)
+
+    def sample_label(self, batch_size: int, device: Union[int, str]):
+        return torch.randint(0, self.n_classes - 1, (batch_size,), device=device)
 
 
 @ModelRegistry.register()

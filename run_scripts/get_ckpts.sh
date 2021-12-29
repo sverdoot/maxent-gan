@@ -2,9 +2,9 @@
 
 # gdown --id 18OiIntHQQO7Ow2T2ghOc5gVQPAFLcmxX   -O checkpoints/wgan_gp/G_CIFAR_studio_best.pth
 
-gdown --id 1Ucqqs_g2zi72Nxe0D3Xe4v6sF5bpnIs6 -O checkpoints/dcgan/G_CIFAR_studio_best.pth
+# gdown --id 1Ucqqs_g2zi72Nxe0D3Xe4v6sF5bpnIs6 -O checkpoints/dcgan/G_CIFAR_studio_best.pth
 
-gdown --id 19avI2ftpPsFekPbmMvAmBjw699Y8Zgpm  -O checkpoints/dcgan/D_CIFAR_studio_best.pth
+# gdown --id 19avI2ftpPsFekPbmMvAmBjw699Y8Zgpm  -O checkpoints/dcgan/D_CIFAR_studio_best.pth
 
 # gdown --id 1xM3QacKa7dIs7rHhsP8jPEOuSlW6F7Pj -O checkpoints/wgan_gp
 
@@ -25,4 +25,10 @@ gdown --id 19avI2ftpPsFekPbmMvAmBjw699Y8Zgpm  -O checkpoints/dcgan/D_CIFAR_studi
 # gdown --id 1kBQTQIwwxZCiAenDO3CnxTEtNQ_0fiqH -O checkpoints/dcgan/D_CIFAR_studio_current.pth
 
 # gdown --id 1zI4n2Ii5vEI80RPK_zjIL4B_jPA0RmXK -O checkpoints/dcgan/G_CIFAR_studio_current.pth
+
+gdown --id 1pUgotG9ZGluVAzXHCCyPc1KqEjZb3hCu -O checkpoints/sagan/G_CIFAR_studio_best.pth
+
+gdown --id 1NbIMZsTrMg1Dq9KiQ2ltTz2zdofApvuV -O checkpoints/sagan/D_CIFAR_studio_best.pth
+
+
 

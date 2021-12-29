@@ -3,25 +3,35 @@ gan_config:
     Normalize:
       mean: &mean [0.5, 0.5, 0.5]
       std: &std [0.5, 0.5, 0.5]
-
   prior: normal
-  eval: true #true
-
-
+  eval: false
   generator:
     name: StudioGen
     params:
-        mean: *mean
-        std: *std
-        config: WGAN-GP.yaml
-    ckpt_path: "checkpoints/wgan_gp/G_CIFAR_studio_best.pth"
-
+      mean: *mean
+      std: *std
+      config: WGAN-GP.yaml
+    ckpt_path: checkpoints/wgan_gp/G_CIFAR_studio_best.pth
   discriminator:
     name: StudioDis
     params:
-        mean: *mean
-        std: *std
-        output_layer: 'identity'
-        config: WGAN-GP.yaml
-    ckpt_path: "checkpoints/wgan_gp/D_CIFAR_studio_best.pth"
+      mean: *mean
+      std: *std
+      output_layer: identity
+      config: WGAN-GP.yaml
+    ckpt_path: checkpoints/wgan_gp/D_CIFAR_studio_best.pth
+  thermalize:
+    true:
+      log_norm_const: -.inf
+      lipschitz_const: 783.3608593750001
+    false:
+      log_norm_const: -.inf
+      lipschitz_const: 16.926562695312498
+eval:
+  true:
+    log_norm_const: .inf
+    lipschitz_const: 16.850612646484375
+  false:
+    log_norm_const: .inf
+    lipschitz_const: 12.965276098632817
 

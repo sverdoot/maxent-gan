@@ -1,13 +1,13 @@
 dir: &dir log/dumb_feature
-n_steps: &n_steps  300
+n_steps: &n_steps 300
 every: &every 25
 seed: null
 device: &device 'cuda'
-total_n: &total_n 10000
-batch_size: &batch_size 500
+total_n: &total_n 10000 #0
+batch_size: &batch_size 250
 weight_step: &weight_step 0.0
 step_size: &step_size 0.001
-name: &name studio_sngan_dumb
+name: &name studio_sagan_dumb
 burn_in_steps: &burn_in_steps 0
-sub_dir: &sub_dir studio_sngan
+sub_dir: &sub_dir studio_sagan
 

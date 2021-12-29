@@ -64,3 +64,6 @@ class BaseGenerator(nn.Module):
     ):
         super().__init__()
         self.inverse_transform = NormalizeInverse(mean, std)
+
+    def sample_label(self, *args, **kwargs):
+        return None

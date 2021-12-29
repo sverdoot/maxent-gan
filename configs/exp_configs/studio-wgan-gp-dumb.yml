@@ -6,7 +6,7 @@ device: &device 'cuda'
 total_n: &total_n 10000
 batch_size: &batch_size 500
 weight_step: &weight_step 0.0
-step_size: &step_size 0.003
+step_size: &step_size 0.0001 #3
 name: &name studio_wgan_gp_dumb
 burn_in_steps: &burn_in_steps 0
 sub_dir: &sub_dir studio_wgan_gp

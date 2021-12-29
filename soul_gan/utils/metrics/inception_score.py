@@ -23,6 +23,7 @@ from soul_gan.utils.callbacks import Callback, CallbackRegistry
 N_INCEPTION_CLASSES = 1000
 MEAN_TRASFORM = [0.485, 0.456, 0.406]
 STD_TRANSFORM = [0.229, 0.224, 0.225]
+N_GEN_IMAGES = 5000
 
 
 @CallbackRegistry.register()

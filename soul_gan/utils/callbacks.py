@@ -7,6 +7,8 @@ import torch
 from torchvision import transforms
 from torchvision.utils import make_grid
 
+from soul_gan.distribution import estimate_log_norm_constant
+
 
 class Callback(ABC):
     cnt: int = 0
@@ -138,13 +140,23 @@ class DiscriminatorCallback(Callback):
         dgz = None
         if self.cnt % self.invoke_every == 0:
             imgs = info["imgs"]
+            if 'label' in info:
+                label = torch.LongTensor(info["label"]).to(self.device)
+            else:
+                label = None
+
             if not batch_size:
                 batch_size = (
                     len(imgs) if not self.batch_size else self.batch_size
                 )
             x = self.transform(torch.from_numpy(imgs).to(self.device))
             dgz = 0
-            for x_batch in torch.split(x, batch_size):
+            for i, x_batch in enumerate(torch.split(x, batch_size)):
+                if label is not None:
+                    label_batch = label[i*batch_size:(i+1)*batch_size]
+                else:
+                    label_batch = None
+                self.dis.label = label_batch
                 # dgz += self.dis.output_layer(self.dis(x_batch)).sum().item()
                 dgz += (self.dis(x_batch)).sum().item()
             dgz /= len(imgs)
@@ -184,17 +196,32 @@ class EnergyCallback(Callback):
         energy = None
         if self.cnt % self.invoke_every == 0:
             zs = torch.FloatTensor(info["zs"]).to(self.device)
+            if 'label' in info:
+                label = torch.LongTensor(info["label"]).to(self.device)
+            else:
+                label = None
+
             if not batch_size:
                 batch_size = (
                     len(zs) if not self.batch_size else self.batch_size
                 )
             energy = 0
-            for z_batch in torch.split(zs, batch_size):
+
+            log_norm_const = estimate_log_norm_constant(self.gen, self.dis, 5000)
+
+            for i, z_batch in enumerate(torch.split(zs, batch_size)):
+                if label is not None:
+                    label_batch = label[i*batch_size:(i+1)*batch_size]
+                else:
+                    label_batch = None
+                self.dis.label = label_batch
+                self.gen.label = label_batch
                 dgz = self.dis(self.gen(z_batch))
                 energy += -(
                     self.gen.prior.log_prob(z_batch).sum() + dgz.sum()
                 ).item()
             energy /= len(zs)
+            energy += log_norm_const
 
             if self.update_input:
                 info["Energy"] = energy
