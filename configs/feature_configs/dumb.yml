@@ -90,6 +90,7 @@ callbacks:
         device: *device
         update_input: true
         batch_size: *batch_size
+        norm_constant: null
     discriminator:
       name: DiscriminatorCallback
       params:
