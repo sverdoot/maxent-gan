@@ -152,7 +152,7 @@ def main(config: DotConfig, device: torch.device, group: str):
             print(zs.shape)
             total_sample_z.append(zs)
             total_sample_x.append(xs)
-            log_prior_dist_z = gen.prior.log_prob(z)
+            log_prior_dist_z = gen.prior.log_prob(zs)
             if i==0:
                 energy_sum = torch.zeros_like(log_prior_dist_z)
             energy_sum = energy_sum + torch.exp(log_prior_dist_z-dis(xs))
