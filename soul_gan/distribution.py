@@ -92,7 +92,14 @@ def estimate_log_norm_constant(
     return log_norm_const
 
 
-def harmonic_mean_estimate(dis: nn.Module, x: Union[np.ndarray, torch.FloatTensor], label: Union[np.ndarray, torch.FloatTensor], device, batch_size: Optional[int]=None, verbose: bool = False) -> float:
+def harmonic_mean_estimate(
+    dis: nn.Module,
+    x: Union[np.ndarray, torch.FloatTensor],
+    label: Union[np.ndarray, torch.FloatTensor],
+    device,
+    batch_size: Optional[int] = None,
+    verbose: bool = False,
+) -> float:
     batch_size = batch_size if batch_size else len(x)
     inv_norm_const = 0
     # if verbose:
@@ -105,7 +112,7 @@ def harmonic_mean_estimate(dis: nn.Module, x: Union[np.ndarray, torch.FloatTenso
         label = torch.from_numpy(label)
 
     for i, x_batch in enumerate(torch.split(x, batch_size)):
-        label_batch = label[i*batch_size: (i+1)*batch_size]
+        label_batch = label[i * batch_size : (i + 1) * batch_size]
         dis.label = label_batch.to(device)
 
         dgz = dis(x_batch.to(device))

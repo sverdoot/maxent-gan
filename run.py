@@ -36,7 +36,7 @@ def parse_arguments():
     parser.add_argument("--group", type=str)
     parser.add_argument("--seed", type=int)
     parser.add_argument("--lipschitz_step_size", action="store_true")
-    parser.add_argument('--step_size_mul', type=float, default=1.)
+    parser.add_argument("--step_size_mul", type=float, default=1.0)
 
     args = parser.parse_args()
     return args
@@ -321,10 +321,10 @@ def main(config: DotConfig, device: torch.device, group: str):
         )
 
         x_final_file = Path(
-                results_dir,
-                "images",
-                f"{config.n_steps}.npy",
-            )
+            results_dir,
+            "images",
+            f"{config.n_steps}.npy",
+        )
         label_file = Path(
             results_dir,
             f"labels.npy",
@@ -332,7 +332,13 @@ def main(config: DotConfig, device: torch.device, group: str):
         label = np.load(label_file)
 
         # need to check correctness
-        log_norm_const = harmonic_mean_estimate(dis, np.load(x_final_file), label, device, batch_size=config.batch_size)
+        log_norm_const = harmonic_mean_estimate(
+            dis,
+            np.load(x_final_file),
+            label,
+            device,
+            batch_size=config.batch_size,
+        )
 
         afterall_callbacks = []
         callbacks = config.callbacks.afterall_callbacks
@@ -344,7 +350,7 @@ def main(config: DotConfig, device: torch.device, group: str):
             if "gen" in params:
                 params["gen"] = gen
             # if "log_norm_const" in params:
-            #     params["log_norm_const"] = log_norm_const 
+            #     params["log_norm_const"] = log_norm_const
             afterall_callbacks.append(
                 CallbackRegistry.create_callback(callback.name, **params)
             )

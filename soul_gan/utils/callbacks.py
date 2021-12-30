@@ -178,7 +178,7 @@ class EnergyCallback(Callback):
         update_input=True,
         device="cuda",
         batch_size: Optional[int] = None,
-        log_norm_const: float = 1
+        log_norm_const: float = 1,
     ):
         self.invoke_every = invoke_every
         self.dis = dis

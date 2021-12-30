@@ -8,7 +8,7 @@ from tqdm import trange
 
 from soul_gan.utils.general_utils import ROOT_DIR, DotConfig
 
-from .base import ModelRegistry, BaseDiscriminator, BaseGenerator
+from .base import BaseDiscriminator, BaseGenerator, ModelRegistry
 
 
 def stabilize_dis(dis, im_size=32, iters=5000, device=0):
