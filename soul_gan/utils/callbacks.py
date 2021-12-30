@@ -140,7 +140,7 @@ class DiscriminatorCallback(Callback):
         dgz = None
         if self.cnt % self.invoke_every == 0:
             imgs = info["imgs"]
-            if 'label' in info:
+            if "label" in info:
                 label = torch.LongTensor(info["label"]).to(self.device)
             else:
                 label = None
@@ -153,7 +153,7 @@ class DiscriminatorCallback(Callback):
             dgz = 0
             for i, x_batch in enumerate(torch.split(x, batch_size)):
                 if label is not None:
-                    label_batch = label[i*batch_size:(i+1)*batch_size]
+                    label_batch = label[i * batch_size : (i + 1) * batch_size]
                 else:
                     label_batch = None
                 self.dis.label = label_batch
@@ -178,6 +178,7 @@ class EnergyCallback(Callback):
         update_input=True,
         device="cuda",
         batch_size: Optional[int] = None,
+        log_norm_const: float = 1
     ):
         self.invoke_every = invoke_every
         self.dis = dis
@@ -186,6 +187,7 @@ class EnergyCallback(Callback):
         self.update_input = update_input
         self.device = device
         self.batch_size = batch_size
+        self.log_norm_const = log_norm_const
 
     @torch.no_grad()
     def invoke(
@@ -196,7 +198,7 @@ class EnergyCallback(Callback):
         energy = None
         if self.cnt % self.invoke_every == 0:
             zs = torch.FloatTensor(info["zs"]).to(self.device)
-            if 'label' in info:
+            if "label" in info:
                 label = torch.LongTensor(info["label"]).to(self.device)
             else:
                 label = None
@@ -206,12 +208,13 @@ class EnergyCallback(Callback):
                     len(zs) if not self.batch_size else self.batch_size
                 )
             energy = 0
-
-            log_norm_const = estimate_log_norm_constant(self.gen, self.dis, 5000)
+            # log_norm_const = estimate_log_norm_constant(
+            #     self.gen, self.dis, 5000
+            # )
 
             for i, z_batch in enumerate(torch.split(zs, batch_size)):
                 if label is not None:
-                    label_batch = label[i*batch_size:(i+1)*batch_size]
+                    label_batch = label[i * batch_size : (i + 1) * batch_size]
                 else:
                     label_batch = None
                 self.dis.label = label_batch
@@ -221,7 +224,7 @@ class EnergyCallback(Callback):
                     self.gen.prior.log_prob(z_batch).sum() + dgz.sum()
                 ).item()
             energy /= len(zs)
-            energy += log_norm_const
+            energy += self.log_norm_const
 
             if self.update_input:
                 info["Energy"] = energy

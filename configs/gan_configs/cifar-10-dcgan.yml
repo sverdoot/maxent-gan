@@ -26,11 +26,5 @@ gan_config:
     false:
       log_norm_const: 0.48769025543098143
       lipschitz_const: 15.67127822265625
-eval:
-  true:
-    log_norm_const: 27.59842009936362
-    lipschitz_const: 15.729645263671873
-  false:
-    log_norm_const: 29.37341516883995
-    lipschitz_const: 34.77598662109375
+
 

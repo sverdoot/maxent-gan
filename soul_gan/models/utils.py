@@ -1,22 +1,22 @@
 from pathlib import Path
 from typing import Tuple
 
+import numpy as np
 import torch
 from torch import nn
-import numpy as np
 from tqdm import trange
 
 from soul_gan.utils.general_utils import ROOT_DIR, DotConfig
 
-from .base import ModelRegistry
+from .base import ModelRegistry, BaseDiscriminator, BaseGenerator
 
 
 def stabilize_dis(dis, im_size=32, iters=5000, device=0):
     for _ in trange(iters):
         x = torch.rand(10, 3, im_size, im_size, device=device)
         label = torch.LongTensor(np.random.randint(0, 10 - 1, len(x))).to(
-                x.device
-            )
+            x.device
+        )
         dis.label = label
         _ = dis(x)
 
@@ -25,15 +25,15 @@ def stabilize_gen(gen, iters=500):
     for _ in trange(iters):
         x = gen.prior.sample((100,))
         label = torch.LongTensor(np.random.randint(0, 10 - 1, len(x))).to(
-                x.device
-            )
+            x.device
+        )
         gen.label = label
         _ = gen(x)
 
 
 def load_gan(
     config: DotConfig, device: torch.device, thermalize: bool
-) -> Tuple[torch.nn.Module, torch.nn.Module]:
+) -> Tuple[BaseGenerator, BaseDiscriminator]:
     gen = ModelRegistry.create_model(
         config.generator.name, **config.generator.params
     ).to(device)
@@ -57,9 +57,9 @@ def load_gan(
         gen.inverse_transform = gen.module.inverse_transform
         gen.z_dim = gen.module.z_dim
 
-        if hasattr(gen.module, 'label'):
+        if hasattr(gen.module, "label"):
             gen.label = gen.module.label
-        if hasattr(dis.module, 'label'):
+        if hasattr(dis.module, "label"):
             dis.label = dis.module.label
 
     if config.prior == "normal":
@@ -98,7 +98,13 @@ def load_gan(
     return gen, dis
 
 
-def estimate_lipschitz_const(gen: nn.Module, dis: nn.Module, n_pts: int, batch_size: int, verbose: bool = False) -> float:
+def estimate_lipschitz_const(
+    gen: nn.Module,
+    dis: nn.Module,
+    n_pts: int,
+    batch_size: int,
+    verbose: bool = False,
+) -> float:
     lipschitz_const_est = 0
     if verbose:
         bar = trange
@@ -117,5 +123,5 @@ def estimate_lipschitz_const(gen: nn.Module, dis: nn.Module, n_pts: int, batch_s
         grad = torch.autograd.grad(energy.sum(), z)[0]
         grad_norm = torch.norm(grad, dim=1, p=2).sum()
         lipschitz_const_est += grad_norm.item() / n_pts
-    
+
     return lipschitz_const_est

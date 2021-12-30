@@ -1,10 +1,7 @@
 from torch import nn
 
-from soul_gan.models.base import (
-    BaseDiscriminator,
-    BaseGenerator,
-    ModelRegistry,
-)
+from soul_gan.models.base import (BaseDiscriminator, BaseGenerator,
+                                  ModelRegistry)
 
 
 @ModelRegistry.register()

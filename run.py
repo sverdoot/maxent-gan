@@ -4,9 +4,9 @@ import sys
 from pathlib import Path
 
 import numpy as np
+import ruamel.yaml as yaml
 import torch
 import torchvision
-import ruamel.yaml as yaml
 
 # from pytorch_fid.fid_score import calculate_frechet_distance
 # from pytorch_fid.inception import InceptionV3
@@ -14,53 +14,53 @@ import ruamel.yaml as yaml
 sys.path.append("thirdparty/studiogan/studiogan")
 
 import wandb
-from soul_gan.distribution import GANTarget
+from soul_gan.distribution import GANTarget, harmonic_mean_estimate
 from soul_gan.feature import FeatureRegistry
-from soul_gan.models.utils import load_gan
 from soul_gan.models.studiogans import StudioDis, StudioGen
+from soul_gan.models.utils import load_gan
 from soul_gan.sample import soul
 from soul_gan.utils.callbacks import CallbackRegistry
 from soul_gan.utils.general_utils import DotConfig  # isort:block
 from soul_gan.utils.general_utils import IgnoreLabelDataset, random_seed
 from soul_gan.utils.metrics.compute_fid_tf import calculate_fid_given_paths
-from soul_gan.utils.metrics.inception_score import (
-    MEAN_TRASFORM,
-    STD_TRANSFORM,
-    N_GEN_IMAGES,
-    get_inception_score,
-)
+from soul_gan.utils.metrics.inception_score import (MEAN_TRASFORM,
+                                                    N_GEN_IMAGES,
+                                                    STD_TRANSFORM,
+                                                    get_inception_score)
 
 
 def parse_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument("configs", type=str, nargs="+")
-    parser.add_argument("--thermalize", action='store_true')
+    parser.add_argument("--thermalize", action="store_true")
     parser.add_argument("--group", type=str)
     parser.add_argument("--seed", type=int)
-    parser.add_argument('--lipschitz_step_size', action='store_true')
+    parser.add_argument("--lipschitz_step_size", action="store_true")
+    parser.add_argument('--step_size_mul', type=float, default=1.)
 
     args = parser.parse_args()
     return args
 
 
 def main(config: DotConfig, device: torch.device, group: str):
-    gen, dis = load_gan(config.gan_config, device, thermalize=config.thermalize)
     # HACK
     suffix = f'{"_therm" if config.thermalize else ""}'
 
     # sample
     if config.sample_params.sample:
-
-        
+        gen, dis = load_gan(
+            config.gan_config, device, thermalize=config.thermalize
+        )
 
         if config.sample_params.sub_dir:
             save_dir = Path(
-                config.sample_params.save_dir, config.sample_params.sub_dir+suffix
+                config.sample_params.save_dir,
+                config.sample_params.sub_dir + suffix,
             )
         else:
             save_dir = Path(
                 config.sample_params.save_dir,
-                datetime.datetime.now().strftime("%Y_%m_%d_%H_%M")+suffix,
+                datetime.datetime.now().strftime("%Y_%m_%d_%H_%M") + suffix,
             )
         save_dir.mkdir(exist_ok=True, parents=True)
 
@@ -139,10 +139,8 @@ def main(config: DotConfig, device: torch.device, group: str):
                     {"name": f"{group}_{i}"}, allow_val_change=True
                 )
 
-            # z = gen.prior.sample((config.sample_params.batch_size,))
-            z = torch.randn((config.sample_params.batch_size, gen.z_dim)).to(
-                device
-            )
+            z = gen.prior.sample((config.sample_params.batch_size,))
+
             # HACK
             label = torch.LongTensor(np.random.randint(0, 10 - 1, len(z))).to(
                 z.device
@@ -151,11 +149,17 @@ def main(config: DotConfig, device: torch.device, group: str):
             dis.label = label
 
             if config.lipschitz_step_size:
-                config.sample_params.params.step_size = 1. / config.gan_config.thermalize.dict[config.thermalize]['lipschitz_const']
+                config.sample_params.params.step_size = (
+                    args.step_size_mul
+                    / config.gan_config.thermalize.dict[config.thermalize][
+                        "lipschitz_const"
+                    ]
+                )
 
             zs, xs = soul(
                 z, gen, ref_dist, feature, **config.sample_params.params
             )
+
             zs = torch.stack(zs, 0)
             xs = torch.stack(xs, 0)
             print(zs.shape)
@@ -169,9 +173,7 @@ def main(config: DotConfig, device: torch.device, group: str):
         total_sample_x = torch.cat(
             total_sample_x, 1
         )  # (number_of_steps / every) x total_n x 32 x 32
-        total_labels = torch.cat(
-            total_labels, 0
-        )
+        total_labels = torch.cat(total_labels, 0)
 
         imgs_dir = Path(save_dir, "images")
         imgs_dir.mkdir(exist_ok=True)
@@ -204,12 +206,13 @@ def main(config: DotConfig, device: torch.device, group: str):
         )
 
     # afterall
-
     results_dir = config.afterall_params.results_dir
     if config.afterall_params.sub_dir == "latest":
         results_dir = filter(Path(results_dir).glob("*"))[-1]
     else:
-        results_dir = Path(results_dir, config.afterall_params.sub_dir+suffix)
+        results_dir = Path(
+            results_dir, config.afterall_params.sub_dir + suffix
+        )
 
     assert Path(results_dir).exists()
 
@@ -243,12 +246,19 @@ def main(config: DotConfig, device: torch.device, group: str):
             )
 
             inception_score_mean, inception_score_std, _ = get_inception_score(
-                dataset, model, resize=True, device=device, batch_size=50, splits=len(images) // N_GEN_IMAGES
+                dataset,
+                model,
+                resize=True,
+                device=device,
+                batch_size=50,
+                splits=len(images) // N_GEN_IMAGES,
             )
 
             print(f"Iter: {step}\t IS: {inception_score_mean}")
             if wandb.run is not None:
-                wandb.run.log({"step": step, "overall IS": inception_score_mean})
+                wandb.run.log(
+                    {"step": step, "overall IS": inception_score_mean}
+                )
 
             is_values.append((inception_score_mean, inception_score_std))
             np.savetxt(
@@ -306,25 +316,23 @@ def main(config: DotConfig, device: torch.device, group: str):
             )
 
     if config.callbacks.afterall_callbacks:
-        # z_final_file = Path(
-        #         results_dir,
-        #         config.afterall_params.sub_dir,
-        #         "latents",
-        #         f"{config.n_steps}.npy",
-        #     )
-        # label_file = Path(
-        #         results_dir,
-        #         config.afterall_params.sub_dir,
-        #         f"labels.npy",
-        #     )
-        # z_final = np.load(z_final_file)
-        # label = np.load(label_file)
+        gen, dis = load_gan(
+            config.gan_config, device, thermalize=config.thermalize
+        )
 
-        label_file = Path(
+        x_final_file = Path(
                 results_dir,
-                f"labels.npy",
+                "images",
+                f"{config.n_steps}.npy",
             )
+        label_file = Path(
+            results_dir,
+            f"labels.npy",
+        )
         label = np.load(label_file)
+
+        # need to check correctness
+        log_norm_const = harmonic_mean_estimate(dis, np.load(x_final_file), label, device, batch_size=config.batch_size)
 
         afterall_callbacks = []
         callbacks = config.callbacks.afterall_callbacks
@@ -335,6 +343,8 @@ def main(config: DotConfig, device: torch.device, group: str):
                 params["dis"] = dis
             if "gen" in params:
                 params["gen"] = gen
+            # if "log_norm_const" in params:
+            #     params["log_norm_const"] = log_norm_const 
             afterall_callbacks.append(
                 CallbackRegistry.create_callback(callback.name, **params)
             )
@@ -351,7 +361,7 @@ def main(config: DotConfig, device: torch.device, group: str):
                 "latents",
                 f"{step}.npy",
             )
-            
+
             print(x_file)
 
             images = np.load(x_file)

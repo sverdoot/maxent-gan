@@ -1,6 +1,6 @@
 # sample
 sample_params: &sample_params
-  sample: true
+  sample: false #true
   save_dir: *dir
   sub_dir: *sub_dir
   
@@ -27,7 +27,7 @@ sample_params: &sample_params
 afterall_params:
     results_dir: *dir
     sub_dir: *sub_dir
-    init_wandb: true
+    init_wandb: #true
     
     compute_fid: true
     compute_is: true

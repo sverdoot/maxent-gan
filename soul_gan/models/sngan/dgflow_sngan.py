@@ -2,11 +2,8 @@ import torch.nn as nn
 from torch.nn import functional as F
 from torch.nn.utils.spectral_norm import spectral_norm
 
-from soul_gan.models.base import (
-    BaseDiscriminator,
-    BaseGenerator,
-    ModelRegistry,
-)
+from soul_gan.models.base import (BaseDiscriminator, BaseGenerator,
+                                  ModelRegistry)
 
 
 def _upsample(x):
