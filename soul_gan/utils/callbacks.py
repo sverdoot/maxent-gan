@@ -174,6 +174,7 @@ class EnergyCallback(Callback):
         self,
         dis,
         gen,
+        norm_constant,
         invoke_every=1,
         update_input=True,
         device="cuda",
@@ -183,6 +184,7 @@ class EnergyCallback(Callback):
         self.invoke_every = invoke_every
         self.dis = dis
         self.gen = gen
+        self.norm_constant = norm_constant
         self.transform = dis.transform
         self.update_input = update_input
         self.device = device
