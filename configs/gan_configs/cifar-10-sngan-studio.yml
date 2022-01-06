@@ -25,10 +25,8 @@ gan_config:
     ckpt_path: checkpoints/sngan/D_CIFAR_studio_current.pth
   thermalize:
     true:
-      log_norm_const: -0.18893454943660165
-      lipschitz_const: 12.846003442382811
+      log_norm_const: -0.1995315524922824
+      lipschitz_const: 12.774847021484375
     false:
-      log_norm_const: 0.030988864005890366
-      lipschitz_const: 12.970832983398434
-
-
+      log_norm_const: 0.03418335853218875
+      lipschitz_const: 12.961513012695312

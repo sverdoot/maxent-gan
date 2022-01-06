@@ -60,6 +60,8 @@ imageio-ffmpeg = "^0.4.5"
 prdc = "^0.2"
 gdown = "^4.2.0"
 "ruamel.yaml" = "^0.17.19"
+umap-learn = "^0.5.2"
+openTSNE = "^0.6.1"
 
 [tool.isort]
 src_paths = ["soul_gan"]

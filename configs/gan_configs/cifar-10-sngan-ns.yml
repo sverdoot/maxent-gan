@@ -19,9 +19,8 @@ gan_config:
     ckpt_path: checkpoints/sngan/DCGAN_D_CIFAR_SNGAN_NonSaturating_150001.pth
   thermalize:
     true:
-      log_norm_const: -0.7916250655778332
-      lipschitz_const: 654.1123234375
+      log_norm_const: -0.7068115529191632
+      lipschitz_const: 5.04527885131836
     false:
-      log_norm_const: 0.06310847870931917
-      lipschitz_const: 1090.7853093749995
-
+      log_norm_const: 0.1867102279031674
+      lipschitz_const: 8.453014648437499

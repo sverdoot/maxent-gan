@@ -1,5 +1,5 @@
 dir: &dir log/dumb_feature
-n_steps: &n_steps 300 #300
+n_steps: &n_steps 500 #300
 every: &every 25
 seed: null
 device: &device 'cuda'

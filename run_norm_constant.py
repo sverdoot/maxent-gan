@@ -119,7 +119,7 @@ def main(config: DotConfig, device: torch.device, group: str):
             random_seed(config.seed)
         total_sample_z = []
         total_sample_x = []
-        total_sample_energy_score=[]
+        total_sample_energy_score = []
         for i in range(
             0, config.sample_params.total_n, config.sample_params.batch_size
         ):
@@ -153,22 +153,19 @@ def main(config: DotConfig, device: torch.device, group: str):
             total_sample_z.append(zs)
             total_sample_x.append(xs)
             log_prior_dist_z = gen.prior.log_prob(zs)
-            if i==0:
+            if i == 0:
                 energy_sum = torch.zeros_like(log_prior_dist_z)
-            energy_sum = energy_sum + torch.exp(log_prior_dist_z-dis(xs))
-            
-        
+            energy_sum = energy_sum + torch.exp(log_prior_dist_z - dis(xs))
+
         total_sample_z = torch.cat(
             total_sample_z, 1
         )  # (number_of_steps / every) x total_n x latent_dim
         total_sample_x = torch.cat(
             total_sample_x, 1
         )  # (number_of_steps / every) x total_n x 32 x 32
-        
-        
-        number_z_seq=total_sample_z.shape[0]*total_sample_x.shape[1]
-        energy_sum = torch.log(energy_sum.sum().item()/number_z_seq)
-        
+
+        number_z_seq = total_sample_z.shape[0] * total_sample_x.shape[1]
+        energy_sum = torch.log(energy_sum.sum().item() / number_z_seq)
 
         imgs_dir = Path(save_dir, "images")
         imgs_dir.mkdir(exist_ok=True)

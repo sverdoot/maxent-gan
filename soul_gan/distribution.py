@@ -35,9 +35,10 @@ class GANTarget(Distribution):
         dis: nn.Module,
         proposal: Union[Distribution, torchDist],
     ) -> Tuple[torch.FloatTensor, torch.FloatTensor, torch.FloatTensor]:
-        dgz = dis(gen(z))
+        dgz = dis(gen(z)).squeeze()
         logp_z = proposal.log_prob(z)
         # print(logp_z.mean(), dgz.mean())
+        assert dgz.shape == logp_z.shape
         log_prob = (logp_z + dgz) / 1.0
 
         return log_prob, logp_z, dgz
@@ -84,7 +85,7 @@ def estimate_log_norm_constant(
         gen.label = label
         dis.label = label
 
-        dgz = dis(gen(z))
+        dgz = dis(gen(z)).squeeze()
         norm_const += (dgz).exp().sum().item()
     norm_const /= n_pts
 
@@ -115,7 +116,7 @@ def harmonic_mean_estimate(
         label_batch = label[i * batch_size : (i + 1) * batch_size]
         dis.label = label_batch.to(device)
 
-        dgz = dis(x_batch.to(device))
+        dgz = dis(x_batch.to(device)).squeeze()
         inv_norm_const += (-dgz).exp().sum().item()
     inv_norm_const /= len(x)
 

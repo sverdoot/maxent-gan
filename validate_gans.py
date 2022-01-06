@@ -39,7 +39,7 @@ def main(args):
             _.as_posix() for _ in Path(CONFIGS_DIR, "gan_configs").glob("*")
         ]
     else:
-        config_paths = args.configs
+        config_paths = args.gan_configs
 
     if args.exc:
         config_paths = sorted(

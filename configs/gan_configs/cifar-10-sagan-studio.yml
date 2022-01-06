@@ -25,9 +25,8 @@ gan_config:
     ckpt_path: checkpoints/sagan/D_CIFAR_studio_best.pth
   thermalize:
     true:
-      log_norm_const: 0.10472944346574146
-      lipschitz_const: 13.248738134765626
+      log_norm_const: 0.1012772917998938
+      lipschitz_const: 13.234888256835935
     false:
-      log_norm_const: 0.2801069823604415
-      lipschitz_const: 13.460238623046877
-
+      log_norm_const: 0.24073791248935514
+      lipschitz_const: 13.46408591308594

@@ -158,7 +158,7 @@ class DiscriminatorCallback(Callback):
                     label_batch = None
                 self.dis.label = label_batch
                 # dgz += self.dis.output_layer(self.dis(x_batch)).sum().item()
-                dgz += (self.dis(x_batch)).sum().item()
+                dgz += (self.dis(x_batch).squeeze()).sum().item()
             dgz /= len(imgs)
 
             if self.update_input:
@@ -221,7 +221,7 @@ class EnergyCallback(Callback):
                     label_batch = None
                 self.dis.label = label_batch
                 self.gen.label = label_batch
-                dgz = self.dis(self.gen(z_batch))
+                dgz = self.dis(self.gen(z_batch)).squeeze()
                 energy += -(
                     self.gen.prior.log_prob(z_batch).sum() + dgz.sum()
                 ).item()

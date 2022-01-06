@@ -23,10 +23,12 @@ from soul_gan.utils.callbacks import CallbackRegistry
 from soul_gan.utils.general_utils import DotConfig  # isort:block
 from soul_gan.utils.general_utils import IgnoreLabelDataset, random_seed
 from soul_gan.utils.metrics.compute_fid_tf import calculate_fid_given_paths
-from soul_gan.utils.metrics.inception_score import (MEAN_TRASFORM,
-                                                    N_GEN_IMAGES,
-                                                    STD_TRANSFORM,
-                                                    get_inception_score)
+from soul_gan.utils.metrics.inception_score import (
+    MEAN_TRASFORM,
+    N_GEN_IMAGES,
+    STD_TRANSFORM,
+    get_inception_score,
+)
 
 
 def parse_arguments():
@@ -37,6 +39,7 @@ def parse_arguments():
     parser.add_argument("--seed", type=int)
     parser.add_argument("--lipschitz_step_size", action="store_true")
     parser.add_argument("--step_size_mul", type=float, default=1.0)
+    parser.add_argument("--resume", action="store_true")
 
     args = parser.parse_args()
     return args
@@ -44,7 +47,10 @@ def parse_arguments():
 
 def main(config: DotConfig, device: torch.device, group: str):
     # HACK
-    suffix = f'{"_therm" if config.thermalize else ""}'
+    suffix = (
+        f'{"_therm" if config.thermalize else ""}'
+        + f'{"_lips" if config.lipschitz_step_size else ""}'
+    )
 
     # sample
     if config.sample_params.sample:
@@ -126,6 +132,7 @@ def main(config: DotConfig, device: torch.device, group: str):
         total_sample_z = []
         total_sample_x = []
         total_labels = []
+
         for i in range(
             0, config.sample_params.total_n, config.sample_params.batch_size
         ):
@@ -139,17 +146,33 @@ def main(config: DotConfig, device: torch.device, group: str):
                     {"name": f"{group}_{i}"}, allow_val_change=True
                 )
 
-            z = gen.prior.sample((config.sample_params.batch_size,))
+            if config.resume:
+                latents_dir = Path(save_dir, "latents")
+                start_step_id = len(list(latents_dir.glob("*.npy"))) - 1
+                config.sample_params.params.dict["n_steps"] = int(
+                    config.sample_params.params.n_steps
+                ) - int(start_step_id * config.sample_params.save_every)
+                z = torch.from_numpy(
+                    np.load(sorted(list(latents_dir.glob("*.npy")))[-1])[
+                        i : i + config.sample_params.batch_size
+                    ]
+                ).to(device)
+                label = torch.from_numpy(
+                    np.load(Path(save_dir, "labels.npy"))
+                ).to(device)
+            else:
+                z = gen.prior.sample((config.sample_params.batch_size,))
+                # HACK
+                label = torch.LongTensor(
+                    np.random.randint(0, 10 - 1, len(z))
+                ).to(z.device)
+                start_step_id = 0
 
-            # HACK
-            label = torch.LongTensor(np.random.randint(0, 10 - 1, len(z))).to(
-                z.device
-            )
             gen.label = label
             dis.label = label
 
             if config.lipschitz_step_size:
-                config.sample_params.params.step_size = (
+                config.sample_params.params.dict["step_size"] = (
                     args.step_size_mul
                     / config.gan_config.thermalize.dict[config.thermalize][
                         "lipschitz_const"
@@ -159,6 +182,9 @@ def main(config: DotConfig, device: torch.device, group: str):
             zs, xs = soul(
                 z, gen, ref_dist, feature, **config.sample_params.params
             )
+            # if config.resume:
+            #     zs = zs[1:]
+            #     xs = xs[1:]
 
             zs = torch.stack(zs, 0)
             xs = torch.stack(xs, 0)
@@ -177,24 +203,22 @@ def main(config: DotConfig, device: torch.device, group: str):
 
         imgs_dir = Path(save_dir, "images")
         imgs_dir.mkdir(exist_ok=True)
-        for slice_id in range(total_sample_x.shape[0]):
+        latents_dir = Path(save_dir, "latents")
+        latents_dir.mkdir(exist_ok=True)
+        for slice_id in range(1, total_sample_x.shape[0]):
             np.save(
                 Path(
                     imgs_dir,
-                    f"{slice_id * config.sample_params.save_every}.npy",
+                    f"{(start_step_id + slice_id) * config.sample_params.save_every}.npy",
                 ),
                 total_sample_x[slice_id].cpu().numpy(),
             )
-
-        latents_dir = Path(save_dir, "latents")
-        latents_dir.mkdir(exist_ok=True)
-        for slice_id, slice in enumerate(total_sample_z):
             np.save(
                 Path(
                     latents_dir,
-                    f"{slice_id * config.sample_params.save_every}.npy",
+                    f"{(start_step_id + slice_id) * config.sample_params.save_every}.npy",
                 ),
-                slice.cpu().numpy(),
+                total_sample_z[slice_id].cpu().numpy(),
             )
 
         np.save(
@@ -216,6 +240,11 @@ def main(config: DotConfig, device: torch.device, group: str):
 
     assert Path(results_dir).exists()
 
+    if config.resume:
+        start_step_id = np.loadtxt(Path(results_dir, "fid_values.txt"))  # - 1
+    else:
+        start_step_id = 0
+
     if config.afterall_params.init_wandb:
         wandb.init(**config.wandb_init_params, group=group)
         wandb.run.config.update({"group": f"{group}"})
@@ -229,8 +258,13 @@ def main(config: DotConfig, device: torch.device, group: str):
         ).to(device)
         model.eval()
 
-        is_values = []
-        for step in range(0, config.n_steps + 1, config.every):
+        if config.resume:
+            is_values = np.loadtxt(Path(results_dir, "is_values.txt")).tolist()
+        else:
+            is_values = []
+        for step in range(
+            start_step_id * config.every, config.n_steps + 1, config.every
+        ):
             file = Path(
                 results_dir,
                 "images",
@@ -274,8 +308,15 @@ def main(config: DotConfig, device: torch.device, group: str):
         # model.eval()
         # stats = np.load("stats/fid_stats_cifar10_train.npz")
 
-        fid_values = []
-        for step in range(0, config.n_steps + 1, config.every):
+        if config.resume:
+            fid_values = np.loadtxt(
+                Path(results_dir, "fid_values.txt")
+            ).tolist()
+        else:
+            fid_values = []
+        for step in range(
+            start_step_id * config.every, config.n_steps + 1, config.every
+        ):
             file = Path(
                 results_dir,
                 "images",
@@ -355,8 +396,16 @@ def main(config: DotConfig, device: torch.device, group: str):
                 CallbackRegistry.create_callback(callback.name, **params)
             )
 
-        results = [[] for _ in afterall_callbacks]
-        for step in range(0, config.n_steps + 1, config.every):
+        if config.resume:
+            results = np.loadtxt(
+                Path(results_dir, "callback_results.txt")
+            ).tolist()
+        else:
+            results = [[] for _ in afterall_callbacks]  # []
+
+        for step in range(
+            start_step_id * config.every, config.n_steps + 1, config.every
+        ):
             x_file = Path(
                 results_dir,
                 "images",
@@ -402,6 +451,7 @@ if __name__ == "__main__":
     config.file_name = Path(args.configs[0]).name
     config.thermalize = args.thermalize
     config.lipschitz_step_size = args.lipschitz_step_size
+    config.resume = args.resume
 
     device = torch.device(
         config.device if torch.cuda.is_available() else "cpu"

@@ -12,6 +12,7 @@ def get_project_root() -> Path:
 
 ROOT_DIR = get_project_root()
 CONFIGS_DIR = Path(ROOT_DIR, "configs")
+DATA_DIR = Path(ROOT_DIR, "data")
 
 
 class DotConfig(Mapping):

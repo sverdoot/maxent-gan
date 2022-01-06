@@ -254,7 +254,7 @@ class DiscriminatorFeature(Feature):
     @Feature.average_feature
     @Feature.invoke_callbacks
     def __call__(self, x) -> List[torch.FloatTensor]:
-        score = self.dis(x).reshape(-1, 1)
+        score = self.dis(x).squeeze()
         score -= self.ref_feature[0]
 
         return [score]

@@ -1,8 +1,11 @@
 import torch.nn as nn
 from torchvision import transforms
 
-from soul_gan.models.base import (BaseDiscriminator, BaseGenerator,
-                                  ModelRegistry)
+from soul_gan.models.base import (
+    BaseDiscriminator,
+    BaseGenerator,
+    ModelRegistry,
+)
 
 
 @ModelRegistry.register()

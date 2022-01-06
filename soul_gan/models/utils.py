@@ -72,7 +72,7 @@ def load_gan(
             -torch.ones(gen.z_dim).to(device), torch.ones(gen.z_dim).to(device)
         )
         prior.project = lambda z: torch.clip(z, -1 + 1e-9, 1 - 1e-9)
-        prior.log_prob = lambda z: torch.zeros_like(z)
+        prior.log_prob = lambda z: torch.zeros(z.shape[0], device=z.device)
     else:
         raise KeyError
     gen.prior = prior
@@ -118,7 +118,7 @@ def estimate_lipschitz_const(
         dis.label = label
 
         x_fake = gen(z)
-        dis_fake = dis(x_fake)
+        dis_fake = dis(x_fake).squeeze()
         energy = gen.prior.log_prob(z) + dis_fake
         grad = torch.autograd.grad(energy.sum(), z)[0]
         grad_norm = torch.norm(grad, dim=1, p=2).sum()

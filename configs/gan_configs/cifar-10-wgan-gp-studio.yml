@@ -23,9 +23,7 @@ gan_config:
   thermalize:
     true:
       log_norm_const: -.inf
-      lipschitz_const: 783.3608593750001
+      lipschitz_const: 778.6779093749999
     false:
       log_norm_const: -.inf
-      lipschitz_const: 16.926562695312498
-
-
+      lipschitz_const: 16.926754785156252
