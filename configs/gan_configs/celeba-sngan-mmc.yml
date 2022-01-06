@@ -1,0 +1,22 @@
+gan_config:
+  dataset: celeba
+  train_transform:
+    Normalize:
+      mean: &mean [0.5, 0.5, 0.5]
+      std: &std [0.5, 0.5, 0.5]
+  prior: normal
+  eval: true
+  generator:
+    name: MMCSNGenerator
+    params:
+      mean: *mean
+      std: *std
+    ckpt_path: checkpoints/sngan/G_CelebA_mimicry.pth
+  discriminator:
+    name: MMCSNDiscriminator
+    params:
+      mean: *mean
+      std: *std
+      output_layer: identity
+    ckpt_path: checkpoints/sngan/D_CelebA_mimicry.pth
+

@@ -18,17 +18,16 @@ conda create -n constrained_gan python=3.8
 conda activate constrained_gan
 ```
 
+```zsh
+pip install poetry
+poetry config virtualenvs.create false --local
+poetry install
+```
 To compute FID in TF fashion:
 
 ```zsh
 conda install tensorflow-gpu
 ```
-
-```zsh
-pip install poetry
-poetry config virtualenvs.create false --local
-```
-
 
 ### StudioGAN:
 

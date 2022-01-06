@@ -26,9 +26,12 @@
 
 # gdown --id 1zI4n2Ii5vEI80RPK_zjIL4B_jPA0RmXK -O checkpoints/dcgan/G_CIFAR_studio_current.pth
 
-gdown --id 1pUgotG9ZGluVAzXHCCyPc1KqEjZb3hCu -O checkpoints/sagan/G_CIFAR_studio_best.pth
+# gdown --id 1pUgotG9ZGluVAzXHCCyPc1KqEjZb3hCu -O checkpoints/sagan/G_CIFAR_studio_best.pth
 
-gdown --id 1NbIMZsTrMg1Dq9KiQ2ltTz2zdofApvuV -O checkpoints/sagan/D_CIFAR_studio_best.pth
+# gdown --id 1NbIMZsTrMg1Dq9KiQ2ltTz2zdofApvuV -O checkpoints/sagan/D_CIFAR_studio_best.pth
 
+# gdown --id 1Hf0xMUjlO9pMi3GynagsXo6q2cPCjomi -O checkpoints/sngan/D_CelebA_mimicry.pth
+
+# gdown --id 1d9pYKKW9Hgi-ylOKwU0UM1ZsmUyD8Bpj -O checkpoints/sngan/G_CelebA_mimicry.pth
 
 

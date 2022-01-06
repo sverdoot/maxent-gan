@@ -19,6 +19,8 @@ from soul_gan.feature import FeatureRegistry
 from soul_gan.models.studiogans import StudioDis, StudioGen
 from soul_gan.models.utils import load_gan
 from soul_gan.sample import soul
+
+# from soul_gan.datasets.utils import get_dataset
 from soul_gan.utils.callbacks import CallbackRegistry
 from soul_gan.utils.general_utils import DotConfig  # isort:block
 from soul_gan.utils.general_utils import IgnoreLabelDataset, random_seed
@@ -148,10 +150,10 @@ def main(config: DotConfig, device: torch.device, group: str):
 
             if config.resume:
                 latents_dir = Path(save_dir, "latents")
-                start_step_id = len(list(latents_dir.glob("*.npy"))) - 1
+                start_step_id = len(list(latents_dir.glob("*.npy")))  # - 1
                 config.sample_params.params.dict["n_steps"] = int(
                     config.sample_params.params.n_steps
-                ) - int(start_step_id * config.sample_params.save_every)
+                ) - int((start_step_id - 1) * config.sample_params.save_every)
                 z = torch.from_numpy(
                     np.load(sorted(list(latents_dir.glob("*.npy")))[-1])[
                         i : i + config.sample_params.batch_size
@@ -198,25 +200,25 @@ def main(config: DotConfig, device: torch.device, group: str):
         )  # (number_of_steps / every) x total_n x latent_dim
         total_sample_x = torch.cat(
             total_sample_x, 1
-        )  # (number_of_steps / every) x total_n x 32 x 32
+        )  # (number_of_steps / every) x total_n x img_size x img_size
         total_labels = torch.cat(total_labels, 0)
 
         imgs_dir = Path(save_dir, "images")
         imgs_dir.mkdir(exist_ok=True)
         latents_dir = Path(save_dir, "latents")
         latents_dir.mkdir(exist_ok=True)
-        for slice_id in range(1, total_sample_x.shape[0]):
+        for slice_id in range(start_step_id, total_sample_x.shape[0]):
             np.save(
                 Path(
                     imgs_dir,
-                    f"{(start_step_id + slice_id) * config.sample_params.save_every}.npy",
+                    f"{(slice_id) * config.sample_params.save_every}.npy",
                 ),
                 total_sample_x[slice_id].cpu().numpy(),
             )
             np.save(
                 Path(
                     latents_dir,
-                    f"{(start_step_id + slice_id) * config.sample_params.save_every}.npy",
+                    f"{(slice_id) * config.sample_params.save_every}.npy",
                 ),
                 total_sample_z[slice_id].cpu().numpy(),
             )
@@ -331,8 +333,9 @@ def main(config: DotConfig, device: torch.device, group: str):
             )
 
             # tf version
+            stat_path = Path("stats", f"fid_stats_{config.gan_config.dataset}")
             fid = calculate_fid_given_paths(
-                ("stats/fid_stats_cifar10_train.npz", file.as_posix()),
+                (stat_path.as_posix(), file.as_posix()),
                 inception_path="thirdparty/TTUR/inception_model",
             )
 
