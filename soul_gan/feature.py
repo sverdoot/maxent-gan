@@ -274,7 +274,7 @@ class ClusterFeature(Feature):
     def __init__(
         self,
         clusters_path,
-        ref_stats_path,
+        ref_stats_path=None,
         inverse_transform=None,
         callbacks=None,
         **kwargs,
@@ -289,15 +289,16 @@ class ClusterFeature(Feature):
             inverse_transform=inverse_transform,
             callbacks=callbacks,
         )
-
-        ref_stats = np.load(Path(ref_stats_path).open("rb"))
-        self.ref_feature = [torch.from_numpy(ref_stats["arr_0"]).float()]
-
-        # self.ref_feature = kwargs.get(
-        #     "ref_score", [torch.zeros(self.n_clusters) + .75]
-        # )
-        # if isinstance(self.ref_feature, torch.Tensor):
-        #     self.ref_feature = [self.ref_feature]
+         
+        if ref_stats_path and Path(ref_stats_path).exists():
+            ref_stats = np.load(Path(ref_stats_path).open("rb"))
+            self.ref_feature = [torch.from_numpy(ref_stats["arr_0"]).float()]
+        else:
+            self.ref_feature = kwargs.get(
+                "ref_score", [torch.zeros(self.n_clusters) + .75]
+            )
+            if isinstance(self.ref_feature, torch.Tensor):
+                self.ref_feature = [self.ref_feature]
 
     def init_weight(self):
         self.weight = [
