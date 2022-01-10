@@ -34,28 +34,30 @@ def stabilize_gen(gen, iters=500):
 def load_gan(
     config: DotConfig, device: torch.device, thermalize: bool
 ) -> Tuple[BaseGenerator, BaseDiscriminator]:
+    state_dict = torch.load(
+        Path(ROOT_DIR, config.generator.ckpt_path), map_location=device
+    )
     gen = ModelRegistry.create_model(
         config.generator.name, **config.generator.params
     ).to(device)
-    state_dict = torch.load(
-        Path(ROOT_DIR, config.generator.ckpt_path, map_location=device)
-    )
     gen.load_state_dict(state_dict, strict=True)
 
+    state_dict = torch.load(
+        Path(ROOT_DIR, config.discriminator.ckpt_path), map_location=device
+    )
     dis = ModelRegistry.create_model(
         config.discriminator.name, **config.discriminator.params
     ).to(device)
-    state_dict = torch.load(
-        Path(ROOT_DIR, config.discriminator.ckpt_path, map_location=device)
-    )
     dis.load_state_dict(state_dict, strict=True)
 
     if config.dp:
         gen = torch.nn.DataParallel(gen)
         dis = torch.nn.DataParallel(dis)
         dis.transform = dis.module.transform
+        dis.output_layer = dis.module.output_layer
         gen.inverse_transform = gen.module.inverse_transform
         gen.z_dim = gen.module.z_dim
+        gen.sample_label = gen.module.sample_label
 
         if hasattr(gen.module, "label"):
             gen.label = gen.module.label
@@ -77,23 +79,19 @@ def load_gan(
         raise KeyError
     gen.prior = prior
 
+    dis.real_score = config.real_score
+    dis.fake_score = config.fake_score
+
     for param in gen.parameters():
         param.requires_grad = True
     for param in dis.parameters():
         param.requires_grad = True
 
-    if thermalize:
-        stabilize_dis(dis, device=device)
-        stabilize_gen(gen)
-    gen.eval()
-    dis.eval()
-
-    # if eval_models:
-    #     gen.eval()
-    #     dis.eval()
-    # else:
+    # if thermalize:
     #     stabilize_dis(dis, device=device)
     #     stabilize_gen(gen)
+    gen.eval()
+    dis.eval()
 
     return gen, dis
 

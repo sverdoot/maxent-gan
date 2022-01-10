@@ -5,11 +5,8 @@ os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 import torch_mimicry as mmc
 from torch_mimicry.nets import sngan
 
-from soul_gan.models.base import (
-    BaseDiscriminator,
-    BaseGenerator,
-    ModelRegistry,
-)
+from soul_gan.models.base import (BaseDiscriminator, BaseGenerator,
+                                  ModelRegistry)
 
 
 @ModelRegistry.register()

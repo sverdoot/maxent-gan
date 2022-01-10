@@ -174,7 +174,7 @@ class EnergyCallback(Callback):
         self,
         dis,
         gen,
-        norm_constant,
+        norm_constant=1,
         invoke_every=1,
         update_input=True,
         device="cuda",
@@ -233,3 +233,40 @@ class EnergyCallback(Callback):
         self.cnt += 1
 
         return energy
+
+
+@CallbackRegistry.register()
+class LogCallback(Callback):
+    def __init__(
+        self,
+        save_dir: Union[Path, str],
+        keys: List[str],
+        invoke_every: int = 1,
+    ):
+        self.save_dir = Path(save_dir)
+        self.invoke_every = invoke_every
+        self.keys = keys
+
+        self.save_paths = []
+        for key in keys:
+            path = Path(save_dir, f"{key}.txt")
+            path.open("w")
+            self.save_paths.append(path)
+
+    @torch.no_grad()
+    def invoke(
+        self,
+        info: Dict[str, Union[float, np.ndarray]],
+    ):
+        if self.cnt % self.invoke_every == 0:
+            for save_path, key in zip(self.save_paths, self.keys):
+                if key not in info:
+                    continue
+                with save_path.open("ab") as f:
+                    np.savetxt(f, [info[key]], delimiter=" ", newline=" ")
+        self.cnt += 1
+
+    def reset(self):
+        super().reset()
+        for save_path in self.save_paths:
+            save_path.open("ab").write(b"\n")

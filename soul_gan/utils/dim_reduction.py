@@ -5,13 +5,12 @@ from pathlib import Path
 import numpy as np
 import torch
 import umap
-
-# from sklearn.manifold import TSNE
 from openTSNE import TSNE, TSNEEmbedding
 from sklearn.decomposition import PCA
 from torchvision import datasets
 from torchvision import transforms as T
 
+from soul_gan.datasets.utils import get_dataset
 from soul_gan.utils.general_utils import DATA_DIR
 
 
@@ -37,17 +36,21 @@ def main(args):
     model_path = Path(DATA_DIR, args.dataset, f"{args.method}_result.pkl")
 
     if args.train:
-        if args.dataset == "cifar10":
-            data = datasets.CIFAR10(root=Path(DATA_DIR, "cifar10").as_posix())
-            data = (
-                data.data[np.random.choice(np.arange(len(data)), len(data))]
-                / 255.0
-            )
-            data = data.transpose(0, 3, 1, 2)
-            data = data.reshape(data.shape[0], -1)
+        data = get_dataset(args.dataset, mean=(0, 0, 0), std=(1, 1, 1))
+        data = np.stack(
+            [data[i] for i in np.random.choice(np.arange(len(data)), 10000)], 0
+        )  # len(data))]
+        # if args.dataset == "cifar10":
+        #     data = datasets.CIFAR10(root=Path(DATA_DIR, "cifar10").as_posix())
+        #     data = (
+        #         data.data[np.random.choice(np.arange(len(data)), len(data))]
+        #         / 255.0
+        #     )
+        data = data.transpose(0, 3, 1, 2)
+        data = data.reshape(data.shape[0], -1)
 
-        else:
-            raise NotImplementedError
+        # else:
+        #     raise NotImplementedError
 
         if args.method == "pca":
             model = PCA(n_components=args.dim, whiten=False)
@@ -67,19 +70,20 @@ def main(args):
 
     model = pickle.load(model_path.open("rb"))
 
-    for img_path, save_dir in zip(args.images, args.save_dirs):
-        images = np.load(img_path)
-        images = images.reshape(images.shape[0], -1)
-        compressed_images = model.transform(images)[:, : args.dim]
-        Path(save_dir).mkdir(exist_ok=True)
-        save_path = Path(save_dir, f"{Path(img_path).stem}_{args.method}")
-        np.save(save_path, compressed_images)
-        pickle.dump(
-            model,
-            Path(save_dir, f"{Path(img_path).stem}_{args.method}.pkl").open(
-                "wb"
-            ),
-        )
+    if args.images and args.save_dirs:
+        for img_path, save_dir in zip(args.images, args.save_dirs):
+            images = np.load(img_path)
+            images = images.reshape(images.shape[0], -1)
+            compressed_images = model.transform(images)[:, : args.dim]
+            Path(save_dir).mkdir(exist_ok=True)
+            save_path = Path(save_dir, f"{Path(img_path).stem}_{args.method}")
+            np.save(save_path, compressed_images)
+            pickle.dump(
+                model,
+                Path(
+                    save_dir, f"{Path(img_path).stem}_{args.method}.pkl"
+                ).open("wb"),
+            )
 
 
 if __name__ == "__main__":

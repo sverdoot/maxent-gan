@@ -5,7 +5,7 @@ seed: null
 device: &device 'cuda'
 total_n: &total_n 10000
 batch_size: &batch_size 500
-weight_step: &weight_step 0.0
+weight_step: &weight_step 0.01
 step_size: &step_size 0.0001 #3
 name: &name studio_wgan_gp_dumb
 burn_in_steps: &burn_in_steps 0

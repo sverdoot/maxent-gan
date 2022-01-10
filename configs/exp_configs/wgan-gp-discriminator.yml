@@ -1,13 +1,13 @@
-dir: &dir log/dumb_feature
+dir: &dir log/discriminator_feature
 n_steps: &n_steps 500 #300
 every: &every 25
 seed: null
 device: &device 'cuda'
 total_n: &total_n 10000
-batch_size: &batch_size 500
+batch_size: &batch_size 1000
 weight_step: &weight_step 0.01
-step_size: &step_size 0.001
-name: &name sngan_ns_dumb
+step_size: &step_size 0.0005
+name: &name wgan_gp_discriminator
 burn_in_steps: &burn_in_steps 0
-sub_dir: &sub_dir sngan_ns
+sub_dir: &sub_dir wgan_gp
 

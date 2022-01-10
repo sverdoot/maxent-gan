@@ -65,6 +65,11 @@ echo "tqdm ninja h5py kornia matplotlib pandas sklearn scipy seaborn wandb PyYam
 poetry add `cat thirdparty/studiogan/requirements.txt`
 ```
 
+Create symbolik link
+```zsh
+ln -s thirdparty/studiogan/studiogan studiogan
+```
+
 To use StudioGAN as is following is needed:
 
 ```python
@@ -73,7 +78,7 @@ from pathlib import Path
 
 from soul_gan.utils.general_utils import ROOT_DIR
 
-sys.path.append(Path(ROOT_DIR, 'thirdparty/studiogan/studiogan'))
+sys.path.append(Path(ROOT_DIR, 'studiogan'))
 ```
 ------------
 

@@ -8,8 +8,12 @@ data/*
 thirdparty/*
 !thirdparty/.gitkeep
 
+studiogan
+
 stats/*
 !stats/.gitkeep
+
+fig_collection/
 
 # notebooks/**
 # !notebooks/.gitkeep

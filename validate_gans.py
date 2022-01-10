@@ -6,9 +6,11 @@ from pathlib import Path
 import numpy as np
 import ruamel.yaml
 import torch
+from torch.utils import data
 
-sys.path.append("thirdparty/studiogan/studiogan")
+sys.path.append("studiogan")
 
+from soul_gan.datasets.utils import get_dataset
 from soul_gan.distribution import estimate_log_norm_constant
 from soul_gan.models.studiogans import StudioDis, StudioGen
 from soul_gan.models.utils import estimate_lipschitz_const, load_gan
@@ -57,7 +59,16 @@ def main(args):
 
         raw_config["gan_config"]["thermalize"] = {True: {}, False: {}}
 
-        for thermalize in [True, False]:
+        dataset = get_dataset(
+            config.dataset,
+            mean=config.train_transform.Normalize.mean,
+            std=config.train_transform.Normalize.std,
+        )
+        dataloader = data.DataLoader(
+            dataset, batch_size=args.batch_size, shuffle=True
+        )
+
+        for thermalize in [False]:  # True, False]:
             print(f"Thermalize: {thermalize}")
 
             gen, dis = load_gan(config, device=device, thermalize=thermalize)
@@ -80,6 +91,23 @@ def main(args):
             )
             print(f"\t lipschitz const: {lipschitz_const:.3f}")
 
+            n_batches = 50
+
+            fake_score = 0
+            for _ in range(0, n_batches):
+                z = gen.prior.sample((args.batch_size,))
+                fake_score += dis(gen(z)).squeeze().mean().item()
+            fake_score /= n_batches
+
+            real_score = 0
+            for i, batch in enumerate(dataloader):
+                if i == n_batches:
+                    break
+                real_score += dis(batch.to(device)).squeeze().mean().item()
+            real_score /= n_batches
+
+            print(f"Fake score: {fake_score}, Real score: {real_score}")
+
             if args.upd_config:
                 raw_config["gan_config"]["thermalize"][thermalize][
                     "log_norm_const"
@@ -87,6 +115,15 @@ def main(args):
                 raw_config["gan_config"]["thermalize"][thermalize][
                     "lipschitz_const"
                 ] = lipschitz_const
+                raw_config["gan_config"]["thermalize"][thermalize][
+                    "fake_score"
+                ] = fake_score
+                raw_config["gan_config"]["thermalize"][thermalize][
+                    "real_score"
+                ] = real_score
+                raw_config["gan_config"]["thermalize"][thermalize][
+                    "mean_score"
+                ] = (real_score + fake_score) / 2.0
         ruamel.yaml.round_trip_dump(raw_config, config_path.open("w"))
 
 

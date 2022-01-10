@@ -1,4 +1,5 @@
 gan_config:
+  dp: true
   dataset: cifar10
   train_transform:
     Normalize:
@@ -21,9 +22,10 @@ gan_config:
       std: *std
     ckpt_path: checkpoints/dcgan/DCGAN_D_CIFAR_199.pth
   thermalize:
-    true:
-      log_norm_const: 7.735251350461522
-      lipschitz_const: 22.23769677734375
+    true: {}
     false:
-      log_norm_const: 0.30141313938405645
-      lipschitz_const: 15.616369750976563
+      log_norm_const: 0.21158193327342437
+      lipschitz_const: 15.621315625
+      fake_score: -4.945679950714111
+      real_score: &real_score -0.43365247461013495
+      mean_score: -2.689666212662123

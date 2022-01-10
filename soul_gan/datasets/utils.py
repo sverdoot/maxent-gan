@@ -68,8 +68,10 @@ def get_celeba_dataset(
     # Transformations to be applied to each individual image sample
     transform = T.Compose(
         [
+            T.CenterCrop(
+                178
+            ),  # Because each image is size (178, 218) spatially.
             T.Resize(img_size),
-            T.CenterCrop(img_size),
             T.ToTensor(),
             T.Normalize(
                 mean=mean,
@@ -85,11 +87,14 @@ def get_celeba_dataset(
 def get_cifar_dataset(
     mean: Tuple[float, float, float] = (0.5, 0.5, 0.5),
     std: Tuple[float, float, float] = (0.5, 0.5, 0.5),
+    img_size: int = 32,
 ) -> Dataset:
     dataset = datasets.CIFAR10(
         Path(DATA_DIR, "cifar10").as_posix(),
         download=True,
-        transform=T.Compose([T.ToTensor(), T.Normalize(mean, std)]),
+        transform=T.Compose(
+            [T.Resize(img_size), T.ToTensor(), T.Normalize(mean, std)]
+        ),
     )
     dataset = IgnoreLabelDataset(dataset)
     return dataset

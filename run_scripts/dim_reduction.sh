@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#!/bin/bash
 declare -a METHODS=(
     "pca"
     "tsne"
@@ -6,48 +6,48 @@ declare -a METHODS=(
     )
 
 
-for method in ${METHODS[@]}
-do
-    echo "$method"
-    python dim_reduction.py --method ${method} --train
-done
+# for method in ${METHODS[@]}
+# do
+#     echo "$method"
+#     python soul_gan/utils/dim_reduction.py --method ${method} --train
+# done
 
 for method in ${METHODS[@]}
 do
     echo "$method"
-    python dim_reduction.py --method ${method} \
+    python soul_gan/utils/dim_reduction.py --method ${method} \
     --images \
-        log/dumb_feature/dcgan/images/0.npy \
-        log/dumb_feature/dcgan/images/500.npy \
-        log/dumb_feature/wgan_gp/images/0.npy \
-        log/dumb_feature/wgan_gp/images/500.npy \
-        log/dumb_feature/sngan_ns/images/0.npy \
-        log/dumb_feature/sngan_ns/images/600.npy \
-        log/dumb_feature/snresnet/images/0.npy \
-        log/dumb_feature/snresnet/images/500.npy \
-        log/dumb_feature/studio_dcgan/images/0.npy \
-        log/dumb_feature/studio_dcgan/images/500.npy \
-        log/dumb_feature/studio_sngan/images/0.npy \
-        log/dumb_feature/studio_sngan/images/600.npy \
-        log/dumb_feature/studio_sagan/images/0.npy \
-        log/dumb_feature/studio_sagan/images/600.npy \
-        log/dumb_feature/studio_wgan_gp/images/0.npy \
-        log/dumb_feature/studio_wgan_gp/images/300.npy \
+        log/dumb_feature/dcgan_lips/images/0.npy \
+        log/dumb_feature/dcgan_lips/images/500.npy \
+        log/dumb_feature/wgan_gp_lips/images/0.npy \
+        log/dumb_feature/wgan_gp_lips/images/500.npy \
+        log/dumb_feature/sngan_ns_lips/images/0.npy \
+        log/dumb_feature/sngan_ns_lips/images/500.npy \
+        log/dumb_feature/snresnet_lips/images/0.npy \
+        log/dumb_feature/snresnet_lips/images/500.npy \
+        log/dumb_feature/studio_dcgan_lips/images/0.npy \
+        log/dumb_feature/studio_dcgan_lips/images/500.npy \
+        log/dumb_feature/studio_sngan_lips/images/0.npy \
+        log/dumb_feature/studio_sngan_lips/images/500.npy \
+        log/dumb_feature/studio_sagan_lips/images/0.npy \
+        log/dumb_feature/studio_sagan_lips/images/500.npy \
+        log/dumb_feature/studio_wgan_gp_lips/images/0.npy \
+        log/dumb_feature/studio_wgan_gp_lips/images/300.npy \
     --save_dirs \
-        log/dumb_feature/dcgan/dim_reduction \
-        log/dumb_feature/dcgan/dim_reduction \
-        log/dumb_feature/wgan_gp/dim_reduction \
-        log/dumb_feature/wgan_gp/dim_reduction \
-        log/dumb_feature/sngan_ns/dim_reduction \
-        log/dumb_feature/sngan_ns/dim_reduction \
-        log/dumb_feature/snresnet/dim_reduction \
-        log/dumb_feature/snresnet/dim_reduction \
-        log/dumb_feature/studio_dcgan/dim_reduction \
-        log/dumb_feature/studio_dcgan/dim_reduction \
-        log/dumb_feature/studio_sngan/dim_reduction \
-        log/dumb_feature/studio_sngan/dim_reduction \
-        log/dumb_feature/studio_sagan/dim_reduction \
-        log/dumb_feature/studio_sagan/dim_reduction \
-        log/dumb_feature/studio_wgan_gp/dim_reduction \
-        log/dumb_feature/studio_wgan_gp/dim_reduction
+        log/dumb_feature/dcgan_lips/dim_reduction \
+        log/dumb_feature/dcgan_lips/dim_reduction \
+        log/dumb_feature/wgan_gp_lips/dim_reduction \
+        log/dumb_feature/wgan_gp_lips/dim_reduction \
+        log/dumb_feature/sngan_ns_lips/dim_reduction \
+        log/dumb_feature/sngan_ns_lips/dim_reduction \
+        log/dumb_feature/snresnet_lips/dim_reduction \
+        log/dumb_feature/snresnet_lips/dim_reduction \
+        log/dumb_feature/studio_dcgan_lips/dim_reduction \
+        log/dumb_feature/studio_dcgan_lips/dim_reduction \
+        log/dumb_feature/studio_sngan_lips/dim_reduction \
+        log/dumb_feature/studio_sngan_lips/dim_reduction \
+        log/dumb_feature/studio_sagan_lips/dim_reduction \
+        log/dumb_feature/studio_sagan_lips/dim_reduction \
+        log/dumb_feature/studio_wgan_gp_lips/dim_reduction \
+        log/dumb_feature/studio_wgan_gp_lips/dim_reduction
 done

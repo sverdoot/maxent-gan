@@ -5,11 +5,13 @@ sample_params: &sample_params
   sub_dir: *sub_dir
   
   feature:
-    name: DumbFeature
+    name: ClusterFeature
     params: 
       device: *device
-      dis: null
-    
+      clusters_path: data/cifar10/kmeans.npz
+      ref_stats_path: stats/ClusterFeature_cifar10.npz
+      # ref_score: *real_score #*mean_score
+
   total_n: *total_n
   batch_size: *batch_size
   save_every: *every
@@ -18,10 +20,11 @@ sample_params: &sample_params
     n_steps: *n_steps
     save_every: *every
     burn_in_steps: *burn_in_steps
+    start_sample: *start_sample
 
     n_sampling_steps: &n_sampling_steps 1
     weight_step: *weight_step
-    step_size: *step_size
+    step_size: *weight_step
 
 # afterall
 afterall_params:
@@ -32,12 +35,11 @@ afterall_params:
     compute_fid: true
     compute_is: true
 
-
 params: &params
     sample_params: *sample_params
     name: *name
     feature:
-      name: dumb
+      name: discriminator
 
 wandb_init_params: &wandb_init_params
   project: &wandb_project soul_gan
@@ -48,7 +50,6 @@ wandb_init_params: &wandb_init_params
 logging:
   wandb: null
 
-
 callbacks:
   feature_callbacks: &feature_callbacks
     log_weight:
@@ -57,6 +58,27 @@ callbacks:
         invoke_every: *every
         keys:
           - weight_norm
+        save_dir: null
+    log_out:
+      name: LogCallback
+      params:
+        invoke_every: *every
+        keys:
+          - out
+        save_dir: null
+    log_ref:
+      name: LogCallback
+      params:
+        invoke_every: *every
+        keys:
+          - ref_score
+        save_dir: null
+    log_res:
+      name: LogCallback
+      params:
+        invoke_every: *every
+        keys:
+          - residual
         save_dir: null
 
   afterall_callbacks: &afterall_callbacks

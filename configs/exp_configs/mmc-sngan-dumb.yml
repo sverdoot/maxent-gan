@@ -3,10 +3,10 @@ n_steps: &n_steps 500 #300
 every: &every 25
 seed: null
 device: &device 'cuda'
-total_n: &total_n 10000
-batch_size: &batch_size  250 #500
-weight_step: &weight_step 0.0
-step_size: &step_size 0.001
+total_n: &total_n 5000
+batch_size: &batch_size  600
+weight_step: &weight_step 0.01
+step_size: &step_size 0.01
 name: &name mmc_sngan_dumb
 burn_in_steps: &burn_in_steps 0
 sub_dir: &sub_dir mmc_sngan

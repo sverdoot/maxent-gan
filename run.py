@@ -11,7 +11,8 @@ import torchvision
 # from pytorch_fid.fid_score import calculate_frechet_distance
 # from pytorch_fid.inception import InceptionV3
 
-sys.path.append("thirdparty/studiogan/studiogan")
+# sys.path.append("thirdparty/studiogan/studiogan")
+sys.path.append("studiogan")
 
 import wandb
 from soul_gan.distribution import GANTarget, harmonic_mean_estimate
@@ -19,18 +20,14 @@ from soul_gan.feature import FeatureRegistry
 from soul_gan.models.studiogans import StudioDis, StudioGen
 from soul_gan.models.utils import load_gan
 from soul_gan.sample import soul
-
-# from soul_gan.datasets.utils import get_dataset
 from soul_gan.utils.callbacks import CallbackRegistry
 from soul_gan.utils.general_utils import DotConfig  # isort:block
 from soul_gan.utils.general_utils import IgnoreLabelDataset, random_seed
 from soul_gan.utils.metrics.compute_fid_tf import calculate_fid_given_paths
-from soul_gan.utils.metrics.inception_score import (
-    MEAN_TRASFORM,
-    N_GEN_IMAGES,
-    STD_TRANSFORM,
-    get_inception_score,
-)
+from soul_gan.utils.metrics.inception_score import (MEAN_TRASFORM,
+                                                    N_GEN_IMAGES,
+                                                    STD_TRANSFORM,
+                                                    get_inception_score)
 
 
 def parse_arguments():
@@ -92,6 +89,8 @@ def main(config: DotConfig, device: torch.device, group: str):
                     params["dis"] = dis
                 if "gen" in params:
                     params["gen"] = gen
+                if "save_dir" in params:
+                    params["save_dir"] = save_dir
                 feature_callbacks.append(
                     CallbackRegistry.create_callback(callback.name, **params)
                 )
@@ -139,6 +138,10 @@ def main(config: DotConfig, device: torch.device, group: str):
             0, config.sample_params.total_n, config.sample_params.batch_size
         ):
             print(i)
+            batch_size = min(
+                config.sample_params.total_n - i,
+                config.sample_params.batch_size,
+            )
             if i > 0:
                 feature.reset()
             if wandb.run is not None:
@@ -156,14 +159,14 @@ def main(config: DotConfig, device: torch.device, group: str):
                 ) - int((start_step_id - 1) * config.sample_params.save_every)
                 z = torch.from_numpy(
                     np.load(sorted(list(latents_dir.glob("*.npy")))[-1])[
-                        i : i + config.sample_params.batch_size
+                        i : i + batch_size  # config.sample_params.batch_size
                     ]
                 ).to(device)
                 label = torch.from_numpy(
                     np.load(Path(save_dir, "labels.npy"))
                 ).to(device)
             else:
-                z = gen.prior.sample((config.sample_params.batch_size,))
+                z = gen.prior.sample((batch_size,))
                 # HACK
                 label = torch.LongTensor(
                     np.random.randint(0, 10 - 1, len(z))
@@ -184,9 +187,6 @@ def main(config: DotConfig, device: torch.device, group: str):
             zs, xs = soul(
                 z, gen, ref_dist, feature, **config.sample_params.params
             )
-            # if config.resume:
-            #     zs = zs[1:]
-            #     xs = xs[1:]
 
             zs = torch.stack(zs, 0)
             xs = torch.stack(xs, 0)
@@ -195,13 +195,15 @@ def main(config: DotConfig, device: torch.device, group: str):
             total_sample_x.append(xs)
             total_labels.append(label.cpu())
 
-        total_sample_z = torch.cat(
-            total_sample_z, 1
-        )  # (number_of_steps / every) x total_n x latent_dim
-        total_sample_x = torch.cat(
-            total_sample_x, 1
-        )  # (number_of_steps / every) x total_n x img_size x img_size
-        total_labels = torch.cat(total_labels, 0)
+        total_sample_z = torch.cat(total_sample_z, 1)[
+            :, : config.sample_params.total_n
+        ]  # (number_of_steps / every) x total_n x latent_dim
+        total_sample_x = torch.cat(total_sample_x, 1)[
+            :, : config.sample_params.total_n
+        ]  # (number_of_steps / every) x total_n x img_size x img_size
+        total_labels = torch.cat(total_labels, 0)[
+            : config.sample_params.total_n
+        ]
 
         imgs_dir = Path(save_dir, "images")
         imgs_dir.mkdir(exist_ok=True)
@@ -286,8 +288,8 @@ def main(config: DotConfig, device: torch.device, group: str):
                 model,
                 resize=True,
                 device=device,
-                batch_size=50,
-                splits=len(images) // N_GEN_IMAGES,
+                batch_size=50,  # 100,
+                splits=max(1, len(images) // N_GEN_IMAGES),
             )
 
             print(f"Iter: {step}\t IS: {inception_score_mean}")
@@ -303,60 +305,6 @@ def main(config: DotConfig, device: torch.device, group: str):
                     "is_values.txt",
                 ),
                 is_values,
-            )
-
-    if config.afterall_params.compute_fid:
-        # model = InceptionV3().to(device)
-        # model.eval()
-        # stats = np.load("stats/fid_stats_cifar10_train.npz")
-
-        if config.resume:
-            fid_values = np.loadtxt(
-                Path(results_dir, "fid_values.txt")
-            ).tolist()
-        else:
-            fid_values = []
-        for step in range(
-            start_step_id * config.every, config.n_steps + 1, config.every
-        ):
-            file = Path(
-                results_dir,
-                "images",
-                f"{step}.npy",
-            )
-            print(file)
-            images = np.load(file)
-            dataset = torch.from_numpy(images)
-            print(dataset.shape)
-            dataset = IgnoreLabelDataset(
-                torch.utils.data.TensorDataset(dataset)
-            )
-
-            # tf version
-            stat_path = Path("stats", f"fid_stats_{config.gan_config.dataset}")
-            fid = calculate_fid_given_paths(
-                (stat_path.as_posix(), file.as_posix()),
-                inception_path="thirdparty/TTUR/inception_model",
-            )
-
-            # torch version
-            # mu, sigma, _ = get_activation_statistics(
-            #     dataset, model, batch_size=100, device=device, verbose=True
-            # )
-            # fid = calculate_frechet_distance(
-            #     mu, sigma, stats["mu"], stats["sigma"]
-            # )
-            print(f"Iter: {step}\t Fid: {fid}")
-            if wandb.run is not None:
-                wandb.run.log({"step": step, "overall fid": fid})
-
-            fid_values.append(fid)
-            np.savetxt(
-                Path(
-                    results_dir,
-                    "fid_values.txt",
-                ),
-                fid_values,
             )
 
     if config.callbacks.afterall_callbacks:
@@ -440,6 +388,62 @@ def main(config: DotConfig, device: torch.device, group: str):
             results,
         )
 
+    if config.afterall_params.compute_fid:
+        # model = InceptionV3().to(device)
+        # model.eval()
+        # stats = np.load("stats/fid_stats_cifar10_train.npz")
+
+        if config.resume:
+            fid_values = np.loadtxt(
+                Path(results_dir, "fid_values.txt")
+            ).tolist()
+        else:
+            fid_values = []
+        for step in range(
+            start_step_id * config.every, config.n_steps + 1, config.every
+        ):
+            file = Path(
+                results_dir,
+                "images",
+                f"{step}.npy",
+            )
+            print(file)
+            images = np.load(file)
+            dataset = torch.from_numpy(images)
+            print(dataset.shape)
+            dataset = IgnoreLabelDataset(
+                torch.utils.data.TensorDataset(dataset)
+            )
+
+            # tf version
+            stat_path = Path(
+                "stats", f"fid_stats_{config.gan_config.dataset}.npz"
+            )
+            fid = calculate_fid_given_paths(
+                (stat_path.as_posix(), file.as_posix()),
+                inception_path="thirdparty/TTUR/inception_model",
+            )
+
+            # torch version
+            # mu, sigma, _ = get_activation_statistics(
+            #     dataset, model, batch_size=100, device=device, verbose=True
+            # )
+            # fid = calculate_frechet_distance(
+            #     mu, sigma, stats["mu"], stats["sigma"]
+            # )
+            print(f"Iter: {step}\t Fid: {fid}")
+            if wandb.run is not None:
+                wandb.run.log({"step": step, "overall fid": fid})
+
+            fid_values.append(fid)
+            np.savetxt(
+                Path(
+                    results_dir,
+                    "fid_values.txt",
+                ),
+                fid_values,
+            )
+
 
 if __name__ == "__main__":
     args = parse_arguments()
@@ -459,6 +463,7 @@ if __name__ == "__main__":
     device = torch.device(
         config.device if torch.cuda.is_available() else "cpu"
     )
+    print(f"Device: {device}")
 
     group = args.group if args.group else f"{Path(args.configs[0]).stem}"
     main(config, device, group)

@@ -1,13 +1,13 @@
-dir: &dir log/dumb_feature
+dir: &dir log/discriminator_feature
 n_steps: &n_steps 500 #300
 every: &every 25
 seed: null
 device: &device 'cuda'
 total_n: &total_n 10000
-batch_size: &batch_size 500
-weight_step: &weight_step 0.01
+batch_size: &batch_size 500 #750
+weight_step: &weight_step 0.001
 step_size: &step_size 0.0001
-name: &name snresnet_dumb
+name: &name snresnet_discriminator
 burn_in_steps: &burn_in_steps 0
 sub_dir: &sub_dir snresnet
 

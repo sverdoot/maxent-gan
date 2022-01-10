@@ -40,7 +40,8 @@ def soul(
     ref_dist: Union[Distribution, torchDist],
     feature: Feature,
     n_steps: int,
-    burn_in_steps: int,
+    burn_in_steps: int = 0,
+    start_sample: int = 0,
     n_sampling_steps: int = 3,
     weight_step: float = 0.1,
     step_size: float = 0.01,
@@ -58,14 +59,11 @@ def soul(
         f = feature(gen(z))
         radnic_logp = feature.log_prob(f)
         ref_logp = ref_dist(z)
-        # print(ref_logp.mean(), radnic_logp.mean())
         logp = radnic_logp + ref_logp
         return logp
 
     for it in trange(1, n_steps + 2):
-        # cond = params['save'] == 'all' and (np.mod(it, n_stride) == 0)
         z.requires_grad_(True)
-
         with torch.no_grad():
             condition_avg = it > burn_in_steps or it == 1
             condition_upd = it > burn_in_steps or it == 1
@@ -89,7 +87,8 @@ def soul(
             n_steps=n_sampling_steps,
             project=ref_dist.project,
         )
-        z = inter_zs[-1]
+        if it > start_sample:
+            z = inter_zs[-1]
 
         if it % save_every == 0:
             zs.append(z.data.cpu())

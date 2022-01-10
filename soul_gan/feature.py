@@ -4,12 +4,15 @@ from typing import Any, Callable, Dict, List, Optional
 
 import numpy as np
 import torch
+import torch.nn.functional as F
 import torchvision
 from pytorch_fid.inception import InceptionV3
 from torch.nn.functional import adaptive_avg_pool2d
 from torchvision import transforms
 
 from soul_gan.utils.metrics import batch_inception
+
+# torch.autograd.set_detect_anomaly(True)
 
 
 class AvgHolder(object):
@@ -69,8 +72,11 @@ class Feature(ABC):
     def log_prob(self, out: List[torch.FloatTensor]) -> torch.FloatTensor:
         lik_f = 0
         for feature_id in range(len(out)):
-            # lik_f -= torch.dot(self.weight[feature_id], out[feature_id])
-            lik_f -= out[feature_id] @ self.weight[feature_id]
+            # lik_f -= (out[feature_id] @ self.weight[feature_id][None, :]).sum(1)
+            # print(out[feature_id], self.weight[feature_id])
+            lik_f -= torch.einsum(
+                "ab,b->a", out[feature_id], self.weight[feature_id]
+            )
 
         return lik_f
 
@@ -234,6 +240,8 @@ class DiscriminatorFeature(Feature):
         )
         self.dis = dis
         self.ref_feature = kwargs.get("ref_score", [np.log(0.5 / (1 - 0.5))])
+        if isinstance(self.ref_feature, float):
+            self.ref_feature = [self.ref_feature]
 
     def init_weight(self):
         self.weight = [torch.zeros(1).to(self.device)]
@@ -245,19 +253,88 @@ class DiscriminatorFeature(Feature):
             "D(G(z))": torch.mean(
                 self.dis.output_layer(feature_out[0] + self.ref_feature[0])
             ).item(),
-            f"weight_{self.__class__.__name__}": torch.norm(
-                self.weight[0]
-            ).item(),
+            # f"weight_{self.__class__.__name__}": torch.norm(
+            #     self.weight[0]
+            # ).item(),
+            f"weight_norm": torch.norm(self.weight[0]).item(),
             "imgs": self.inverse_transform(x).detach().cpu().numpy(),
         }
 
     @Feature.average_feature
     @Feature.invoke_callbacks
     def __call__(self, x) -> List[torch.FloatTensor]:
-        score = self.dis(x).squeeze()
+        score = self.dis(x).view(-1, 1)
         score -= self.ref_feature[0]
 
         return [score]
+
+
+@FeatureRegistry.register()
+class ClusterFeature(Feature):
+    def __init__(
+        self,
+        clusters_path,
+        ref_stats_path,
+        inverse_transform=None,
+        callbacks=None,
+        **kwargs,
+    ):
+        self.device = kwargs.get("device", 0)
+        clusters_info = np.load(Path(clusters_path).open("rb"))
+        self.centroids = torch.from_numpy(clusters_info["centroids"]).float()
+        self.sigmas = torch.from_numpy(clusters_info["sigmas"]).float()
+        self.n_clusters = len(clusters_info["sigmas"])
+        super().__init__(
+            n_features=1,
+            inverse_transform=inverse_transform,
+            callbacks=callbacks,
+        )
+
+        ref_stats = np.load(Path(ref_stats_path).open("rb"))
+        self.ref_feature = [torch.from_numpy(ref_stats["arr_0"]).float()]
+
+        # self.ref_feature = kwargs.get(
+        #     "ref_score", [torch.zeros(self.n_clusters) + .75]
+        # )
+        # if isinstance(self.ref_feature, torch.Tensor):
+        #     self.ref_feature = [self.ref_feature]
+
+    def init_weight(self):
+        self.weight = [
+            torch.zeros(self.n_clusters, dtype=torch.float32).to(self.device)
+        ]
+
+    def get_useful_info(
+        self, x: torch.FloatTensor, feature_out: List[torch.FloatTensor]
+    ) -> Dict:
+        return {
+            "residual": feature_out[0].norm(-1).mean(0).item(),
+            "out": (feature_out[0].cpu().mean(0) + self.ref_feature[0])
+            .mean(0)
+            .item(),
+            "ref_score": self.ref_feature[0].mean().item(),
+            "weight_norm": torch.norm(self.weight[0]).item(),
+            "imgs": self.inverse_transform(x).detach().cpu().numpy(),
+        }
+
+    def apply(self, x: torch.FloatTensor) -> List[torch.FloatTensor]:
+        dists = torch.norm(
+            x.reshape(x.shape[0], -1)[:, None, :]
+            - self.centroids[None, ...].to(x.device),
+            dim=-1,
+        )
+        result = torch.sigmoid(
+            (dists - self.sigmas[None, :].to(x.device)) / 10.0
+        )
+        return [result]
+
+    @Feature.average_feature
+    @Feature.invoke_callbacks
+    def __call__(self, x: torch.FloatTensor) -> List[torch.FloatTensor]:
+        result = self.apply(x)
+        for i, ref in enumerate(self.ref_feature):
+            result[i] = result[i] - ref[None, :].to(x.device)
+        return result
 
 
 @FeatureRegistry.register()
