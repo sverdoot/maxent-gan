@@ -19,9 +19,7 @@ class MMCSNGenerator(BaseGenerator):
         self.z_dim = self.gen.nz
 
     def load_state_dict(self, state_dict, strict: bool = True):
-        return self.gen.load_state_dict(
-            state_dict["model_state_dict"], strict=strict
-        )
+        return self.gen.load_state_dict(state_dict["model_state_dict"], strict=strict)
 
     def forward(self, z):
         return self.gen(z)
@@ -39,9 +37,7 @@ class MMCSNDiscriminator(BaseDiscriminator):
         self.dis = sngan.SNGANDiscriminator64()
 
     def load_state_dict(self, state_dict, strict: bool = True):
-        return self.dis.load_state_dict(
-            state_dict["model_state_dict"], strict=strict
-        )
+        return self.dis.load_state_dict(state_dict["model_state_dict"], strict=strict)
 
     def forward(self, x):
         return self.dis(x)

@@ -9,7 +9,7 @@ documentation = "TBD"
 
 [tool.black]
 target-version = ["py38"]
-line-length = 79
+line-length = 88
 include = '\.pyi?$'
 exclude = '''
 /(
@@ -64,6 +64,7 @@ umap-learn = "^0.5.2"
 openTSNE = "^0.6.1"
 poetry-core = "1.0.4"
 torch-mimicry = {git = "https://github.com/kwotsin/mimicry.git", rev = "master"}
+flake8 = "^4.0.1"
 
 [tool.isort]
 src_paths = ["soul_gan"]
@@ -71,6 +72,43 @@ multi_line_output = 3
 include_trailing_comma = true
 force_grid_wrap = 0
 use_parentheses = true
-line_length = 100
+line_length = 88
 lines_after_imports = 2
 skip_glob = 'thirdparty'
+
+[tool.flake8]
+min_python_version = "3.8.0"
+max-line-length = 88
+# ban-relative-imports = true
+# flake8-use-fstring: https://github.com/MichaelKim0407/flake8-use-fstring#--percent-greedy-and---format-greedy
+format-greedy = 1
+inline-quotes = "double"
+# Allow omission of a return type hint for __init__ if at least one argument is annotated
+# used by flake8-annotations
+mypy-init-return = true
+#enable-extensions = TC, TC2
+#type-checking-exempt-modules = typing, typing-extensions
+eradicate-whitelist-extend = "^-.*;"
+extend-ignore = """
+    # E203: Whitespace before ':' (pycqa/pycodestyle#373)
+    E203,
+    # SIM106: Handle error-cases first
+    SIM106,
+    # ANN101: Missing type annotation for self in method
+    ANN101,
+    # ANN102: Missing type annotation for cls in classmethod
+    ANN102,
+    """
+#per-file-ignores =
+    # F401: Module imported by unused (non-implicit modules)
+    # TC002: Move third-party import '...' into a type-checking block
+    #__init__.py:F401,TC002,
+    # ANN201: Missing return type annotation for public function
+    #tests/test_*:ANN201
+    #tests/**/test_*:ANN201
+extend-exclude = """
+    # Frozen and not subject to change in this repo:
+    thirdparty/*,
+    soul_gan/utils/metrics/compute_fid_tf.py,
+    # # External to the project's coding standards:
+    """

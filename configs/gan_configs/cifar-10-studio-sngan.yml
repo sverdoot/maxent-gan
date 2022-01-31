@@ -1,5 +1,5 @@
 gan_config:
-  dp: true
+  dp: false #true
   dataset: cifar10
   train_transform:
     Normalize:

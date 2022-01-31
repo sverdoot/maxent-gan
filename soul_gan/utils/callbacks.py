@@ -76,9 +76,7 @@ class WandbCallback(Callback):
                 if isinstance(info[key], np.ndarray):
                     log[key] = wandb.Image(
                         make_grid(
-                            self.img_transform(
-                                torch.from_numpy(info[key][:25])
-                            ),
+                            self.img_transform(torch.from_numpy(info[key][:25])),
                             nrow=5,
                         ),
                         caption=key,
@@ -146,9 +144,7 @@ class DiscriminatorCallback(Callback):
                 label = None
 
             if not batch_size:
-                batch_size = (
-                    len(imgs) if not self.batch_size else self.batch_size
-                )
+                batch_size = len(imgs) if not self.batch_size else self.batch_size
             x = self.transform(torch.from_numpy(imgs).to(self.device))
             dgz = 0
             for i, x_batch in enumerate(torch.split(x, batch_size)):
@@ -179,7 +175,7 @@ class EnergyCallback(Callback):
         update_input=True,
         device="cuda",
         batch_size: Optional[int] = None,
-        log_norm_const: float = 1,
+        log_norm_const: float = 0,
     ):
         self.invoke_every = invoke_every
         self.dis = dis
@@ -206,9 +202,7 @@ class EnergyCallback(Callback):
                 label = None
 
             if not batch_size:
-                batch_size = (
-                    len(zs) if not self.batch_size else self.batch_size
-                )
+                batch_size = len(zs) if not self.batch_size else self.batch_size
             energy = 0
             # log_norm_const = estimate_log_norm_constant(
             #     self.gen, self.dis, 5000
@@ -217,14 +211,13 @@ class EnergyCallback(Callback):
             for i, z_batch in enumerate(torch.split(zs, batch_size)):
                 if label is not None:
                     label_batch = label[i * batch_size : (i + 1) * batch_size]
+                    self.dis.label = label_batch
+                    self.gen.label = label_batch
                 else:
                     label_batch = None
-                self.dis.label = label_batch
-                self.gen.label = label_batch
+
                 dgz = self.dis(self.gen(z_batch)).squeeze()
-                energy += -(
-                    self.gen.prior.log_prob(z_batch).sum() + dgz.sum()
-                ).item()
+                energy += -(self.gen.prior.log_prob(z_batch).sum() + dgz.sum()).item()
             energy /= len(zs)
             energy += self.log_norm_const
 

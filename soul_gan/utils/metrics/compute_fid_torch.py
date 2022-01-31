@@ -23,9 +23,7 @@ def get_activation_statistics(
     verbose=False,
 ):
     if len(dataset) > batch_size:
-        dataloader = DataLoader(
-            dataset, batch_size=batch_size, num_workers=num_workers
-        )
+        dataloader = DataLoader(dataset, batch_size=batch_size, num_workers=num_workers)
         n_img = len(dataset)
     else:
         dataloader = dataset

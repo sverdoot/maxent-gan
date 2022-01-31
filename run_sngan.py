@@ -54,9 +54,7 @@ def load_sngan():
     gen_net = Generator(args).eval().cuda()
     dis_net = Discriminator(args).eval().cuda()
 
-    gen_net.inverse_transform = NormalizeInverse(
-        (0.5, 0.5, 0.5), (0.5, 0.5, 0.5)
-    )
+    gen_net.inverse_transform = NormalizeInverse((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
     print(f"=> resuming from {args.load_path}")
     assert os.path.exists(args.load_path)
     checkpoint_file = args.load_path
@@ -82,9 +80,7 @@ def main(config, gan_config, device):
             )
         save_dir.mkdir(exist_ok=True, parents=True)
 
-        yaml.dump(
-            config.dict, Path(save_dir, config.file_name).open("w"), Dumper
-        )
+        yaml.dump(config.dict, Path(save_dir, config.file_name).open("w"), Dumper)
         yaml.dump(
             gan_config.dict,
             Path(save_dir, gan_config.file_name).open("w"),
@@ -147,9 +143,7 @@ def main(config, gan_config, device):
         latents_dir.mkdir(exist_ok=True)
         for slice_id, slice in enumerate(total_sample):
             np.save(
-                Path(
-                    latents_dir, f"{slice_id * config.sample.save_every}.npy"
-                ),
+                Path(latents_dir, f"{slice_id * config.sample.save_every}.npy"),
                 slice.cpu().numpy(),
             )
 
@@ -175,7 +169,5 @@ if __name__ == "__main__":
     gan_config = DotConfig(yaml.load(Path(args.gan_config).open("r"), Loader))
     gan_config.file_name = Path(args.gan_config).name  # stem
 
-    device = torch.device(
-        config.device if torch.cuda.is_available() else "cpu"
-    )
+    device = torch.device(config.device if torch.cuda.is_available() else "cpu")
     main(config, gan_config, device)

@@ -2,7 +2,11 @@ import argparse
 from pathlib import Path
 
 import numpy as np
+import torch
+import torchvision
 from sklearn.cluster import KMeans, MiniBatchKMeans
+from torch.utils.data import DataLoader
+from tqdm import tqdm
 
 from soul_gan.datasets.utils import get_dataset
 from soul_gan.utils.general_utils import DATA_DIR
@@ -13,18 +17,14 @@ def parse_arguments():
     parser.add_argument(
         "--dataset", type=str, default="cifar10", choices=["cifar10", "celeba"]
     )
-    parser.add_argument(
-        "--method", type=str, default="kmeans", choices=["kmeans"]
-    )
-    parser.add_argument(
-        "--norm_mean", type=float, nargs=3, default=(0.5, 0.5, 0.5)
-    )
-    parser.add_argument(
-        "--norm_std", type=float, nargs=3, default=(0.5, 0.5, 0.5)
-    )
+    parser.add_argument("--method", type=str, default="kmeans", choices=["kmeans"])
+    parser.add_argument("--norm_mean", type=float, nargs=3, default=(0.5, 0.5, 0.5))
+    parser.add_argument("--norm_std", type=float, nargs=3, default=(0.5, 0.5, 0.5))
     parser.add_argument("--img_size", type=int, default=32)
-    parser.add_argument("--n_clusters", type=str, default=100)
-    # parser.add_argument('--savepath')
+    parser.add_argument("--n_clusters", type=int, default=100)
+    parser.add_argument("--model", type=str)
+    parser.add_argument("--batch_size", type=int, default=256)
+    parser.add_argument("--device", type=int, default=0)
 
     args = parser.parse_args()
     return args
@@ -32,9 +32,45 @@ def parse_arguments():
 
 def main(args):
     dataset = get_dataset(args.dataset, mean=args.norm_mean, std=args.norm_std)
-    np_dataset = np.stack(
-        [dataset[i].numpy() for i in range(len(dataset))], 0
-    ).reshape(len(dataset), -1)
+    if args.model:
+        device = torch.device(args.device if torch.cuda.is_available() else "cpu")
+        if args.model == "resnet34":
+            model = torchvision.models.resnet34
+        elif args.model == "resnet50":
+            model = torchvision.models.resnet50
+        elif args.model == "resnet101":
+            model = torchvision.models.resnet101
+        else:
+            raise ValueError(f"Version {args.model} is not available")
+
+        model = model(pretrained=True).to(device)
+        activation = {}
+
+        def get_activation(name):
+            def hook(model, input, output):
+                activation[0] = output
+
+            return hook
+
+        model.avgpool.register_forward_hook(get_activation("avgpool"))
+        model.eval()
+
+        dataloader = DataLoader(dataset, batch_size=args.batch_size)
+        np_dataset = []
+        for batch in tqdm(dataloader):
+            model(batch.to(device))
+            out = activation[0].squeeze(3).squeeze(2).to(device)
+            np_dataset.append(out.detach().cpu().numpy())
+        np_dataset = np.concatenate(np_dataset, 0)
+    else:
+        np_dataset = np.concatenate(
+            [
+                dataset[i].unsqueeze(0).reshape(1, -1).numpy()
+                for i in range(len(dataset))
+            ],
+            0,
+        )  # .reshape(len(dataset), -1)
+
     centroids = np.zeros((args.n_clusters, np_dataset.shape[1]))
     ns = np.zeros(args.n_clusters)
     closest_pts = np.zeros_like(centroids)
@@ -68,7 +104,8 @@ def main(args):
     sigmas /= ns
     sigmas = sigmas ** 0.5
     print(len(ns))
-    save_path = Path(DATA_DIR, args.dataset, f"{args.method}.npz")
+    name = f"{args.method}" + (f"_{args.model}" if args.model else "") + ".npz"
+    save_path = Path(DATA_DIR, args.dataset, name)
     np.savez(
         save_path.open("wb"),
         centroids=centroids,

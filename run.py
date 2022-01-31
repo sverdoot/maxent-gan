@@ -1,6 +1,7 @@
 import argparse
 import datetime
 import sys
+from asyncio import run_coroutine_threadsafe
 from pathlib import Path
 
 import numpy as np
@@ -11,11 +12,11 @@ import torchvision
 # from pytorch_fid.fid_score import calculate_frechet_distance
 # from pytorch_fid.inception import InceptionV3
 
-# sys.path.append("thirdparty/studiogan/studiogan")
 sys.path.append("studiogan")
 
 import wandb
-from soul_gan.distribution import GANTarget, harmonic_mean_estimate
+from soul_gan.distribution import (Distribution, DistributionRegistry,
+                                   harmonic_mean_estimate)
 from soul_gan.feature import FeatureRegistry
 from soul_gan.models.studiogans import StudioDis, StudioGen
 from soul_gan.models.utils import load_gan
@@ -39,6 +40,9 @@ def parse_arguments():
     parser.add_argument("--lipschitz_step_size", action="store_true")
     parser.add_argument("--step_size_mul", type=float, default=1.0)
     parser.add_argument("--resume", action="store_true")
+    parser.add_argument("--step_size", type=float)
+    parser.add_argument("--weight_step", type=float)
+    parser.add_argument("--suffix", type=str)
 
     args = parser.parse_args()
     return args
@@ -46,41 +50,37 @@ def parse_arguments():
 
 def main(config: DotConfig, device: torch.device, group: str):
     # HACK
-    suffix = (
-        f'{"_therm" if config.thermalize else ""}'
-        + f'{"_lips" if config.lipschitz_step_size else ""}'
-    )
+    # suffix = (
+    #     f'{"_therm" if config.thermalize else ""}'
+    #     + f'{"_lips" if config.lipschitz_step_size else ""}'
+    # )
+    suffix = f"_{config.suffix}" if config.suffix else ""
+    dir_suffix = f"_{config.distribution.name}"
 
     # sample
     if config.sample_params.sample:
-        gen, dis = load_gan(
-            config.gan_config, device, thermalize=config.thermalize
-        )
+        gen, dis = load_gan(config.gan_config, device, thermalize=config.thermalize)
 
         if config.sample_params.sub_dir:
             save_dir = Path(
-                config.sample_params.save_dir,
+                config.sample_params.save_dir + dir_suffix,
                 config.sample_params.sub_dir + suffix,
             )
         else:
             save_dir = Path(
-                config.sample_params.save_dir,
+                config.sample_params.save_dir + dir_suffix,
                 datetime.datetime.now().strftime("%Y_%m_%d_%H_%M") + suffix,
             )
         save_dir.mkdir(exist_ok=True, parents=True)
 
-        yaml.round_trip_dump(
-            config.dict, Path(save_dir, config.file_name).open("w")
-        )
+        yaml.round_trip_dump(config.dict, Path(save_dir, config.file_name).open("w"))
         yaml.round_trip_dump(
             dict(gan_config=config.gan_config.dict),
             Path(save_dir, "gan_config.yml").open("w"),
         )
 
         feature_callbacks = []
-
         callbacks = config.callbacks.feature_callbacks
-
         if callbacks:
             for _, callback in callbacks.items():
                 params = callback.params.dict
@@ -126,13 +126,16 @@ def main(config: DotConfig, device: torch.device, group: str):
         #     idx = config.callbacks.keys().index("FIDCallback")
         #     feature.callbacks[idx].model = feature.model
 
-        ref_dist = GANTarget(gen, dis)
+        ref_dist = DistributionRegistry.create_distribution(
+            config.sample_params.distribution.name, gen=gen, dis=dis
+        )
 
         if config.seed is not None:
             random_seed(config.seed)
         total_sample_z = []
         total_sample_x = []
         total_labels = []
+        weights = []
 
         for i in range(
             0, config.sample_params.total_n, config.sample_params.batch_size
@@ -147,9 +150,7 @@ def main(config: DotConfig, device: torch.device, group: str):
             if wandb.run is not None:
                 run = wandb.run
                 run.config.update({"group": f"{group}"})
-                run.config.update(
-                    {"name": f"{group}_{i}"}, allow_val_change=True
-                )
+                run.config.update({"name": f"{group}_{i}"}, allow_val_change=True)
 
             if config.resume:
                 latents_dir = Path(save_dir, "latents")
@@ -162,15 +163,20 @@ def main(config: DotConfig, device: torch.device, group: str):
                         i : i + batch_size  # config.sample_params.batch_size
                     ]
                 ).to(device)
-                label = torch.from_numpy(
-                    np.load(Path(save_dir, "labels.npy"))
-                ).to(device)
+                try:
+                    label = torch.from_numpy(np.load(Path(save_dir, "labels.npy"))).to(
+                        device
+                    )
+                except:
+                    label = torch.LongTensor(np.random.randint(0, 10 - 1, len(z))).to(
+                        z.device
+                    )
             else:
                 z = gen.prior.sample((batch_size,))
                 # HACK
-                label = torch.LongTensor(
-                    np.random.randint(0, 10 - 1, len(z))
-                ).to(z.device)
+                label = torch.LongTensor(np.random.randint(0, 10 - 1, len(z))).to(
+                    z.device
+                )
                 start_step_id = 0
 
             gen.label = label
@@ -184,9 +190,7 @@ def main(config: DotConfig, device: torch.device, group: str):
                     ]
                 )
 
-            zs, xs = soul(
-                z, gen, ref_dist, feature, **config.sample_params.params
-            )
+            zs, xs = soul(z, gen, ref_dist, feature, **config.sample_params.params)
 
             zs = torch.stack(zs, 0)
             xs = torch.stack(xs, 0)
@@ -194,6 +198,8 @@ def main(config: DotConfig, device: torch.device, group: str):
             total_sample_z.append(zs)
             total_sample_x.append(xs)
             total_labels.append(label.cpu())
+            if len(feature.weight) > 0:
+                weights.append(torch.cat(feature.weight, dim=0).detach())
 
         total_sample_z = torch.cat(total_sample_z, 1)[
             :, : config.sample_params.total_n
@@ -201,9 +207,9 @@ def main(config: DotConfig, device: torch.device, group: str):
         total_sample_x = torch.cat(total_sample_x, 1)[
             :, : config.sample_params.total_n
         ]  # (number_of_steps / every) x total_n x img_size x img_size
-        total_labels = torch.cat(total_labels, 0)[
-            : config.sample_params.total_n
-        ]
+        total_labels = torch.cat(total_labels, 0)[: config.sample_params.total_n]
+        if len(feature.weight) > 0:
+            weights = torch.stack(weights, 0)
 
         imgs_dir = Path(save_dir, "images")
         imgs_dir.mkdir(exist_ok=True)
@@ -232,15 +238,21 @@ def main(config: DotConfig, device: torch.device, group: str):
             ),
             total_labels.cpu().numpy(),
         )
+        if len(feature.weight) > 0:
+            np.save(
+                Path(
+                    save_dir,
+                    f"weights.npy",
+                ),
+                weights.cpu().numpy(),
+            )
 
     # afterall
-    results_dir = config.afterall_params.results_dir
+    results_dir = config.afterall_params.results_dir + dir_suffix
     if config.afterall_params.sub_dir == "latest":
         results_dir = filter(Path(results_dir).glob("*"))[-1]
     else:
-        results_dir = Path(
-            results_dir, config.afterall_params.sub_dir + suffix
-        )
+        results_dir = Path(results_dir, config.afterall_params.sub_dir + suffix)
 
     assert Path(results_dir).exists()
 
@@ -254,9 +266,7 @@ def main(config: DotConfig, device: torch.device, group: str):
         wandb.run.config.update({"group": f"{group}"})
 
     if config.afterall_params.compute_is:
-        transform = torchvision.transforms.Normalize(
-            MEAN_TRASFORM, STD_TRANSFORM
-        )
+        transform = torchvision.transforms.Normalize(MEAN_TRASFORM, STD_TRANSFORM)
         model = torchvision.models.inception_v3(
             pretrained=True, transform_input=False
         ).to(device)
@@ -279,9 +289,7 @@ def main(config: DotConfig, device: torch.device, group: str):
             images = np.load(file)
             dataset = transform(torch.from_numpy(images))
             print(dataset.shape)
-            dataset = IgnoreLabelDataset(
-                torch.utils.data.TensorDataset(dataset)
-            )
+            dataset = IgnoreLabelDataset(torch.utils.data.TensorDataset(dataset))
 
             inception_score_mean, inception_score_std, _ = get_inception_score(
                 dataset,
@@ -294,9 +302,7 @@ def main(config: DotConfig, device: torch.device, group: str):
 
             print(f"Iter: {step}\t IS: {inception_score_mean}")
             if wandb.run is not None:
-                wandb.run.log(
-                    {"step": step, "overall IS": inception_score_mean}
-                )
+                wandb.run.log({"step": step, "overall IS": inception_score_mean})
 
             is_values.append((inception_score_mean, inception_score_std))
             np.savetxt(
@@ -308,9 +314,7 @@ def main(config: DotConfig, device: torch.device, group: str):
             )
 
     if config.callbacks.afterall_callbacks:
-        gen, dis = load_gan(
-            config.gan_config, device, thermalize=config.thermalize
-        )
+        gen, dis = load_gan(config.gan_config, device, thermalize=config.thermalize)
 
         x_final_file = Path(
             results_dir,
@@ -321,16 +325,19 @@ def main(config: DotConfig, device: torch.device, group: str):
             results_dir,
             f"labels.npy",
         )
-        label = np.load(label_file)
+        try:
+            label = np.load(label_file)
+        except:
+            label = np.random.randint(0, 10 - 1, 10000)
 
         # need to check correctness
-        log_norm_const = harmonic_mean_estimate(
-            dis,
-            np.load(x_final_file),
-            label,
-            device,
-            batch_size=config.batch_size,
-        )
+        # log_norm_const = harmonic_mean_estimate(
+        #     dis,
+        #     np.load(x_final_file),
+        #     label,
+        #     device,
+        #     batch_size=config.batch_size,
+        # )
 
         afterall_callbacks = []
         callbacks = config.callbacks.afterall_callbacks
@@ -348,9 +355,7 @@ def main(config: DotConfig, device: torch.device, group: str):
             )
 
         if config.resume:
-            results = np.loadtxt(
-                Path(results_dir, "callback_results.txt")
-            ).tolist()
+            results = np.loadtxt(Path(results_dir, "callback_results.txt")).tolist()
         else:
             results = [[] for _ in afterall_callbacks]  # []
 
@@ -394,9 +399,7 @@ def main(config: DotConfig, device: torch.device, group: str):
         # stats = np.load("stats/fid_stats_cifar10_train.npz")
 
         if config.resume:
-            fid_values = np.loadtxt(
-                Path(results_dir, "fid_values.txt")
-            ).tolist()
+            fid_values = np.loadtxt(Path(results_dir, "fid_values.txt")).tolist()
         else:
             fid_values = []
         for step in range(
@@ -411,14 +414,10 @@ def main(config: DotConfig, device: torch.device, group: str):
             images = np.load(file)
             dataset = torch.from_numpy(images)
             print(dataset.shape)
-            dataset = IgnoreLabelDataset(
-                torch.utils.data.TensorDataset(dataset)
-            )
+            dataset = IgnoreLabelDataset(torch.utils.data.TensorDataset(dataset))
 
             # tf version
-            stat_path = Path(
-                "stats", f"fid_stats_{config.gan_config.dataset}.npz"
-            )
+            stat_path = Path("stats", f"fid_stats_{config.gan_config.dataset}.npz")
             fid = calculate_fid_given_paths(
                 (stat_path.as_posix(), file.as_posix()),
                 inception_path="thirdparty/TTUR/inception_model",
@@ -443,15 +442,54 @@ def main(config: DotConfig, device: torch.device, group: str):
                 ),
                 fid_values,
             )
+    if config.afterall_params.remove_chains:
+        for file_path in Path(results_dir, "images").glob("*.npy"):
+            file_path.unlink()
+        for file_path in Path(results_dir, "latents").glob("*.npy"):
+            file_path.unlink()
+        Path(results_dir, "labels.npy").unlink()
 
 
 if __name__ == "__main__":
     args = parse_arguments()
     import subprocess
 
-    proc = subprocess.Popen(["cat", *args.configs], stdout=subprocess.PIPE)
-    config = yaml.round_trip_load(proc.stdout.read())
+    params = yaml.round_trip_load(Path(args.configs[0]).open("r"))
+    if args.weight_step:
+        params["weight_step"] = yaml.scalarfloat.ScalarFloat(
+            args.weight_step,
+            prec=1,
+            width=10,
+            anchor=params["weight_step"].anchor.value,
+        )
+    if args.step_size:
+        params["step_size"] = yaml.scalarfloat.ScalarFloat(
+            args.step_size,
+            prec=1,
+            width=10,
+            anchor=params["step_size"].anchor.value,
+        )
+    if args.suffix:
+        params["suffix"] = yaml.scalarstring.LiteralScalarString(
+            args.suffix
+        )  # , anchor=params['suffix'].anchor.value)
+    print(yaml.round_trip_dump(params))
 
+    proc = subprocess.Popen("/bin/bash", stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+    out, err = proc.communicate(
+        (
+            " ".join(
+                [
+                    "echo",
+                    '"' + str(yaml.round_trip_dump(params)) + '"',
+                    "|",
+                    "cat - ",
+                    *args.configs[1:],
+                ]
+            )
+        ).encode("utf-8")
+    )
+    config = yaml.round_trip_load(out.decode("utf-8"))
     config = DotConfig(config)
     if args.seed:
         config.seed = args.seed
@@ -460,9 +498,7 @@ if __name__ == "__main__":
     config.lipschitz_step_size = args.lipschitz_step_size
     config.resume = args.resume
 
-    device = torch.device(
-        config.device if torch.cuda.is_available() else "cpu"
-    )
+    device = torch.device(config.device if torch.cuda.is_available() else "cpu")
     print(f"Device: {device}")
 
     group = args.group if args.group else f"{Path(args.configs[0]).stem}"

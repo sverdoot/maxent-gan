@@ -23,9 +23,7 @@ class GenBlock(nn.Module):
         self.activation = activation
         self.upsample = upsample
         self.learnable_sc = in_channels != out_channels or upsample
-        hidden_channels = (
-            out_channels if hidden_channels is None else hidden_channels
-        )
+        hidden_channels = out_channels if hidden_channels is None else hidden_channels
         self.n_classes = n_classes
         self.c1 = nn.Conv2d(
             in_channels, hidden_channels, kernel_size=ksize, padding=pad
@@ -37,9 +35,7 @@ class GenBlock(nn.Module):
         self.b1 = nn.BatchNorm2d(in_channels)
         self.b2 = nn.BatchNorm2d(hidden_channels)
         if self.learnable_sc:
-            self.c_sc = nn.Conv2d(
-                in_channels, out_channels, kernel_size=1, padding=0
-            )
+            self.c_sc = nn.Conv2d(in_channels, out_channels, kernel_size=1, padding=0)
 
     def upsample_conv(self, x, conv):
         return conv(nn.UpsamplingNearest2d(scale_factor=2)(x))
@@ -56,11 +52,7 @@ class GenBlock(nn.Module):
 
     def shortcut(self, x):
         if self.learnable_sc:
-            x = (
-                self.upsample_conv(x, self.c_sc)
-                if self.upsample
-                else self.c_sc(x)
-            )
+            x = self.upsample_conv(x, self.c_sc) if self.upsample else self.c_sc(x)
             return x
         else:
             return x

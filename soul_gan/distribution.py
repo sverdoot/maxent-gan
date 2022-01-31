@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Optional, Tuple, Union
 
 import numpy as np
 import torch
@@ -17,7 +17,57 @@ class Distribution(ABC):
         raise NotImplementedError
 
 
-class GANTarget(Distribution):
+class DistributionRegistry:
+    registry: Dict = {}
+
+    @classmethod
+    def register(cls, name: Optional[str] = None) -> Callable:
+        def inner_wrapper(wrapped_class: Distribution) -> Callable:
+            if name is None:
+                name_ = wrapped_class.__name__
+            else:
+                name_ = name
+            cls.registry[name_] = wrapped_class
+            return wrapped_class
+
+        return inner_wrapper
+
+    @classmethod
+    def create_distribution(cls, name: str, **kwargs) -> Distribution:
+        exec_class = cls.registry[name]
+        executor = exec_class(**kwargs)
+        return executor
+
+
+@DistributionRegistry.register()
+class PriorTarget(Distribution):
+    def __init__(
+        self,
+        gen: nn.Module,
+        dis: Optional[nn.Module] = None,
+        # proposal: Union[Distribution, torchDist],
+    ):
+        self.gen = gen
+        self.proposal = gen.prior
+
+    @staticmethod
+    def latent_target(
+        z: torch.FloatTensor,
+        proposal: Union[Distribution, torchDist],
+    ) -> Tuple[torch.FloatTensor, torch.FloatTensor, torch.FloatTensor]:
+        logp_z = proposal.log_prob(z)
+        return logp_z
+
+    def __call__(self, z: torch.FloatTensor) -> torch.FloatTensor:
+        logp = self.latent_target(z, self.proposal)
+        return logp
+
+    def project(self, z):
+        return self.proposal.project(z)
+
+
+@DistributionRegistry.register()
+class DiscriminatorTarget(Distribution):
     def __init__(
         self,
         gen: nn.Module,
@@ -37,11 +87,10 @@ class GANTarget(Distribution):
     ) -> Tuple[torch.FloatTensor, torch.FloatTensor, torch.FloatTensor]:
         dgz = dis(gen(z)).squeeze()
         logp_z = proposal.log_prob(z)
-        # print(logp_z.mean().item(), dgz.mean().item())
         assert dgz.shape == logp_z.shape
         log_prob = (logp_z + dgz) / 1.0
 
-        return log_prob, logp_z, dgz
+        return (log_prob, logp_z, dgz)
 
     def __call__(self, z: torch.FloatTensor) -> torch.FloatTensor:
         logp = self.latent_target(z, self.gen, self.dis, self.proposal)[0]
@@ -57,9 +106,6 @@ def grad_log_prob(
     # x: Optional[Any] = None,
 ) -> Tuple[torch.FloatTensor, torch.FloatTensor]:
     point = point.detach().requires_grad_()
-    # if x is not None:
-    #     log_prob = log_dens(z=point, x=x)
-    # else:
     log_prob = log_dens(point)
     grad = torch.autograd.grad(log_prob.sum(), point)[0]
     return log_prob, grad
@@ -103,10 +149,6 @@ def harmonic_mean_estimate(
 ) -> float:
     batch_size = batch_size if batch_size else len(x)
     inv_norm_const = 0
-    # if verbose:
-    #     bar = tqdm
-    # else:
-    #     bar = range
     if isinstance(x, np.ndarray):
         x = torch.from_numpy(x)
     if isinstance(label, np.ndarray):

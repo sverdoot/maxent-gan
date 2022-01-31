@@ -44,9 +44,7 @@ class InceptionScoreCallback(Callback):
             self.model = nn.DataParallel(self.model)
 
         self.model.eval()
-        self.transform = transforms.Normalize(
-            mean=MEAN_TRASFORM, std=STD_TRANSFORM
-        )
+        self.transform = transforms.Normalize(mean=MEAN_TRASFORM, std=STD_TRANSFORM)
         self.update_input = update_input
         self.invoke_every = invoke_every
 
@@ -179,9 +177,7 @@ if __name__ == "__main__":
         from soul_gan.models.utils import load_gan
         from soul_gan.utils.general_utils import DotConfig
 
-        gan_config = DotConfig(
-            yaml.load(Path(args.gan_config).open("r"), Loader)
-        )
+        gan_config = DotConfig(yaml.load(Path(args.gan_config).open("r"), Loader))
         gen, _ = load_gan(gan_config, device)
 
         n_imgs = 100  # 1000

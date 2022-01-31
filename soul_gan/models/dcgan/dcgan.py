@@ -35,9 +35,7 @@ class DCGANGenerator(BaseGenerator):
             nn.ConvTranspose2d(ngf * 2, ngf, 4, 2, 1, bias=False),
             nn.BatchNorm2d(ngf),
             nn.ReLU(True),
-            nn.ConvTranspose2d(
-                ngf, nc, kernel_size=1, stride=1, padding=0, bias=False
-            ),
+            nn.ConvTranspose2d(ngf, nc, kernel_size=1, stride=1, padding=0, bias=False),
             nn.Tanh(),
         )
 
@@ -45,9 +43,7 @@ class DCGANGenerator(BaseGenerator):
         if input.ndim == 2:
             input = input[..., None, None]
         if input.is_cuda and self.ngpu > 1:
-            output = nn.parallel.data_parallel(
-                self.main, input, range(self.ngpu)
-            )
+            output = nn.parallel.data_parallel(self.main, input, range(self.ngpu))
         else:
             output = self.main(input)
         return output
@@ -89,9 +85,7 @@ class DCGANDiscriminator(BaseDiscriminator):
 
     def forward(self, input):
         if input.is_cuda and self.ngpu > 1:
-            output = nn.parallel.data_parallel(
-                self.main, input, range(self.ngpu)
-            )
+            output = nn.parallel.data_parallel(self.main, input, range(self.ngpu))
         else:
             output = self.main(input)
 

@@ -21,21 +21,22 @@ from soul_gan.datasets.utils import get_dataset
 from soul_gan.feature import FeatureRegistry
 from soul_gan.models.studiogans import StudioDis, StudioGen
 from soul_gan.models.utils import load_gan
-from soul_gan.utils.general_utils import (ROOT_DIR, DotConfig,  # isort:block
-                                          random_seed)
+from soul_gan.utils.general_utils import DotConfig  # isort:block
+from soul_gan.utils.general_utils import ROOT_DIR, random_seed
 
 
 def parse_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument("configs", type=str, nargs="+")
     parser.add_argument("--seed", type=int)
+    parser.add_argument("--save_path", type=str)
 
     args = parser.parse_args()
     return args
 
 
 def main(config: DotConfig, device: torch.device):
-    _, dis = load_gan(config.gan_config, device, thermalize=config.thermalize)
+    gen, dis = load_gan(config.gan_config, device, thermalize=config.thermalize)
 
     feature_kwargs = config.sample_params.feature.params.dict
     # HACK
@@ -44,7 +45,7 @@ def main(config: DotConfig, device: torch.device):
 
     feature = FeatureRegistry.create_feature(
         config.sample_params.feature.name,
-        inverse_transform=None,  # gen.inverse_transform,
+        inverse_transform=gen.inverse_transform,
         **feature_kwargs,
     )
 
@@ -56,9 +57,7 @@ def main(config: DotConfig, device: torch.device):
         mean=config.gan_config.train_transform.Normalize.mean,
         std=config.gan_config.train_transform.Normalize.std,
     )
-    dataloader = DataLoader(
-        dataset, batch_size=config.batch_size, shuffle=True
-    )
+    dataloader = DataLoader(dataset, batch_size=config.batch_size, shuffle=True)
     stats = defaultdict(lambda: 0)
     n = 0
     for batch in tqdm(dataloader):
@@ -70,11 +69,14 @@ def main(config: DotConfig, device: torch.device):
         stats[i] /= n
     print(stats)
 
-    stats_dir = Path(ROOT_DIR, "stats")
+    # stats_dir = Path(ROOT_DIR, "stats")
+    if not args.save_path:
+        args.save_path = config.feature.params.ref_stats_path
+        # args.save_name = f"{config.sample_params.feature.name}_{config.gan_config.dataset}.npz"
     np.savez(
         Path(
-            stats_dir,
-            f"{config.sample_params.feature.name}_{config.gan_config.dataset}.npz",
+            # stats_dir,
+            args.save_path,
         ).open("wb"),
         *stats.values(),
     )
@@ -95,9 +97,7 @@ if __name__ == "__main__":
     # config.lipschitz_step_size = args.lipschitz_step_size
     # config.resume = args.resume
 
-    device = torch.device(
-        config.device if torch.cuda.is_available() else "cpu"
-    )
+    device = torch.device(config.device if torch.cuda.is_available() else "cpu")
     print(f"Device: {device}")
 
     main(config, device)

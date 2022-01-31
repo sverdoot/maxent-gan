@@ -16,9 +16,7 @@ from soul_gan.utils.general_utils import DATA_DIR
 
 def parse_arguments():
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--dataset", type=str, default="cifar10", choices=["cifar10"]
-    )
+    parser.add_argument("--dataset", type=str, default="cifar10", choices=["cifar10"])
     parser.add_argument(
         "--method", type=str, default="pca", choices=["pca", "tsne", "umap"]
     )
@@ -39,18 +37,10 @@ def main(args):
         data = get_dataset(args.dataset, mean=(0, 0, 0), std=(1, 1, 1))
         data = np.stack(
             [data[i] for i in np.random.choice(np.arange(len(data)), 10000)], 0
-        )  # len(data))]
-        # if args.dataset == "cifar10":
-        #     data = datasets.CIFAR10(root=Path(DATA_DIR, "cifar10").as_posix())
-        #     data = (
-        #         data.data[np.random.choice(np.arange(len(data)), len(data))]
-        #         / 255.0
-        #     )
+        )
+
         data = data.transpose(0, 3, 1, 2)
         data = data.reshape(data.shape[0], -1)
-
-        # else:
-        #     raise NotImplementedError
 
         if args.method == "pca":
             model = PCA(n_components=args.dim, whiten=False)
@@ -80,9 +70,7 @@ def main(args):
             np.save(save_path, compressed_images)
             pickle.dump(
                 model,
-                Path(
-                    save_dir, f"{Path(img_path).stem}_{args.method}.pkl"
-                ).open("wb"),
+                Path(save_dir, f"{Path(img_path).stem}_{args.method}.pkl").open("wb"),
             )
 
 

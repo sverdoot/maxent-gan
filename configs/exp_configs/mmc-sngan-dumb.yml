@@ -8,6 +8,7 @@ batch_size: &batch_size  600
 weight_step: &weight_step 0.01
 step_size: &step_size 0.01
 name: &name mmc_sngan_dumb
-burn_in_steps: &burn_in_steps 0
+burn_in_steps: &burn_in_steps 0.
+start_sample: &start_sample 0.
 sub_dir: &sub_dir mmc_sngan
-
+suffix: *step_size

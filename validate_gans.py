@@ -64,9 +64,7 @@ def main(args):
             mean=config.train_transform.Normalize.mean,
             std=config.train_transform.Normalize.std,
         )
-        dataloader = data.DataLoader(
-            dataset, batch_size=args.batch_size, shuffle=True
-        )
+        dataloader = data.DataLoader(dataset, batch_size=args.batch_size, shuffle=True)
 
         for thermalize in [False]:  # True, False]:
             print(f"Thermalize: {thermalize}")
@@ -121,9 +119,9 @@ def main(args):
                 raw_config["gan_config"]["thermalize"][thermalize][
                     "real_score"
                 ] = real_score
-                raw_config["gan_config"]["thermalize"][thermalize][
-                    "mean_score"
-                ] = (real_score + fake_score) / 2.0
+                raw_config["gan_config"]["thermalize"][thermalize]["mean_score"] = (
+                    real_score + fake_score
+                ) / 2.0
         ruamel.yaml.round_trip_dump(raw_config, config_path.open("w"))
 
 

@@ -10,9 +10,7 @@ class Generator(nn.Module):
         self.activation = activation
         self.n_classes = n_classes
         self.ch = args.gf_dim
-        self.l1 = nn.Linear(
-            args.latent_dim, (self.bottom_width ** 2) * self.ch
-        )
+        self.l1 = nn.Linear(args.latent_dim, (self.bottom_width ** 2) * self.ch)
         self.block2 = GenBlock(
             self.ch,
             self.ch,
@@ -71,15 +69,9 @@ class OptimizedDisBlock(nn.Module):
         super(OptimizedDisBlock, self).__init__()
         self.activation = activation
 
-        self.c1 = nn.Conv2d(
-            in_channels, out_channels, kernel_size=ksize, padding=pad
-        )
-        self.c2 = nn.Conv2d(
-            out_channels, out_channels, kernel_size=ksize, padding=pad
-        )
-        self.c_sc = nn.Conv2d(
-            in_channels, out_channels, kernel_size=1, padding=0
-        )
+        self.c1 = nn.Conv2d(in_channels, out_channels, kernel_size=ksize, padding=pad)
+        self.c2 = nn.Conv2d(out_channels, out_channels, kernel_size=ksize, padding=pad)
+        self.c_sc = nn.Conv2d(in_channels, out_channels, kernel_size=1, padding=0)
         if args.d_spectral_norm:
             self.c1 = nn.utils.spectral_norm(self.c1)
             self.c2 = nn.utils.spectral_norm(self.c2)
@@ -116,9 +108,7 @@ class DisBlock(nn.Module):
         self.activation = activation
         self.downsample = downsample
         self.learnable_sc = (in_channels != out_channels) or downsample
-        hidden_channels = (
-            in_channels if hidden_channels is None else hidden_channels
-        )
+        hidden_channels = in_channels if hidden_channels is None else hidden_channels
         self.c1 = nn.Conv2d(
             in_channels, hidden_channels, kernel_size=ksize, padding=pad
         )
@@ -130,9 +120,7 @@ class DisBlock(nn.Module):
             self.c2 = nn.utils.spectral_norm(self.c2)
 
         if self.learnable_sc:
-            self.c_sc = nn.Conv2d(
-                in_channels, out_channels, kernel_size=1, padding=0
-            )
+            self.c_sc = nn.Conv2d(in_channels, out_channels, kernel_size=1, padding=0)
             if args.d_spectral_norm:
                 self.c_sc = nn.utils.spectral_norm(self.c_sc)
 

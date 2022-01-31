@@ -1,0 +1,3 @@
+distribution: &target_distribution
+  name: DiscriminatorTarget
+

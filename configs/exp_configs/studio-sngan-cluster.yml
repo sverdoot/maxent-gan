@@ -1,0 +1,14 @@
+dir: &dir log/cluster_feature
+n_steps: &n_steps 1000
+every: &every 25
+seed: null
+device: &device 'cuda'
+total_n: &total_n 10000 #
+batch_size: &batch_size 250 #1000
+weight_step: &weight_step 1 #0.01
+step_size: &step_size 0.001
+name: &name studio_sngan_cluster
+burn_in_steps: &burn_in_steps 0.
+start_sample: &start_sample 0.
+sub_dir: &sub_dir studio_sngan
+suffix: *step_size

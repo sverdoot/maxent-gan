@@ -1,0 +1,12 @@
+
+feature: &feature
+  name: IdentityFeature
+  params: 
+    device: *device
+    ref_stats_path: stats/IdentityFeature_cifar10.npz
+    opt_params:
+      name:
+        SGD
+      params:  
+        momentum: 0.9
+        nesterov: True

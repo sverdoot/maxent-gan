@@ -89,7 +89,7 @@ def _get_inception_layer(sess):
 # -------------------------------------------------------------------------------
 
 
-def get_activations(images, sess, batch_size=150, verbose=True):  # False):
+def get_activations(images, sess, batch_size=100, verbose=True):  # False):
     """Calculates the activations of the pool_3 layer for all images.
 
     Params:
@@ -132,9 +132,7 @@ def get_activations(images, sess, batch_size=150, verbose=True):  # False):
             end = n_images
 
         batch = images[start:end]
-        pred = sess.run(
-            inception_layer, {"FID_Inception_Net/ExpandDims:0": batch}
-        )
+        pred = sess.run(inception_layer, {"FID_Inception_Net/ExpandDims:0": batch})
         pred_arr[start:end] = pred.reshape(batch.shape[0], -1)
     if verbose:
         print(" done")
@@ -202,17 +200,13 @@ def calculate_frechet_distance(mu1, sigma1, mu2, sigma2, eps=1e-6):
 
     tr_covmean = np.trace(covmean)
 
-    return (
-        diff.dot(diff) + np.trace(sigma1) + np.trace(sigma2) - 2 * tr_covmean
-    )
+    return diff.dot(diff) + np.trace(sigma1) + np.trace(sigma2) - 2 * tr_covmean
 
 
 # -------------------------------------------------------------------------------
 
 
-def calculate_activation_statistics(
-    images, sess, batch_size=50, verbose=False
-):
+def calculate_activation_statistics(images, sess, batch_size=50, verbose=False):
     """Calculation of the statistics used by the FID.
     Params:
     -- images      : Numpy array of dimension (n_images, hi, wi, 3). The values
@@ -288,9 +282,7 @@ def get_activations_from_files(files, sess, batch_size=50, verbose=False):
             end = n_imgs
 
         batch = load_image_batch(files[start:end])
-        pred = sess.run(
-            inception_layer, {"FID_Inception_Net/ExpandDims:0": batch}
-        )
+        pred = sess.run(inception_layer, {"FID_Inception_Net/ExpandDims:0": batch})
         pred_arr[start:end] = pred.reshape(batch_size, -1)
         del batch  # clean up memory
     if verbose:
@@ -332,7 +324,9 @@ def calculate_activation_statistics_from_files(
 def check_or_download_inception(inception_path):
     """Checks if the path to the inception file is valid, or downloads
     the file if it is not present."""
-    INCEPTION_URL = "http://download.tensorflow.org/models/image/imagenet/inception-2015-12-05.tgz"
+    INCEPTION_URL = (
+        "http://download.tensorflow.org/models/image/imagenet/inception-2015-12-05.tgz"
+    )
     if inception_path is None:
         inception_path = "/tmp"
     inception_path = pathlib.Path(inception_path)

@@ -1,0 +1,14 @@
+dir: &dir log/resnet34_feature
+n_steps: &n_steps 1000
+every: &every 25
+seed: null
+device: &device 'cuda'
+burn_in_steps: &burn_in_steps 0.0
+start_sample: &start_sample 0.0
+total_n: &total_n 10000 #
+batch_size: &batch_size 1000 #1000
+weight_step: &weight_step 1 #0.5 #0.01
+step_size: &step_size 0.001 # 0.1
+name: &name sngan_ns_resnet34
+sub_dir: &sub_dir sngan_ns
+suffix: *step_size

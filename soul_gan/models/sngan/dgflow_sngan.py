@@ -121,9 +121,7 @@ class ResidualBlock(nn.Module):
         self.activation = activation
         self.upsample = upsample
         self.learnable_sc = in_channels != out_channels or upsample
-        hidden_channels = (
-            out_channels if hidden_channels is None else hidden_channels
-        )
+        hidden_channels = out_channels if hidden_channels is None else hidden_channels
         self.n_classes = n_classes
         c1 = nn.Conv2d(in_channels, hidden_channels, ksize, padding=pad)
         self.c1 = c1
@@ -144,9 +142,7 @@ class ResidualBlock(nn.Module):
         b2 = nn.BatchNorm2d(hidden_channels, eps=2e-5, momentum=0.1)
         self.b2 = b2
         if self.learnable_sc:
-            c_sc = nn.Conv2d(
-                in_channels, out_channels, kernel_size=1, padding=0
-            )
+            c_sc = nn.Conv2d(in_channels, out_channels, kernel_size=1, padding=0)
             self.c_sc = c_sc
 
     def residual(self, x, y=None, **kwargs):

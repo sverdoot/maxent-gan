@@ -5,6 +5,7 @@ import numpy as np
 import torch
 
 import studiogan
+import studiogan.config
 import studiogan.configs
 import studiogan.utils
 import studiogan.utils.misc
@@ -54,13 +55,11 @@ class StudioGen(BaseGenerator):
         return out
 
     def forward(self, x):
-        label = self.label
+        label = self.label  # .to(x.device)
         return self.gen.forward(x, label)
 
     def sample_label(self, batch_size: int, device: Union[int, str]):
-        return torch.randint(
-            0, self.n_classes - 1, (batch_size,), device=device
-        )
+        return torch.randint(0, self.n_classes - 1, (batch_size,), device=device)
 
 
 @ModelRegistry.register()
@@ -111,5 +110,5 @@ class StudioDis(BaseDiscriminator):
         return out
 
     def forward(self, x):
-        label = self.label
+        label = self.label  # .to(x.device)
         return self.dis.forward(x, label)["adv_output"]

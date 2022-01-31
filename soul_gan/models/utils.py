@@ -14,9 +14,7 @@ from .base import BaseDiscriminator, BaseGenerator, ModelRegistry
 def stabilize_dis(dis, im_size=32, iters=5000, device=0):
     for _ in trange(iters):
         x = torch.rand(10, 3, im_size, im_size, device=device)
-        label = torch.LongTensor(np.random.randint(0, 10 - 1, len(x))).to(
-            x.device
-        )
+        label = torch.LongTensor(np.random.randint(0, 10 - 1, len(x))).to(x.device)
         dis.label = label
         _ = dis(x)
 
@@ -24,9 +22,7 @@ def stabilize_dis(dis, im_size=32, iters=5000, device=0):
 def stabilize_gen(gen, iters=500):
     for _ in trange(iters):
         x = gen.prior.sample((100,))
-        label = torch.LongTensor(np.random.randint(0, 10 - 1, len(x))).to(
-            x.device
-        )
+        label = torch.LongTensor(np.random.randint(0, 10 - 1, len(x))).to(x.device)
         gen.label = label
         _ = gen(x)
 
