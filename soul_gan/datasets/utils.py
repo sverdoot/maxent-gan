@@ -1,12 +1,15 @@
 import zipfile
 from pathlib import Path
-from typing import Tuple
+from typing import Tuple, Optional
 
 import gdown
 from PIL import Image
-from torch.utils.data import Dataset
+import torch
+from torch.utils.data import Dataset, TensorDataset
 from torchvision import datasets
 from torchvision import transforms as T
+
+from .synthetic import prepare_2d_gaussian_grid_data
 
 from soul_gan.utils.general_utils import DATA_DIR, IgnoreLabelDataset
 
@@ -96,9 +99,24 @@ def get_cifar_dataset(
     return dataset
 
 
+def get_gaussians_grid_dataset(
+    sample_size: int, 
+    n_modes: int=25, 
+    xlims: Tuple[float, float]=(-2, 2), 
+    ylims: Tuple[float, float]=(-2, 2), 
+    sigma: float=0.05, 
+    seed: Optional[int]=None
+) -> Dataset:
+    dataset, _  = prepare_2d_gaussian_grid_data(sample_size, n_modes, xlims, ylims, sigma, seed)
+    dataset = IgnoreLabelDataset(TensorDataset(torch.from_numpy(dataset)))
+    return dataset
+
+
 def get_dataset(name: str = "cifar10", *args, **kwargs) -> Dataset:
     if name == "cifar10":
         return get_cifar_dataset(*args, **kwargs)
+    if name == "gaussians_grid":
+        return get_gaussians_grid_dataset(*args, **kwargs)
     elif name == "celeba":
         return get_celeba_dataset(*args, **kwargs)
     else:

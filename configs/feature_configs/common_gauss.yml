@@ -1,0 +1,133 @@
+# sample
+sample_params: &sample_params
+  sample: true
+  save_dir: *dir
+  sub_dir: *sub_dir
+
+  distribution:
+    <<: *target_distribution
+  
+  feature:
+    <<: *feature
+
+  total_n: *total_n
+  batch_size: *batch_size
+  save_every: *every
+
+  params:
+    n_steps: *n_steps
+    save_every: *every
+    burn_in_steps: *burn_in_steps
+    start_sample: *start_sample
+
+    n_sampling_steps: &n_sampling_steps 1
+    weight_step: *weight_step
+    step_size: *step_size
+
+# afterall
+afterall_params:
+    results_dir: *dir
+    sub_dir: *sub_dir
+    init_wandb: false #true
+    
+    remove_chains: false #true
+
+params: &params
+    sample_params: *sample_params
+    name: *name
+    feature:
+      name: discriminator
+
+# wandb_init_params: &wandb_init_params
+#   project: &wandb_project soul_gan
+#   entity: &wandb_account sverdoot
+#   name: *name
+#   config: *params
+
+# logging:
+#   wandb: null
+
+callbacks:
+  feature_callbacks: &feature_callbacks
+    log_weight:
+      name: LogCallback
+      params:
+        invoke_every: *every
+        keys:
+          - weight_norm
+        save_dir: null
+    log_out:
+      name: LogCallback
+      params:
+        invoke_every: *every
+        keys:
+          - out
+        save_dir: null
+    log_ref:
+      name: LogCallback
+      params:
+        invoke_every: *every
+        keys:
+          - ref_score
+        save_dir: null
+    log_res:
+      name: LogCallback
+      params:
+        invoke_every: *every
+        keys:
+          - residual
+        save_dir: null
+    energy:
+      name: EnergyCallback
+      params:
+        dis: null
+        gen: null
+        invoke_every: *every
+        device: *device
+        update_input: true
+        # batch_size: *batch_size
+        norm_constant: null
+    log_energy:
+      name: LogCallback
+      params:
+        invoke_every: *every
+        keys:
+          - Energy
+        save_dir: null
+    log_dot_pr:
+      name: LogCallback
+      params:
+        invoke_every: *every
+        keys:
+          - dot_pr
+        save_dir: null
+
+  afterall_callbacks: &afterall_callbacks
+    energy:
+      name: EnergyCallback
+      params:
+        dis: null
+        gen: null
+        invoke_every: 1
+        device: *device
+        update_input: true
+        batch_size: 250 #*batch_size
+        norm_constant: null
+    discriminator:
+      name: DiscriminatorCallback
+      params:
+        dis: null
+        invoke_every: 1
+        device: *device
+        update_input: true
+        batch_size: 250 #*batch_size
+    # wandb:
+    #   name: WandbCallback
+    #   params:
+    #     init_params:
+    #       <<: *wandb_init_params
+    #       reinit: False
+    #     invoke_every: 1
+    #     keys:
+    #       - Energy
+    #       - D(G(z))

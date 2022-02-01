@@ -28,6 +28,7 @@
 
 # sngan-ns
 
-python run.py configs/exp_configs/sngan-ns-dumb.yml configs/targets/discriminator.yml configs/gan_configs/cifar-10-sngan-ns.yml  configs/feature_configs/dumb.yml configs/feature_configs/common.yml --weight_step 0.1 --step_size 0.003 --suffix 0.003
-python run.py configs/exp_configs/sngan-ns-resnet34.yml configs/targets/discriminator.yml configs/gan_configs/cifar-10-sngan-ns.yml  configs/feature_configs/resnet34.yml configs/feature_configs/common.yml --weight_step 0.1 --step_size 0.003 --suffix 0.003
+# python run.py configs/exp_configs/sngan-ns-dumb.yml configs/targets/discriminator.yml configs/gan_configs/cifar-10-sngan-ns.yml  configs/feature_configs/dumb.yml configs/feature_configs/common.yml --weight_step 0.1 --step_size 0.003 --suffix 0.003
+# python run.py configs/exp_configs/sngan-ns-resnet34.yml configs/targets/discriminator.yml configs/gan_configs/cifar-10-sngan-ns.yml  configs/feature_configs/resnet34.yml configs/feature_configs/common.yml --weight_step 0.1 --step_size 0.003 --suffix 0.003
+
 # python run.py configs/exp_configs/sngan-ns-resnet34.yml configs/targets/prior.yml configs/gan_configs/cifar-10-sngan-ns.yml  configs/feature_configs/resnet34.yml configs/feature_configs/common.yml --weight_step 0.1 --step_size 0.01 --suffix 0.001

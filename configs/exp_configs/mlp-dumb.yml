@@ -3,12 +3,12 @@ n_steps: &n_steps 1000 #500
 every: &every 25
 seed: null
 device: &device 'cuda'
-total_n: &total_n 10000 #0
+total_n: &total_n 1000 #0
 batch_size: &batch_size 1000
-weight_step: &weight_step #0.01
-step_size: &step_size 0.2 #0.01
-name: &name dcgan_dumb
+weight_step: &weight_step 0.0 #0.01
+step_size: &step_size 0.1 #0.01
+name: &name mlp_dumb
 burn_in_steps: &burn_in_steps 0.
 start_sample: &start_sample 0. #10
-sub_dir: &sub_dir dcgan # dcgan
+sub_dir: &sub_dir mlp # dcgan
 suffix: *step_size
