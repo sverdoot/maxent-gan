@@ -2,8 +2,8 @@ feature: &feature
   name: ClusterFeature
   params: 
     device: *device
-    clusters_path: null #data/cifar10/kmeans.npz
-    ref_stats_path: null #stats/ClusterFeature_cifar10.npz
+    clusters_path: data/25_gaussians_modes.npz
+    ref_stats_path: stats/ClusterFeature_25_gaussians.npz
     opt_params:
       name:
         SGD
