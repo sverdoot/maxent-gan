@@ -41,7 +41,6 @@ class MLPGenerator(BaseGenerator):
         n_out=2,
         non_linear=nn.ReLU(),
     ):
-        #super().__init__(mean, std)
         nn.Module.__init__(self)
         self.non_linear = non_linear
         self.n_hid = n_hid
@@ -85,7 +84,6 @@ class MLPDiscriminator(BaseDiscriminator):
         non_linear=nn.ReLU(),
     ):
         nn.Module.__init__(self)
-        #super().__init__(mean, std, 'sigmoid')
         self.output_layer = nn.Sigmoid()
 
         self.non_linear = non_linear
