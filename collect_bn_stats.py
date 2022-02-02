@@ -8,10 +8,10 @@ import torchvision
 import torchvision.transforms as T
 from tqdm import tqdm
 
-sys.path.append("thirdparty/studiogan/studiogan")
 
-import soul_gan.models
-from soul_gan.models.studiogans import StudioDis, StudioGen
+sys.path.append("studiogan")
+
+from soul_gan.models.studiogans import StudioDis, StudioGen  # noqa: F401
 from soul_gan.models.utils import load_gan
 from soul_gan.utils.general_utils import DotConfig
 

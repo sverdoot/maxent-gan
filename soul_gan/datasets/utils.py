@@ -1,17 +1,18 @@
 import zipfile
 from pathlib import Path
-from typing import Tuple, Optional
+from typing import Optional, Tuple
 
 import gdown
-from PIL import Image
 import torch
+from PIL import Image
 from torch.utils.data import Dataset, TensorDataset
 from torchvision import datasets
 from torchvision import transforms as T
 
+from soul_gan.utils.general_utils import DATA_DIR, IgnoreLabelDataset
+
 from .synthetic import prepare_2d_gaussian_grid_data
 
-from soul_gan.utils.general_utils import DATA_DIR, IgnoreLabelDataset
 
 N_CIFAR_CLASSES = 10
 
@@ -101,21 +102,22 @@ def get_cifar_dataset(
 
 def get_gaussians_grid_dataset(
     sample_size: int = 10000,
-    mean: Tuple[float, float] = (0., 0.),
-    std: Tuple[float, float] = (1.0, 1.0), 
-    n_modes: int=25, 
-    xlims: Tuple[float, float]=(-2, 2), 
-    ylims: Tuple[float, float]=(-2, 2), 
-    sigma: float=0.05, 
-    seed: Optional[int]=None,
-
+    mean: Tuple[float, float] = (0.0, 0.0),
+    std: Tuple[float, float] = (1.0, 1.0),
+    n_modes: int = 25,
+    xlims: Tuple[float, float] = (-2, 2),
+    ylims: Tuple[float, float] = (-2, 2),
+    sigma: float = 0.05,
+    seed: Optional[int] = None,
 ) -> Dataset:
-    dataset, _  = prepare_2d_gaussian_grid_data(sample_size, n_modes, xlims, ylims, sigma, seed)
+    dataset, _ = prepare_2d_gaussian_grid_data(
+        sample_size, n_modes, xlims, ylims, sigma, seed
+    )
     mean = torch.as_tensor(mean)
     std = torch.as_tensor(std)
-    dataset = IgnoreLabelDataset(TensorDataset(
-        (torch.from_numpy(dataset) - mean[None, :]) / std[None, :]
-        ))
+    dataset = IgnoreLabelDataset(
+        TensorDataset((torch.from_numpy(dataset) - mean[None, :]) / std[None, :])
+    )
     return dataset
 
 

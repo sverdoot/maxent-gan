@@ -1,10 +1,9 @@
 import torch
 import torch.nn as nn
 
-from soul_gan.models.base import (BaseDiscriminator, BaseGenerator,
-                                  ModelRegistry)
+from soul_gan.models.base import BaseDiscriminator, BaseGenerator, ModelRegistry
 
-                                
+
 # import random
 
 # import numpy as np
@@ -58,7 +57,9 @@ class MLPGenerator(BaseGenerator):
 
         mean = torch.as_tensor(mean)
         std = torch.as_tensor(std)
-        self.inverse_transform = lambda x: (x * std[None, :].to(x.device) + mean[None, :].to(x.device))
+        self.inverse_transform = lambda x: (
+            x * std[None, :].to(x.device) + mean[None, :].to(x.device)
+        )
 
     def forward(self, z):
         z = self.layers.forward(z)
@@ -97,7 +98,9 @@ class MLPDiscriminator(BaseDiscriminator):
 
         mean = torch.as_tensor(mean)
         std = torch.as_tensor(std)
-        self.transform = lambda x: (x - mean[None, :].to(x.device)) / std[None, :].to(x.device)
+        self.transform = lambda x: (x - mean[None, :].to(x.device)) / std[None, :].to(
+            x.device
+        )
 
     def forward(self, z):
         z = self.layers.forward(z)

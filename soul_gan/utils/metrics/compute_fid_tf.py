@@ -27,11 +27,13 @@ import warnings
 
 import numpy as np
 
+
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
 warnings.filterwarnings("ignore")
 import tensorflow
 import tensorflow.compat.v1 as tf
+
 
 tf.disable_v2_behavior()
 
@@ -43,6 +45,7 @@ import warnings
 from imageio import imread
 from scipy import linalg
 from tqdm import tqdm, trange
+
 
 tf.get_logger().setLevel(logging.ERROR)
 

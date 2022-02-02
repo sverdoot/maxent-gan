@@ -4,7 +4,6 @@ from typing import Any, Callable, Dict, List, Optional
 
 import numpy as np
 import torch
-import torch.nn.functional as F
 import torchvision
 from pytorch_fid.inception import InceptionV3
 from torch.nn.functional import adaptive_avg_pool2d
@@ -110,7 +109,7 @@ class Feature(ABC):
             for group in self.opt.param_groups:
                 group["lr"] = np.abs(step)
 
-            if not grad is 0:
+            if grad is not 0:  # noqa: F632
                 self.weight[i].grad = -grad
         if self.opt:
             self.opt.step()
@@ -408,15 +407,79 @@ class ClusterFeature(SoulFeature):
             self.activation = None
             x = out.squeeze(3).squeeze(2)
 
-        # x = self.inverse_transform(x)
+        dists = torch.norm(
+            x.reshape(x.shape[0], -1)[:, None, :]
+            - self.centroids[None, ...].to(x.device),
+            dim=-1,
+        )
+        result = torch.sigmoid(dists - 2 * self.sigmas[None, :].to(x.device))
+
+        return [result]
+
+
+@FeatureRegistry.register()
+class IMLEFeature(SoulFeature):
+    def __init__(
+        self,
+        clusters_path,
+        ref_stats_path=None,
+        inverse_transform=None,
+        callbacks=None,
+        **kwargs,
+    ):
+        self.embedding_model = kwargs.get("embedding_model", None)
+        self.device = kwargs.get("device", 0)
+        clusters_info = np.load(Path(clusters_path).open("rb"))
+        self.centroids = torch.from_numpy(clusters_info["centroids"]).float()
+        self.sigmas = torch.from_numpy(clusters_info["sigmas"]).float()
+        self.n_clusters = len(clusters_info["sigmas"])
+
+        super().__init__(
+            ref_stats_path=ref_stats_path,
+            inverse_transform=inverse_transform,
+            callbacks=callbacks,
+            **kwargs,
+        )
+        if self.embedding_model:
+            if self.embedding_model == "resnet34":
+                model = torchvision.models.resnet34
+            elif self.embedding_model == "resnet50":
+                model = torchvision.models.resnet50
+            elif self.embedding_model == "resnet101":
+                model = torchvision.models.resnet101
+            else:
+                raise ValueError(f"Version {self.resnet_version} is not available")
+
+            self.model = model(pretrained=True).to(self.device)
+            self.activation = None
+
+            def get_activation(name):
+                def hook(model, input, output):
+                    self.activation = output
+
+                return hook
+
+            self.model.avgpool.register_forward_hook(get_activation("avgpool"))
+            # if dp:
+            #     self.model = torch.nn.DataParallel(self.model)
+            self.model.eval()
+            self.transform = transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+        else:
+            self.model = None
+
+    def apply(self, x: torch.FloatTensor) -> List[torch.FloatTensor]:
+        if self.model:
+            self.model(self.transform(self.inverse_transform(x)))
+            out = self.activation.to(self.device)
+            self.activation = None
+            x = out.squeeze(3).squeeze(2)
 
         dists = torch.norm(
             x.reshape(x.shape[0], -1)[:, None, :]
             - self.centroids[None, ...].to(x.device),
             dim=-1,
         )
-
-        result = torch.sigmoid(dists - 2 * self.sigmas[None, :].to(x.device))
+        result = torch.exp(-2 * dists ** 2)
 
         return [result]
 

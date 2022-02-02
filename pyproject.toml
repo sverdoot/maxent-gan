@@ -75,6 +75,7 @@ use_parentheses = true
 line_length = 88
 lines_after_imports = 2
 skip_glob = 'thirdparty'
+known_third_party = ["numpy", "pytorch_fid", "torch", "torchvision", "tqdm", "yaml"]
 
 [tool.flake8]
 min_python_version = "3.8.0"
@@ -98,6 +99,8 @@ extend-ignore = """
     ANN101,
     # ANN102: Missing type annotation for cls in classmethod
     ANN102,
+    # E402: module level import not at top of file
+    E402,
     """
 #per-file-ignores =
     # F401: Module imported by unused (non-implicit modules)

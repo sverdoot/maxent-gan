@@ -7,8 +7,6 @@ import torch
 from torchvision import transforms
 from torchvision.utils import make_grid
 
-from soul_gan.distribution import estimate_log_norm_constant
-
 
 class Callback(ABC):
     cnt: int = 0

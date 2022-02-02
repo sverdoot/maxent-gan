@@ -1,5 +1,4 @@
 import argparse
-import datetime
 import sys
 from collections import defaultdict
 from pathlib import Path
@@ -7,9 +6,9 @@ from pathlib import Path
 import numpy as np
 import ruamel.yaml as yaml
 import torch
-import torchvision
 from torch.utils.data import DataLoader
 from tqdm import tqdm
+
 
 # from pytorch_fid.fid_score import calculate_frechet_distance
 # from pytorch_fid.inception import InceptionV3
@@ -19,10 +18,10 @@ sys.path.append("studiogan")
 
 from soul_gan.datasets.utils import get_dataset
 from soul_gan.feature import FeatureRegistry
-from soul_gan.models.studiogans import StudioDis, StudioGen
+from soul_gan.models.studiogans import StudioDis, StudioGen  # noqa: F401
 from soul_gan.models.utils import load_gan
 from soul_gan.utils.general_utils import DotConfig  # isort:block
-from soul_gan.utils.general_utils import ROOT_DIR, random_seed
+from soul_gan.utils.general_utils import random_seed
 
 
 def parse_arguments():
@@ -72,7 +71,7 @@ def main(config: DotConfig, device: torch.device):
     # stats_dir = Path(ROOT_DIR, "stats")
     if not args.save_path:
         args.save_path = config.feature.params.ref_stats_path
-        # args.save_name = f"{config.sample_params.feature.name}_{config.gan_config.dataset}.npz"
+
     np.savez(
         Path(
             # stats_dir,

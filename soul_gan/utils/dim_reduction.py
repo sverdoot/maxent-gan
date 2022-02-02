@@ -3,12 +3,9 @@ import pickle
 from pathlib import Path
 
 import numpy as np
-import torch
 import umap
-from openTSNE import TSNE, TSNEEmbedding
+from openTSNE import TSNE
 from sklearn.decomposition import PCA
-from torchvision import datasets
-from torchvision import transforms as T
 
 from soul_gan.datasets.utils import get_dataset
 from soul_gan.utils.general_utils import DATA_DIR

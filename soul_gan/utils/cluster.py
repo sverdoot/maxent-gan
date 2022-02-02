@@ -4,7 +4,7 @@ from pathlib import Path
 import numpy as np
 import torch
 import torchvision
-from sklearn.cluster import KMeans, MiniBatchKMeans
+from sklearn.cluster import MiniBatchKMeans
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 

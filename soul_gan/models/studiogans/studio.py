@@ -1,16 +1,15 @@
 from pathlib import Path
 from typing import Union
 
-import numpy as np
-import torch
-
 import studiogan
 import studiogan.config
 import studiogan.configs
 import studiogan.utils
 import studiogan.utils.misc
-from soul_gan.models.base import (BaseDiscriminator, BaseGenerator,
-                                  ModelRegistry)
+import torch
+
+from soul_gan.models.base import BaseDiscriminator, BaseGenerator, ModelRegistry
+
 
 configs = Path(studiogan.configs.__path__[0])
 

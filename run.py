@@ -1,7 +1,6 @@
 import argparse
 import datetime
 import sys
-from asyncio import run_coroutine_threadsafe
 from pathlib import Path
 
 import numpy as np
@@ -9,26 +8,29 @@ import ruamel.yaml as yaml
 import torch
 import torchvision
 
+
 # from pytorch_fid.fid_score import calculate_frechet_distance
 # from pytorch_fid.inception import InceptionV3
 
 sys.path.append("studiogan")
 
 import wandb
-from soul_gan.distribution import (Distribution, DistributionRegistry,
-                                   harmonic_mean_estimate)
+
+from soul_gan.distribution import DistributionRegistry
 from soul_gan.feature import FeatureRegistry
-from soul_gan.models.studiogans import StudioDis, StudioGen
+from soul_gan.models.studiogans import StudioDis, StudioGen  # noqa: F401
 from soul_gan.models.utils import load_gan
 from soul_gan.sample import soul
 from soul_gan.utils.callbacks import CallbackRegistry
 from soul_gan.utils.general_utils import DotConfig  # isort:block
 from soul_gan.utils.general_utils import IgnoreLabelDataset, random_seed
 from soul_gan.utils.metrics.compute_fid_tf import calculate_fid_given_paths
-from soul_gan.utils.metrics.inception_score import (MEAN_TRASFORM,
-                                                    N_GEN_IMAGES,
-                                                    STD_TRANSFORM,
-                                                    get_inception_score)
+from soul_gan.utils.metrics.inception_score import (
+    MEAN_TRASFORM,
+    N_GEN_IMAGES,
+    STD_TRANSFORM,
+    get_inception_score,
+)
 
 
 def parse_arguments():
@@ -167,7 +169,7 @@ def main(config: DotConfig, device: torch.device, group: str):
                     label = torch.from_numpy(np.load(Path(save_dir, "labels.npy"))).to(
                         device
                     )
-                except:
+                except Exception:
                     label = torch.LongTensor(np.random.randint(0, 10 - 1, len(z))).to(
                         z.device
                     )
@@ -234,7 +236,7 @@ def main(config: DotConfig, device: torch.device, group: str):
         np.save(
             Path(
                 save_dir,
-                f"labels.npy",
+                "labels.npy",
             ),
             total_labels.cpu().numpy(),
         )
@@ -242,7 +244,7 @@ def main(config: DotConfig, device: torch.device, group: str):
             np.save(
                 Path(
                     save_dir,
-                    f"weights.npy",
+                    "weights.npy",
                 ),
                 weights.cpu().numpy(),
             )
@@ -316,18 +318,18 @@ def main(config: DotConfig, device: torch.device, group: str):
     if config.callbacks.afterall_callbacks:
         gen, dis = load_gan(config.gan_config, device, thermalize=config.thermalize)
 
-        x_final_file = Path(
-            results_dir,
-            "images",
-            f"{config.n_steps}.npy",
-        )
+        # x_final_file = Path(
+        #     results_dir,
+        #     "images",
+        #     f"{config.n_steps}.npy",
+        # )
         label_file = Path(
             results_dir,
-            f"labels.npy",
+            "labels.npy",
         )
         try:
             label = np.load(label_file)
-        except:
+        except Exception:
             label = np.random.randint(0, 10 - 1, 10000)
 
         # need to check correctness
