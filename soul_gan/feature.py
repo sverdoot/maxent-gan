@@ -101,10 +101,7 @@ class Feature(ABC):
         self, out: List[torch.FloatTensor], step: float, grad_norm: float = 0
     ):
         for i in range(len(self.weight)):
-            if isinstance(out[i], torch.FloatTensor):
-                grad = out[i].mean(0)
-            else:
-                grad = out[i]
+            grad = out[i]
 
             for group in self.opt.param_groups:
                 group["lr"] = np.abs(step)
