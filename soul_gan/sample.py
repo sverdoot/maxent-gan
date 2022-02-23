@@ -68,16 +68,16 @@ def soul(
 
     for it in trange(1, n_steps + 2):
         z.requires_grad_(True)
-        condition_avg = it > burn_in_steps or it == 1
-        condition_upd = it > burn_in_steps or it == 1
+        avg = it > burn_in_steps or it == 1
+        upd = it > burn_in_steps or it == 1
+        reset = it > burn_in_steps or it == 1
 
-        if condition_upd:
+        if upd:
             feature.weight_up(feature.avg_feature.data, weight_step, grad_norm)
-
-        if condition_avg:
+        if avg:
             feature.avg_weight.upd(feature.weight)
-
-        feature.avg_feature.reset()
+        if reset:
+            feature.avg_feature.reset()
 
         inter_zs, grad_norms = ula(
             z,

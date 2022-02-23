@@ -25,6 +25,7 @@ class WGANDiscriminator(BaseDiscriminator):
         self.l4 = nn.Linear(bw * bw * ch, output_dim)
 
         self.lrelu = nn.LeakyReLU(negative_slope=0.2, inplace=True)
+        self.lrelu1 = nn.LeakyReLU(negative_slope=0.2, inplace=True)
 
     def forward(self, x):
         h = self.lrelu(self.c0(x))
@@ -33,6 +34,6 @@ class WGANDiscriminator(BaseDiscriminator):
         h = self.lrelu(self.c2(h))
         h = self.lrelu(self.c2_0(h))
         h = self.lrelu(self.c3(h))
-        h = self.lrelu(self.c3_0(h))
+        h = self.lrelu1(self.c3_0(h))
         h = h.view(x.size(0), -1)
         return self.l4(h)

@@ -62,6 +62,7 @@ class MLPGenerator(BaseGenerator):
         )
 
     def forward(self, z):
+        # return z
         z = self.layers.forward(z)
         return z
 

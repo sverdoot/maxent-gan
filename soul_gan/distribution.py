@@ -43,12 +43,11 @@ class DistributionRegistry:
 class PriorTarget(Distribution):
     def __init__(
         self,
-        gen: nn.Module,
-        dis: Optional[nn.Module] = None,
+        gan,
         # proposal: Union[Distribution, torchDist],
     ):
-        self.gen = gen
-        self.proposal = gen.prior
+        self.gan = gan
+        self.proposal = gan.prior
 
     @staticmethod
     def latent_target(
@@ -70,22 +69,19 @@ class PriorTarget(Distribution):
 class DiscriminatorTarget(Distribution):
     def __init__(
         self,
-        gen: nn.Module,
-        dis: nn.Module,
+        gan,
         # proposal: Union[Distribution, torchDist],
     ):
-        self.gen = gen
-        self.dis = dis
-        self.proposal = gen.prior
+        self.gan = gan
+        self.proposal = gan.prior
 
     @staticmethod
     def latent_target(
         z: torch.FloatTensor,
-        gen: nn.Module,
-        dis: nn.Module,
+        gan,
         proposal: Union[Distribution, torchDist],
     ) -> Tuple[torch.FloatTensor, torch.FloatTensor, torch.FloatTensor]:
-        dgz = dis(gen(z)).squeeze()
+        dgz = gan.dis(gan.gen(z)).squeeze()
         logp_z = proposal.log_prob(z)
         assert dgz.shape == logp_z.shape
         log_prob = (logp_z + dgz) / 1.0
@@ -93,7 +89,7 @@ class DiscriminatorTarget(Distribution):
         return (log_prob, logp_z, dgz)
 
     def __call__(self, z: torch.FloatTensor) -> torch.FloatTensor:
-        logp = self.latent_target(z, self.gen, self.dis, self.proposal)[0]
+        logp = self.latent_target(z, self.gan, self.proposal)[0]
         return logp
 
     def project(self, z):
@@ -111,56 +107,56 @@ def grad_log_prob(
     return log_prob, grad
 
 
-def estimate_log_norm_constant(
-    gen: nn.Module,
-    dis: nn.Module,
-    n_pts: int,
-    batch_size: Optional[int] = None,
-    verbose: bool = False,
-) -> float:
-    batch_size = batch_size if batch_size else n_pts
-    norm_const = 0
-    if verbose:
-        bar = trange
-    else:
-        bar = range
+# def estimate_log_norm_constant(
+#     gen: nn.Module,
+#     dis: nn.Module,
+#     n_pts: int,
+#     batch_size: Optional[int] = None,
+#     verbose: bool = False,
+# ) -> float:
+#     batch_size = batch_size if batch_size else n_pts
+#     norm_const = 0
+#     if verbose:
+#         bar = trange
+#     else:
+#         bar = range
 
-    for _ in bar(0, n_pts, batch_size):
-        z = gen.prior.sample((batch_size,))
-        label = gen.sample_label(batch_size, z.device)
-        gen.label = label
-        dis.label = label
+#     for _ in bar(0, n_pts, batch_size):
+#         z = gen.prior.sample((batch_size,))
+#         label = gen.sample_label(batch_size, z.device)
+#         gen.label = label
+#         dis.label = label
 
-        dgz = dis(gen(z)).squeeze()
-        norm_const += (dgz).exp().sum().item()
-    norm_const /= n_pts
+#         dgz = dis(gen(z)).squeeze()
+#         norm_const += (dgz).exp().sum().item()
+#     norm_const /= n_pts
 
-    log_norm_const = float(np.log(norm_const))
-    return log_norm_const
+#     log_norm_const = float(np.log(norm_const))
+#     return log_norm_const
 
 
-def harmonic_mean_estimate(
-    dis: nn.Module,
-    x: Union[np.ndarray, torch.FloatTensor],
-    label: Union[np.ndarray, torch.FloatTensor],
-    device,
-    batch_size: Optional[int] = None,
-    verbose: bool = False,
-) -> float:
-    batch_size = batch_size if batch_size else len(x)
-    inv_norm_const = 0
-    if isinstance(x, np.ndarray):
-        x = torch.from_numpy(x)
-    if isinstance(label, np.ndarray):
-        label = torch.from_numpy(label)
+# def harmonic_mean_estimate(
+#     dis: nn.Module,
+#     x: Union[np.ndarray, torch.FloatTensor],
+#     label: Union[np.ndarray, torch.FloatTensor],
+#     device,
+#     batch_size: Optional[int] = None,
+#     verbose: bool = False,
+# ) -> float:
+#     batch_size = batch_size if batch_size else len(x)
+#     inv_norm_const = 0
+#     if isinstance(x, np.ndarray):
+#         x = torch.from_numpy(x)
+#     if isinstance(label, np.ndarray):
+#         label = torch.from_numpy(label)
 
-    for i, x_batch in enumerate(torch.split(x, batch_size)):
-        label_batch = label[i * batch_size : (i + 1) * batch_size]
-        dis.label = label_batch.to(device)
+#     for i, x_batch in enumerate(torch.split(x, batch_size)):
+#         label_batch = label[i * batch_size : (i + 1) * batch_size]
+#         dis.label = label_batch.to(device)
 
-        dgz = dis(x_batch.to(device)).squeeze()
-        inv_norm_const += (-dgz).exp().sum().item()
-    inv_norm_const /= len(x)
+#         dgz = dis(x_batch.to(device)).squeeze()
+#         inv_norm_const += (-dgz).exp().sum().item()
+#     inv_norm_const /= len(x)
 
-    log_norm_const = float(-np.log(inv_norm_const))
-    return log_norm_const
+#     log_norm_const = float(-np.log(inv_norm_const))
+#     return log_norm_const

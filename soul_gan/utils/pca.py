@@ -5,6 +5,7 @@ import numpy as np
 import torch
 import torchvision
 from sklearn.cluster import MiniBatchKMeans
+from sklearn.decomposition import PCA, KernelPCA
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
@@ -17,11 +18,15 @@ def parse_arguments():
     parser.add_argument(
         "--dataset", type=str, default="cifar10", choices=["cifar10", "celeba"]
     )
-    parser.add_argument("--method", type=str, default="kmeans", choices=["kmeans"])
+    parser.add_argument("--method", type=str, default="pca", choices=["pca"])
+    parser.add_argument(
+        "--kernel", type=str, default="linear", choices=["linear", "rbf", "poly"]
+    )
+    parser.add_argument("--n_pts", type=int)
     parser.add_argument("--norm_mean", type=float, nargs=3, default=(0.5, 0.5, 0.5))
     parser.add_argument("--norm_std", type=float, nargs=3, default=(0.5, 0.5, 0.5))
     parser.add_argument("--img_size", type=int, default=32)
-    parser.add_argument("--n_clusters", type=int, default=100)
+    parser.add_argument("--n_components", type=int, default=100)
     parser.add_argument("--model", type=str)
     parser.add_argument("--batch_size", type=int, default=256)
     parser.add_argument("--device", type=int, default=0)
@@ -71,48 +76,54 @@ def main(args):
             0,
         )  # .reshape(len(dataset), -1)
 
-    centroids = np.zeros((args.n_clusters, np_dataset.shape[1]))
-    ns = np.zeros(args.n_clusters)
-    closest_pts = np.zeros_like(centroids)
-    sigmas = np.zeros((args.n_clusters,))
-    if args.method == "kmeans":
-        model = MiniBatchKMeans(n_clusters=args.n_clusters)
-        model.fit(np_dataset)
-        centroids = model.cluster_centers_
-        distances = model.transform(centroids)
-        ids = np.argmin(distances, 1)
-        centroids = centroids[ids]
-        distances = model.transform(np_dataset)
+    if args.method == "pca":
+        if args.kernel == "linear":
+            pca = PCA(n_components=args.n_components, whiten=False)
+            pca.fit(np_dataset)
+            components = pca.components_
+            mean = pca.mean_
+            cov_eigs = pca.explained_variance_ ** 0.5
 
-        sigmas = np.zeros(args.n_clusters)
-        for i, point in enumerate(np_dataset):
-            label = np.argmin(distances[i])
-            sigmas[label] = sigmas[label] + distances[i][label] ** 2
-            if (
-                distances[i][label]
-                < model.transform(closest_pts[None, label])[0, label]
-                or (closest_pts[label] == 0).all()
-            ):
-                closest_pts[label] = point
-            ns[label] += 1
+            name = f"{args.method}" + (f"_{args.model}" if args.model else "") + ".npz"
+            save_path = Path(DATA_DIR, args.dataset, name)
+            np.savez(
+                save_path.open("wb"),
+                components=components,
+                mean=mean,
+                cov_eigs=cov_eigs,
+            )
 
-    centroids = centroids[sigmas != 0]
-    ns = ns[sigmas != 0]
-    closest_pts = closest_pts[sigmas != 0]
-    sigmas = sigmas[sigmas != 0]
+        else:
+            pca = KernelPCA(
+                n_components=args.n_components,
+                kernel=args.kernel,
+                gamma=1.0 / np_dataset.shape[1],
+            )
+            pca.fit(
+                np_dataset[np.random.choice(np.arange(len(np_dataset)), args.n_pts)]
+            )
 
-    sigmas /= ns
-    sigmas = sigmas ** 0.5
-    print(len(ns))
-    name = f"{args.method}" + (f"_{args.model}" if args.model else "") + ".npz"
-    save_path = Path(DATA_DIR, args.dataset, name)
-    np.savez(
-        save_path.open("wb"),
-        centroids=centroids,
-        sigmas=sigmas,
-        closest_pts=closest_pts,
-        priors=ns / sum(ns),
-    )
+            non_zeros = np.flatnonzero(pca.eigenvalues_)
+            scaled_alphas = np.zeros_like(pca.eigenvectors_)
+            scaled_alphas[:, non_zeros] = pca.eigenvectors_[:, non_zeros] / np.sqrt(
+                pca.eigenvalues_[non_zeros]
+            )
+            x = pca.X_fit_
+            gamma = pca.gamma
+
+            name = (
+                f"{args.method}"
+                + f"_{args.kernel}"
+                + (f"_{args.model}" if args.model else "")
+                + ".npz"
+            )
+            save_path = Path(DATA_DIR, args.dataset, name)
+            np.savez(
+                save_path.open("wb"),
+                scaled_alphas=scaled_alphas,
+                x=x,
+                gamma=gamma,
+            )
 
 
 if __name__ == "__main__":

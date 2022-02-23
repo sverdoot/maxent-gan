@@ -6,12 +6,14 @@ import numpy as np
 import torch
 import torchvision
 from pytorch_fid.inception import InceptionV3
+from torch.nn import functional as F
 from torch.nn.functional import adaptive_avg_pool2d
 from torch.optim import SGD, Adam
 from torchvision import transforms
 
 from soul_gan.utils.metrics import batch_inception
 
+torch.autograd.set_detect_anomaly(True)
 
 class AvgHolder(object):
     cnt: int = 0
@@ -56,8 +58,8 @@ class Feature(ABC):
         self.opt_params = (
             opt_params
             if opt_params is not None
-            else {"name": "SGD", "params": {"momentum": 0.9, "nesterov": True}}
-        )  # {'name': 'Adam', 'params': {}}
+            else {"name": "SGD", "params": {"momentum": 0.0, "nesterov": False}}
+        )
 
         self.callbacks = callbacks if callbacks else []
 
@@ -92,7 +94,6 @@ class Feature(ABC):
         lik_f = 0
         for feature_id in range(len(out)):
             # lik_f -= (out[feature_id] @ self.weight[feature_id][None, :]).sum(1)
-            # print(out[feature_id], self.weight[feature_id])
             lik_f -= torch.einsum("ab,b->a", out[feature_id], self.weight[feature_id])
 
         return lik_f
@@ -106,7 +107,7 @@ class Feature(ABC):
             for group in self.opt.param_groups:
                 group["lr"] = np.abs(step)
 
-            if grad is not 0:  # noqa: F632
+            if isinstance(grad, torch.Tensor):  # noqa: F632
                 self.weight[i].grad = -grad
         if self.opt:
             self.opt.step()
@@ -212,12 +213,7 @@ class SoulFeature(Feature):
         self.weight = [
             torch.zeros(ref_feature.shape[0], dtype=torch.float32).to(self.device)
             for ref_feature in self.ref_feature
-            # torch.randn(ref_feature.shape[0], dtype=torch.float32).to(
-            #     self.device
-            # )
-            # for ref_feature in self.ref_feature
         ]
-        # self.weight = [w / torch.norm(w) for w in self.weight]
 
     def get_useful_info(
         self,
@@ -323,20 +319,50 @@ class InceptionScoreFeature(Feature):
 
 @FeatureRegistry.register()
 class DiscriminatorFeature(SoulFeature):
-    def __init__(self, dis, inverse_transform=None, callbacks=None, **kwargs):
+    def __init__(self, dis, inverse_transform=None, callbacks=None, ref_stats_path=None, **kwargs):
         self.dis = dis
-        ref_feature = kwargs.get("ref_score", 0.5 / (1 - 0.5))
-        if isinstance(ref_feature, float):
-            ref_feature = [torch.FloatTensor([ref_feature])]
+        # ref_feature = kwargs.get("ref_score", 0.5 / (1 - 0.5))
+        # if isinstance(ref_feature, float):
+        #     ref_feature = [torch.FloatTensor([ref_feature])]
         super().__init__(
             inverse_transform=inverse_transform,
             callbacks=callbacks,
-            ref_score=ref_feature,
-            # **kwargs,
+            ref_stats_path=ref_stats_path,
+            # ref_score=ref_feature,
         )
 
     def apply(self, x: torch.FloatTensor) -> List[torch.FloatTensor]:
         result = self.dis(x).view(-1, 1)
+
+        # print(result.mean())
+        return [result]
+
+@FeatureRegistry.register()
+class DiscriminatorFeature_v1(SoulFeature):
+    def __init__(self, dis, inverse_transform=None, callbacks=None, ref_stats_path=None, **kwargs):
+        self.dis = dis
+        super().__init__(
+            inverse_transform=inverse_transform,
+            callbacks=callbacks,
+            ref_stats_path=ref_stats_path
+        )
+
+    def apply(self, x: torch.FloatTensor) -> List[torch.FloatTensor]:
+        self.activation = []
+
+        def get_activation(name):
+            def hook(model, input, output):
+                self.activation.append(output)
+            return hook
+        hook = self.dis.module.main[-2].register_forward_hook(get_activation("avgpool"))
+        #hook = self.dis.module.lrelu1.register_forward_hook(get_activation("avgpool"))
+        self.dis(x)
+        hook.remove()
+        result = torch.cat([_.to(x.device) for _ in self.activation], 0).view(len(x), -1)
+        result = torch.sigmoid(result)
+        self.activation = []
+
+        # print(result.mean())
         return [result]
 
 
@@ -355,14 +381,18 @@ class ClusterFeature(SoulFeature):
         ref_stats_path=None,
         inverse_transform=None,
         callbacks=None,
+        version=0,
         **kwargs,
     ):
+        self.radius = kwargs.get("radius", 100.0)
         self.embedding_model = kwargs.get("embedding_model", None)
         self.device = kwargs.get("device", 0)
         clusters_info = np.load(Path(clusters_path).open("rb"))
         self.centroids = torch.from_numpy(clusters_info["centroids"]).float()
         self.sigmas = torch.from_numpy(clusters_info["sigmas"]).float()
+        self.priors = torch.from_numpy(clusters_info["priors"]).float()
         self.n_clusters = len(clusters_info["sigmas"])
+        self.version = version
 
         super().__init__(
             ref_stats_path=ref_stats_path,
@@ -397,6 +427,10 @@ class ClusterFeature(SoulFeature):
         else:
             self.model = None
 
+        self.ts = None
+
+        self.h = torch.zeros_like(self.priors) # N
+
     def apply(self, x: torch.FloatTensor) -> List[torch.FloatTensor]:
         if self.model:
             self.model(self.transform(self.inverse_transform(x)))
@@ -404,32 +438,132 @@ class ClusterFeature(SoulFeature):
             self.activation = None
             x = out.squeeze(3).squeeze(2)
 
-        dists = torch.norm(
-            x.reshape(x.shape[0], -1)[:, None, :]
-            - self.centroids[None, ...].to(x.device),
-            dim=-1,
-        )
-        result = torch.sigmoid(dists - 2 * self.sigmas[None, :].to(x.device))
+        # if True: #self.ts is None:
+        #     pis = -dists ** 2 / (2. * sigmas ** 2) - torch.log((dists < 2. * sigmas).float().mean(0) + 1e-4)[None, :] + torch.log(self.priors.to(x.device))[None, :]
+        #     pis -= pis.max(1)[0][:, None]
+        #     pis = torch.softmax(pis, -1).detach()
+        #     self.ts = torch.multinomial(pis, 1)[:, 0].tolist()
+
+        if self.version == 0:
+            dists = torch.norm(
+                x.reshape(x.shape[0], -1)[:, None, :]
+                - self.centroids[None, ...].to(x.device),
+                dim=-1,
+            )
+            sigmas = self.sigmas[None, :].to(x.device)
+            result = torch.sigmoid(dists - 2 * sigmas)
+
+        elif self.version == 1:
+            # #result = dists.min(1)[0].reshape(-1, 1) # - good but not for mode collapse
+            # result = torch.exp(-dists ** 2 / (2. * sigmas **2 + 1.)) * self.priors[None, :].to(x.device)
+            # #result = result / (result.sum(1)[:, None] + 1e-10) * self.n_clusters # self.n_clusters - constant for stability (helps for some reason)
+            # result = torch.log(result + 1e-10)
+            # result = dists
+            # result[dists < sigmas] = result[dists < sigmas]**2
+            # result = torch.exp(-result / sigmas)
+            # result = 1 * torch.exp(-(dists / h) ** 2)
+            # result = (dists / sigmas * sigmas.mean())[np.arange(len(x)), self.ts].reshape(-1, 1)
+
+            # rff
+            # w = torch.randn((len(x), len(self.centroids), self.centroids.shape[-1]), device=x.device)
+            # w = torch.randn((len(self.centroids), self.centroids.shape[-1]), device=x.device)
+            # prod = (self.w[None, :, :].to(x.device) * (x.reshape(len(x), -1)[:, None, :] - self.centroids[None, :, :].to(x.device))).sum(-1)
+            # prod = (self.w[None, :, :].to(x.device) * x.reshape(len(x), -1)[:, None, :]).sum(-1) / (self.w.norm(dim=-1).to(x.device) + 0.1)
+
+            # hyperbolic distance
+            # sigmas = self.sigmas[None, :].to(x.device)
+            # dists = torch.norm(
+            #     x.reshape(x.shape[0], -1)[:, None, :] / self.radius
+            #     - self.centroids[None, ...].to(x.device) / self.radius,
+            #     dim=-1, p=1
+            # ) / 100
+            # # result = torch.exp(dists) # not bad         #torch.exp(-dists / sigmas)
+
+            # sigmas = self.sigmas[None, :, None].to(x.device)
+            #result = (torch.exp(-(x.reshape(len(x), -1)[:, None, :] - self.centroids[None, ...].to(x.device))**2) / 2. ).mean(1)
+
+            #result = torch.abs(x.reshape(len(x), -1)[:, None, :] - self.centroids[None, ...].to(x.device)).mean(-1) # not bad
+            result = ((x.reshape(len(x), -1)[:, None, :] - self.centroids[None, ...].to(x.device))**2).mean(-1)
+            
+            
+        
+            #result = (dists[:, None, :] * dists[:, :, None]).reshape(len(x), -1)
+            #result = torch.cat([dists, result], 1)
+            
+            
+            #result = dists ** 2
+            #result = torch.exp(-dists**2 / sigmas **2)
+            #result = result.masked_fill(result != result.min(-1)[0][:, None], 0)
+            
+            #result = torch.exp(-(dists)** 2)
+
+            # result = torch.clip(dists, min=2 * sigmas)**2
+
+            # x_norm = x.reshape(len(x), -1).norm(dim=-1) / self.radius
+            # centr_norm = self.centroids.norm(dim=-1).to(x.device) / self.radius
+            # z = 1. + 2 * dists**2 / (1. - x_norm**2)[:, None] / (1. - centr_norm**2)[None, :]
+            # result = torch.arccosh(z)
+            # sigmas = self.sigmas[None, :, None].to(x.device)
+            # result = ((torch.clip(x.reshape(x.shape[0], -1)[:, None, :] - self.centroids[None, ...].to(x.device), min=2*sigmas) / sigmas)**2).sum(1)
+            # result = torch.exp(-(x.reshape(x.shape[0], -1)[:, None, :] - self.centroids[None, ...].to(x.device))**2).mean(1)
+
+            # cent = self.centroids.reshape(-1, *x.shape[1:]).to(x.device)
+            # conv = F.conv2d(x, cent, padding=16, stride=2)
+            # result = conv.mean(1).reshape(len(x), -1) #conv.reshape(len(x), -1) / 10
+            # result = F.max_pool2d(conv, conv.shape[-1]).squeeze(-1).squeeze(-1) / 10.
+
+        elif self.version == 2:
+            dists = torch.norm(
+                x.reshape(x.shape[0], -1)[:, None, :]
+                - self.centroids[None, ...].to(x.device),
+                dim=-1,
+            )
+            # if not self.eval:
+            #     ws = dists.min(1)[1].detach()
+            #     ws = F.one_hot(ws, dists.shape[1]).float().mean(0)
+            #     dE_dh = ws - self.priors.to(x.device)
+            #     dE_dh -= dE_dh.mean(0)
+            #     self.h = self.h.to(x.device)
+            #     self.h = self.h - 0.1 * dE_dh
+            # else:
+            #     self.h = self.h.to(x.device)
+
+            ids = torch.min(dists, 1)[1]
+            result = (x.reshape(len(x), -1) * self.centroids[ids, :].to(x.device)).sum(-1) / 100 + self.dis(x)
+            result = result.view(-1, 1)
+
+
+            
+            #result = (x.reshape(len(x), -1)[:, None, :] * self.centroids[None, :, :].to(x.device)).sum(-1)   + self.h[None, :]
+            # ids = torch.max((x.reshape(len(x), -1)[:, None, :] * self.centroids[None, :, :].to(x.device)).sum(-1)   + self.h[None, :], 1)[1] #.reshape(-1, 1)
+            # result = dists[np.arange(len(x)), ids.tolist()].reshape(len(x), 1)
+            #du_dx = self.centroids[np.arange(len(x)), ids.tolist()]
+            #result = du_dx
+
+        else:
+            raise KeyError
 
         return [result]
 
 
 @FeatureRegistry.register()
-class IMLEFeature(SoulFeature):
+class PCAFeature(SoulFeature):
     def __init__(
         self,
-        clusters_path,
+        info_path,
         ref_stats_path=None,
         inverse_transform=None,
         callbacks=None,
+        version=0,
         **kwargs,
     ):
         self.embedding_model = kwargs.get("embedding_model", None)
         self.device = kwargs.get("device", 0)
-        clusters_info = np.load(Path(clusters_path).open("rb"))
-        self.centroids = torch.from_numpy(clusters_info["centroids"]).float()
-        self.sigmas = torch.from_numpy(clusters_info["sigmas"]).float()
-        self.n_clusters = len(clusters_info["sigmas"])
+        info = np.load(Path(info_path).open("rb"))
+        self.components = torch.from_numpy(info["components"]).float()
+        self.mean = torch.from_numpy(info["mean"]).float()
+        self.cov_eigs = torch.from_numpy(info["cov_eigs"]).float()
+        self.version = version
 
         super().__init__(
             ref_stats_path=ref_stats_path,
@@ -464,6 +598,8 @@ class IMLEFeature(SoulFeature):
         else:
             self.model = None
 
+        self.ts = None
+
     def apply(self, x: torch.FloatTensor) -> List[torch.FloatTensor]:
         if self.model:
             self.model(self.transform(self.inverse_transform(x)))
@@ -471,14 +607,177 @@ class IMLEFeature(SoulFeature):
             self.activation = None
             x = out.squeeze(3).squeeze(2)
 
-        dists = torch.norm(
-            x.reshape(x.shape[0], -1)[:, None, :]
-            - self.centroids[None, ...].to(x.device),
-            dim=-1,
+        result = (
+            (x.reshape(len(x), -1) - self.mean[None, :].to(x.device))
+            @ self.components.to(x.device).T
+            / self.cov_eigs.to(x.device)[None, :]
         )
-        result = torch.exp(-2 * dists ** 2)
+        # result = torch.cat([result, result.norm(dim=-1)[:, None]], 1)
+        # result = torch.cat([result, x.reshape(len(x), -1)], 1)
 
         return [result]
+
+
+@FeatureRegistry.register()
+class KernelPCAFeature(SoulFeature):
+    def __init__(
+        self,
+        info_path,
+        ref_stats_path=None,
+        inverse_transform=None,
+        callbacks=None,
+        version=0,
+        **kwargs,
+    ):
+        self.embedding_model = kwargs.get("embedding_model", None)
+        self.device = kwargs.get("device", 0)
+        info = np.load(Path(info_path).open("rb"))
+        self.x = torch.from_numpy(info["x"]).float()
+        self.scaled_alphas = torch.from_numpy(info["scaled_alphas"]).float()
+        self.gamma = info["gamma"]
+        self.version = version
+
+        super().__init__(
+            ref_stats_path=ref_stats_path,
+            inverse_transform=inverse_transform,
+            callbacks=callbacks,
+            **kwargs,
+        )
+        if self.embedding_model:
+            if self.embedding_model == "resnet34":
+                model = torchvision.models.resnet34
+            elif self.embedding_model == "resnet50":
+                model = torchvision.models.resnet50
+            elif self.embedding_model == "resnet101":
+                model = torchvision.models.resnet101
+            else:
+                raise ValueError(f"Version {self.resnet_version} is not available")
+
+            self.model = model(pretrained=True).to(self.device)
+            self.activation = None
+
+            def get_activation(name):
+                def hook(model, input, output):
+                    self.activation = output
+
+                return hook
+
+            self.model.avgpool.register_forward_hook(get_activation("avgpool"))
+            # if dp:
+            #     self.model = torch.nn.DataParallel(self.model)
+            self.model.eval()
+            self.transform = transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+        else:
+            self.model = None
+
+        self.ts = None
+
+    def apply(self, x: torch.FloatTensor) -> List[torch.FloatTensor]:
+        if self.model:
+            self.model(self.transform(self.inverse_transform(x)))
+            out = self.activation.to(self.device)
+            self.activation = None
+            x = out.squeeze(3).squeeze(2)
+        device = x.device
+        K = torch.exp(
+            -self.gamma
+            * torch.norm(
+                x.reshape(len(x), -1)[:, None, :] - self.x[None, ...].to(device), dim=-1
+            )
+            ** 2
+        )
+        result = K @ self.scaled_alphas.to(device)
+
+        return [result]
+
+
+@FeatureRegistry.register()
+class DiscriminatorGradientFeature(SoulFeature):
+    def __init__(
+        self, dis, ref_stats_path=None, inverse_transform=None, callbacks=None, **kwargs
+    ):
+        self.dis = dis
+        super().__init__(
+            ref_stats_path=ref_stats_path,
+            inverse_transform=inverse_transform,
+            callbacks=callbacks,
+            **kwargs,
+        )
+
+    def apply(self, x: torch.FloatTensor) -> List[torch.FloatTensor]:
+        # result = self.dis(x).view(-1, 1)
+        x.requires_grad_(True)
+        result = torch.autograd.grad(self.dis(x).sum(), x, retain_graph=True)[0].view(
+            len(x), -1
+        )
+        return [result]
+
+
+# @FeatureRegistry.register()
+# class IMLEFeature(SoulFeature):
+#     def __init__(
+#         self,
+#         clusters_path,
+#         ref_stats_path=None,
+#         inverse_transform=None,
+#         callbacks=None,
+#         **kwargs,
+#     ):
+#         self.embedding_model = kwargs.get("embedding_model", None)
+#         self.device = kwargs.get("device", 0)
+#         clusters_info = np.load(Path(clusters_path).open("rb"))
+#         self.centroids = torch.from_numpy(clusters_info["centroids"]).float()
+#         self.sigmas = torch.from_numpy(clusters_info["sigmas"]).float()
+#         self.n_clusters = len(clusters_info["sigmas"])
+
+#         super().__init__(
+#             ref_stats_path=ref_stats_path,
+#             inverse_transform=inverse_transform,
+#             callbacks=callbacks,
+#             **kwargs,
+#         )
+#         if self.embedding_model:
+#             if self.embedding_model == "resnet34":
+#                 model = torchvision.models.resnet34
+#             elif self.embedding_model == "resnet50":
+#                 model = torchvision.models.resnet50
+#             elif self.embedding_model == "resnet101":
+#                 model = torchvision.models.resnet101
+#             else:
+#                 raise ValueError(f"Version {self.resnet_version} is not available")
+
+#             self.model = model(pretrained=True).to(self.device)
+#             self.activation = None
+
+#             def get_activation(name):
+#                 def hook(model, input, output):
+#                     self.activation = output
+
+#                 return hook
+
+#             self.model.avgpool.register_forward_hook(get_activation("avgpool"))
+#             # if dp:
+#             #     self.model = torch.nn.DataParallel(self.model)
+#             self.model.eval()
+#             self.transform = transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+#         else:
+#             self.model = None
+
+#     def apply(self, x: torch.FloatTensor) -> List[torch.FloatTensor]:
+#         if self.model:
+#             self.model(self.transform(self.inverse_transform(x)))
+#             out = self.activation.to(self.device)
+#             self.activation = None
+#             x = out.squeeze(3).squeeze(2)
+
+#         dists = torch.norm(
+#             x.reshape(x.shape[0], -1)[:, None, :]
+#             - self.centroids[None, ...].to(x.device),
+#             dim=-1,
+#         )
+#         result = torch.exp(-2 * dists ** 2)
+
+#         return [result]
 
 
 @FeatureRegistry.register()

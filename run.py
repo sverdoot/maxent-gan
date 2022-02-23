@@ -16,12 +16,14 @@ sys.path.append("studiogan")
 
 import wandb
 
+from soul_gan.datasets.utils import get_dataset
 from soul_gan.distribution import DistributionRegistry
 from soul_gan.feature import FeatureRegistry
 from soul_gan.models.studiogans import StudioDis, StudioGen  # noqa: F401
-from soul_gan.models.utils import load_gan
+from soul_gan.models.utils import GANWrapper
 from soul_gan.sample import soul
 from soul_gan.utils.callbacks import CallbackRegistry
+from soul_gan.utils.eval_feature import evaluate
 from soul_gan.utils.general_utils import DotConfig  # isort:block
 from soul_gan.utils.general_utils import IgnoreLabelDataset, random_seed
 from soul_gan.utils.metrics.compute_fid_tf import calculate_fid_given_paths
@@ -61,7 +63,7 @@ def main(config: DotConfig, device: torch.device, group: str):
 
     # sample
     if config.sample_params.sample:
-        gen, dis = load_gan(config.gan_config, device, thermalize=config.thermalize)
+        gan = GANWrapper(config.gan_config, device)
 
         if config.sample_params.sub_dir:
             save_dir = Path(
@@ -88,9 +90,9 @@ def main(config: DotConfig, device: torch.device, group: str):
                 params = callback.params.dict
                 # HACK
                 if "dis" in params:
-                    params["dis"] = dis
+                    params["dis"] = gan.dis
                 if "gen" in params:
-                    params["gen"] = gen
+                    params["gen"] = gan.gen
                 if "save_dir" in params:
                     params["save_dir"] = save_dir
                 feature_callbacks.append(
@@ -101,14 +103,38 @@ def main(config: DotConfig, device: torch.device, group: str):
 
         # HACK
         if "dis" in config.sample_params.feature.params:
-            feature_kwargs["dis"] = dis
+            feature_kwargs["dis"] = gan.dis
 
         feature = FeatureRegistry.create_feature(
             config.sample_params.feature.name,
             callbacks=feature_callbacks,
-            inverse_transform=gen.inverse_transform,
+            inverse_transform=gan.inverse_transform,
             **feature_kwargs,
         )
+
+        if config.sample_params.feature.params.ref_stats_path:
+            dataset = get_dataset(
+                config.gan_config.dataset,
+                mean=config.gan_config.train_transform.Normalize.mean,
+                std=config.gan_config.train_transform.Normalize.std,
+            )
+            # print(config.sample_params.feature.params.ref_stats_path)
+            feature.eval = True
+            stats = evaluate(
+                feature,
+                dataset,
+                config.batch_size,
+                device,
+                Path(config.sample_params.feature.params.ref_stats_path),
+            )
+            print(stats)
+            feature = FeatureRegistry.create_feature(
+                config.sample_params.feature.name,
+                callbacks=feature_callbacks,
+                inverse_transform=gan.inverse_transform,
+                **feature_kwargs,
+            )
+        feature.eval = False
 
         # HACK
         if (
@@ -129,7 +155,7 @@ def main(config: DotConfig, device: torch.device, group: str):
         #     feature.callbacks[idx].model = feature.model
 
         ref_dist = DistributionRegistry.create_distribution(
-            config.sample_params.distribution.name, gen=gen, dis=dis
+            config.sample_params.distribution.name, gan=gan
         )
 
         if config.seed is not None:
@@ -174,15 +200,14 @@ def main(config: DotConfig, device: torch.device, group: str):
                         z.device
                     )
             else:
-                z = gen.prior.sample((batch_size,))
+                z = gan.prior.sample((batch_size,))
                 # HACK
                 label = torch.LongTensor(np.random.randint(0, 10 - 1, len(z))).to(
                     z.device
                 )
                 start_step_id = 0
 
-            gen.label = label
-            dis.label = label
+            gan.set_label(label)
 
             if config.lipschitz_step_size:
                 config.sample_params.params.dict["step_size"] = (
@@ -192,7 +217,7 @@ def main(config: DotConfig, device: torch.device, group: str):
                     ]
                 )
 
-            zs, xs = soul(z, gen, ref_dist, feature, **config.sample_params.params)
+            zs, xs = soul(z, gan.gen, ref_dist, feature, **config.sample_params.params)
 
             zs = torch.stack(zs, 0)
             xs = torch.stack(xs, 0)
@@ -316,8 +341,8 @@ def main(config: DotConfig, device: torch.device, group: str):
             )
 
     if config.callbacks.afterall_callbacks:
-        gen, dis = load_gan(config.gan_config, device, thermalize=config.thermalize)
-
+        gan = GANWrapper(config.gan_config, device) 
+        
         # x_final_file = Path(
         #     results_dir,
         #     "images",
@@ -347,9 +372,9 @@ def main(config: DotConfig, device: torch.device, group: str):
             params = callback.params.dict
             # HACK
             if "dis" in params:
-                params["dis"] = dis
+                params["dis"] = gan.dis
             if "gen" in params:
-                params["gen"] = gen
+                params["gen"] = gan.gen
             # if "log_norm_const" in params:
             #     params["log_norm_const"] = log_norm_const
             afterall_callbacks.append(
@@ -419,7 +444,7 @@ def main(config: DotConfig, device: torch.device, group: str):
             dataset = IgnoreLabelDataset(torch.utils.data.TensorDataset(dataset))
 
             # tf version
-            stat_path = Path("stats", f"fid_stats_{config.gan_config.dataset}.npz")
+            stat_path = Path("stats", f'{config.gan_config.dataset}', f"fid_stats_{config.gan_config.dataset}.npz")
             fid = calculate_fid_given_paths(
                 (stat_path.as_posix(), file.as_posix()),
                 inception_path="thirdparty/TTUR/inception_model",

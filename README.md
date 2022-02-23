@@ -29,6 +29,16 @@ To compute FID in TF fashion:
 conda install tensorflow-gpu
 ```
 
+Check whether TF can see GPU:
+
+```python
+import tensorflow.compat.v1 as tf
+
+tf.test.gpu_device_name()
+```
+
+If FID computation stucks that might be caused by conflict with scipy. Try running ```export MKL_NUM_THREADS=1```.
+
 ### StudioGAN:
 
 ```zsh

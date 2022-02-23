@@ -2,6 +2,7 @@ import argparse
 import sys
 from collections import defaultdict
 from pathlib import Path
+from typing import Optional
 
 import numpy as np
 import ruamel.yaml as yaml
@@ -9,17 +10,12 @@ import torch
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-
-# from pytorch_fid.fid_score import calculate_frechet_distance
-# from pytorch_fid.inception import InceptionV3
-
-# sys.path.append("thirdparty/studiogan/studiogan")
 sys.path.append("studiogan")
 
 from soul_gan.datasets.utils import get_dataset
 from soul_gan.feature import FeatureRegistry
 from soul_gan.models.studiogans import StudioDis, StudioGen  # noqa: F401
-from soul_gan.models.utils import load_gan
+from soul_gan.models.utils import GANWrapper
 from soul_gan.utils.general_utils import DotConfig  # isort:block
 from soul_gan.utils.general_utils import random_seed
 
@@ -34,17 +30,39 @@ def parse_arguments():
     return args
 
 
+def evaluate(
+    feature, dataset, batch_size: int, device, save_path: Optional[Path] = None
+):
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+    stats = defaultdict(lambda: 0)
+    n = 0
+    for batch in tqdm(dataloader):
+        feature_result = feature.apply(batch.to(device))
+        for i, feature_res in enumerate(feature_result):
+            stats[i] += feature_res.mean(0).detach().cpu().numpy()
+        n += 1
+    for i in range(len(stats)):
+        stats[i] /= n
+
+    if save_path:
+        np.savez(
+            save_path.open("wb"),
+            *stats.values(),
+        )
+    return stats
+
+
 def main(config: DotConfig, device: torch.device):
-    gen, dis = load_gan(config.gan_config, device, thermalize=config.thermalize)
+    gan = GANWrapper(config.gan_config, device)
 
     feature_kwargs = config.sample_params.feature.params.dict
     # HACK
     if "dis" in config.sample_params.feature.params:
-        feature_kwargs["dis"] = dis
+        feature_kwargs["dis"] = gan.dis
 
     feature = FeatureRegistry.create_feature(
         config.sample_params.feature.name,
-        inverse_transform=gen.inverse_transform,
+        inverse_transform=gan.inverse_transform,
         **feature_kwargs,
     )
 
@@ -56,28 +74,12 @@ def main(config: DotConfig, device: torch.device):
         mean=config.gan_config.train_transform.Normalize.mean,
         std=config.gan_config.train_transform.Normalize.std,
     )
-    dataloader = DataLoader(dataset, batch_size=config.batch_size, shuffle=True)
-    stats = defaultdict(lambda: 0)
-    n = 0
-    for batch in tqdm(dataloader):
-        feature_result = feature.apply(batch.to(device))
-        for i, feature_res in enumerate(feature_result):
-            stats[i] += feature_res.mean(0).detach().cpu().numpy()
-        n += 1
-    for i in range(len(stats)):
-        stats[i] /= n
-    print(stats)
 
-    # stats_dir = Path(ROOT_DIR, "stats")
     if not args.save_path:
         args.save_path = config.feature.params.ref_stats_path
 
-    np.savez(
-        Path(
-            # stats_dir,
-            args.save_path,
-        ).open("wb"),
-        *stats.values(),
+    evaluate(
+        feature, dataset, config.batch_size, device, save_path=Path(args.save_path)
     )
 
 
@@ -91,10 +93,6 @@ if __name__ == "__main__":
     config = DotConfig(config)
     if args.seed:
         config.seed = args.seed
-    # config.file_name = Path(args.configs[0]).name
-    # config.thermalize = args.thermalize
-    # config.lipschitz_step_size = args.lipschitz_step_size
-    # config.resume = args.resume
 
     device = torch.device(config.device if torch.cuda.is_available() else "cpu")
     print(f"Device: {device}")
