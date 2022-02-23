@@ -53,8 +53,8 @@ def prepare_2d_ring_data(
 
     means = np.array([
         [
-            rad * np.cos(2 * np.pi * float(n_modes)), 
-            rad * np.sin(2 * np.pi * float(n_modes))
-        ] for _ in range(n_modes)])
+            rad * np.cos(2 * np.pi * i / float(n_modes)), 
+            rad * np.sin(2 * np.pi * i / float(n_modes))
+        ] for i in range(n_modes)])
 
     return dataset, means

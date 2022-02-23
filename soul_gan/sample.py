@@ -23,6 +23,7 @@ def ula(
 
     for it in range(n_steps):
         _, grad = grad_log_prob(z, target)
+        #grad = torch.clip(grad, max=1e1)
         grad_norms.append(torch.norm(grad + z, dim=-1).mean().item())
         noise = torch.randn(z.shape, dtype=torch.float).to(device)
         noise_scale = (2.0 * step_size) ** 0.5

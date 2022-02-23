@@ -1,0 +1,14 @@
+feature: &feature
+  name: ClusterFeature
+  params: 
+    device: *device
+    clusters_path: data/8_gaussians_modes.npz
+    ref_stats_path: stats/ClusterFeature_v1_8_gaussians.npz
+    version: 1
+    opt_params:
+      name:
+        SGD
+      params:  
+        momentum: 0.0 #0.1
+        nesterov: False #True
+        weight_decay: 0.01 #0.025 #0.075 #1

@@ -483,7 +483,7 @@ class ClusterFeature(SoulFeature):
             #result = (torch.exp(-(x.reshape(len(x), -1)[:, None, :] - self.centroids[None, ...].to(x.device))**2) / 2. ).mean(1)
 
             #result = torch.abs(x.reshape(len(x), -1)[:, None, :] - self.centroids[None, ...].to(x.device)).mean(-1) # not bad
-            result = ((x.reshape(len(x), -1)[:, None, :] - self.centroids[None, ...].to(x.device))**2).mean(-1)
+            result = ((x.reshape(len(x), -1)[:, None, :] - self.centroids[None, ...].to(x.device))**2).mean(-1) / len(self.centroids)
             
             
         
