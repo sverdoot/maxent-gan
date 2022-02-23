@@ -11,7 +11,7 @@ from torchvision import transforms as T
 
 from soul_gan.utils.general_utils import DATA_DIR, IgnoreLabelDataset
 
-from .synthetic import prepare_2d_gaussian_grid_data
+from .synthetic import prepare_2d_gaussian_grid_data, prepare_2d_ring_data
 
 
 N_CIFAR_CLASSES = 10
@@ -121,11 +121,33 @@ def get_gaussians_grid_dataset(
     return dataset
 
 
+def get_gaussians_ring_dataset(
+    sample_size: int = 10000,
+    mean: Tuple[float, float] = (0.0, 0.0),
+    std: Tuple[float, float] = (1.0, 1.0),
+    n_modes: int = 25,
+    rad: float = 2,
+    sigma: float = 0.02,
+    seed: Optional[int] = None,
+) -> Dataset:
+    dataset, _ = prepare_2d_ring_data(
+        sample_size, n_modes, rad, sigma, seed
+    )
+    mean = torch.as_tensor(mean)
+    std = torch.as_tensor(std)
+    dataset = IgnoreLabelDataset(
+        TensorDataset((torch.from_numpy(dataset) - mean[None, :]) / std[None, :])
+    )
+    return dataset
+
+
 def get_dataset(name: str = "cifar10", *args, **kwargs) -> Dataset:
     if name == "cifar10":
         return get_cifar_dataset(*args, **kwargs)
-    if name == "gaussians_grid":
+    elif name == "gaussians_grid":
         return get_gaussians_grid_dataset(*args, **kwargs)
+    elif name == "gaussians_ring":
+        return get_gaussians_ring_dataset(*args, **kwargs)
     elif name == "celeba":
         return get_celeba_dataset(*args, **kwargs)
     else:

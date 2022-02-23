@@ -1,0 +1,28 @@
+gan_config:
+  dp: false
+  dataset: gaussians_ring
+  train_transform:
+    Normalize:
+      mean: &mean [0., 0.]
+      std: &std [1., 1.]
+  prior: normal
+  eval: true
+  generator:
+    name: MLPGenerator
+    params:
+      mean: *mean
+      std: *std
+      z_dim: 256
+      n_layers: 2
+      n_hid: 128
+      n_out: 2
+    ckpt_path: checkpoints/mlp/G_8_gauss.pth
+  discriminator:
+    name: MLPDiscriminator
+    params:
+      mean: *mean
+      std: *std
+      n_layers: 2
+      n_hid: 128
+      n_in: 2
+    ckpt_path: checkpoints/mlp/D_8_gauss.pth
