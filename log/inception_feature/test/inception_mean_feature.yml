@@ -1,0 +1,47 @@
+callbacks:
+  feature_callbacks:
+    fid:
+      name: FIDCallback
+      params:
+        data_stat_path: stats/fid_stats_cifar10.npz
+        device: cuda
+        invoke_every: 50
+        update_input: true
+    inception_score:
+      name: InceptionScoreCallback
+      params:
+        device: cuda
+        invoke_every: 50
+        update_input: true
+compute_fid: null
+compute_is: null
+device: cuda
+dir: log/inception_feature
+every: 10
+logging:
+  wandb: null
+n_steps: 2000
+sample: &id001
+  batch_size: 100
+  feature:
+    name: InceptionV3MeanFeature
+    params:
+      data_stat_path: stats/fid_stats_cifar10.npz
+      device: cuda
+  params:
+    burn_in_steps: 10
+    n_sampling_steps: 1
+    n_steps: 2000
+    save_every: 1
+    step_size: 0.005
+    weight_step: 0.01
+  save_dir: log/inception_feature
+  save_every: 10
+  sub_dir: test
+  total_n: 100
+seed: null
+wandb_init_params:
+  config: *id001
+  entity: sverdoot
+  name: inception_score
+  project: soul_gan

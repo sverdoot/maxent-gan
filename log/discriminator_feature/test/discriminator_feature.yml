@@ -1,0 +1,74 @@
+callbacks:
+  feature_callbacks:
+    fid:
+      name: FIDCallback
+      params:
+        data_stat_path: stats/fid_stats_cifar10.npz
+        device: cuda
+        invoke_every: 50
+        update_input: true
+    inception_score:
+      name: InceptionScoreCallback
+      params:
+        device: cuda
+        invoke_every: 50
+        update_input: true
+    wandb:
+      name: WandbCallback
+      params:
+        init_params:
+          config: &id001
+            batch_size: 100
+            feature:
+              name: DiscriminatorFeature
+              params:
+                device: cuda
+                dis: null
+            params:
+              burn_in_steps: 10
+              n_sampling_steps: 1
+              n_steps: 2000
+              save_every: 1
+              step_size: 0.001
+              weight_step: 0.01
+            save_dir: log/discriminator_feature
+            save_every: 10
+            sub_dir: test
+            total_n: 100
+          entity: sverdoot
+          name: discriminator_feature
+          project: soul_gan
+          reinit: false
+        invoke_every: 50
+        keys:
+        - inception score
+        - weight_DiscriminatorFeature
+        - D(G(z))
+        - fid
+    wandb_imgs:
+      name: WandbCallback
+      params:
+        init_params:
+          config: *id001
+          entity: sverdoot
+          name: discriminator_feature
+          project: soul_gan
+          reinit: false
+        invoke_every: 50
+        keys:
+        - imgs
+compute_fid: null
+compute_is: null
+device: cuda
+dir: log/discriminator_feature
+every: 10
+logging:
+  wandb: null
+n_steps: 2000
+sample: *id001
+seed: null
+wandb_init_params:
+  config: *id001
+  entity: sverdoot
+  name: discriminator_feature
+  project: soul_gan

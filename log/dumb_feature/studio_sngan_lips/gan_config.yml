@@ -1,0 +1,32 @@
+gan_config:
+  train_transform:
+    Normalize:
+      mean: &mean [0.5, 0.5, 0.5]
+      std: &std [0.5, 0.5, 0.5]
+  prior: normal
+  eval: false
+  label: &label true
+  generator:
+    name: StudioGen
+    params:
+      mean: *mean
+      std: *std
+      config: SNGAN.yaml
+      label: *label
+    ckpt_path: checkpoints/sngan/G_CIFAR_studio_current.pth
+  discriminator:
+    name: StudioDis
+    params:
+      mean: *mean
+      std: *std
+      output_layer: identity
+      config: SNGAN.yaml
+      label: *label
+    ckpt_path: checkpoints/sngan/D_CIFAR_studio_current.pth
+  thermalize:
+    true: {}
+    false:
+      log_norm_const: 0.013205028067694139
+      lipschitz_const: 12.937666943359375
+      fake_score: -0.7003044998645782
+      real_score: 1.422824158668518

@@ -1,0 +1,28 @@
+gan_config:
+  discriminator:
+    ckpt_path: checkpoints/wgan_gp/D_CIFAR_studio_best.pth
+    name: StudioDis
+    params:
+      config: WGAN-GP.yaml
+      mean: &id001
+      - 0.5
+      - 0.5
+      - 0.5
+      output_layer: identity
+      std: &id002
+      - 0.5
+      - 0.5
+      - 0.5
+  eval: false
+  generator:
+    ckpt_path: checkpoints/wgan_gp/G_CIFAR_studio_best.pth
+    name: StudioGen
+    params:
+      config: WGAN-GP.yaml
+      mean: *id001
+      std: *id002
+  prior: normal
+  train_transform:
+    Normalize:
+      mean: *id001
+      std: *id002

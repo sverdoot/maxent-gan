@@ -1,0 +1,159 @@
+dir: &dir log/cluster_feature
+n_steps: &n_steps 1000
+every: &every 25
+seed:
+device: &device cuda
+total_n: &total_n 10000
+batch_size: &batch_size 10000
+weight_step: &weight_step 1.00000000
+step_size: &step_size 0.00100000
+name: &name mlp_cluster
+burn_in_steps: &burn_in_steps 0.
+start_sample: &start_sample 0.
+sub_dir: &sub_dir mlp
+suffix: |-
+  wass_0.001
+distribution: &target_distribution
+  name: PriorTarget
+gan_config:
+  dp: false
+  dataset: gaussians_grid
+  train_transform:
+    Normalize:
+      mean: &mean [0., 0.]
+      std: &std [1.415, 1.415]
+  prior: normal
+  eval: true
+  generator:
+    name: MLPGenerator
+    params:
+      mean: *mean
+      std: *std
+      z_dim: 2
+      n_layers: 3
+      n_hid: 128
+      n_out: 2
+    ckpt_path: checkpoints/mlp/G_25_gauss_wass.pth
+  discriminator:
+    name: MLPDiscriminator
+    params:
+      mean: *mean
+      std: *std
+      n_layers: 3
+      n_hid: 256
+      n_in: 2
+    ckpt_path: checkpoints/mlp/D_25_gauss_wass.pth
+feature: &feature
+  name: ClusterFeature
+  params:
+    device: *device
+    clusters_path: data/25_gaussians_modes.npz
+    ref_stats_path: stats/ClusterFeature_25_gaussians.npz
+    version: 1
+    opt_params:
+      name: SGD
+      params:
+        momentum: 0.0
+        nesterov: false
+        weight_decay: 0.01
+sample_params: &sample_params
+  sample: true
+  save_dir: *dir
+  sub_dir: *sub_dir
+  distribution:
+    <<: *target_distribution
+  feature:
+    <<: *feature
+  total_n: *total_n
+  batch_size: *batch_size
+  save_every: *every
+  params:
+    n_steps: *n_steps
+    save_every: *every
+    burn_in_steps: *burn_in_steps
+    start_sample: *start_sample
+    n_sampling_steps: &n_sampling_steps 1
+    weight_step: *weight_step
+    step_size: *step_size
+afterall_params:
+  results_dir: *dir
+  sub_dir: *sub_dir
+  init_wandb: false
+  remove_chains: false
+params:
+  sample_params: *sample_params
+  name: *name
+  feature:
+    name: discriminator
+callbacks:
+  feature_callbacks:
+    log_weight:
+      name: LogCallback
+      params:
+        invoke_every: *every
+        keys:
+        - weight_norm
+        save_dir:
+    log_out:
+      name: LogCallback
+      params:
+        invoke_every: *every
+        keys:
+        - out
+        save_dir:
+    log_ref:
+      name: LogCallback
+      params:
+        invoke_every: *every
+        keys:
+        - ref_score
+        save_dir:
+    log_res:
+      name: LogCallback
+      params:
+        invoke_every: *every
+        keys:
+        - residual
+        save_dir:
+    energy:
+      name: EnergyCallback
+      params:
+        dis:
+        gen:
+        invoke_every: *every
+        device: *device
+        update_input: true
+        norm_constant:
+    log_energy:
+      name: LogCallback
+      params:
+        invoke_every: *every
+        keys:
+        - Energy
+        save_dir:
+    log_dot_pr:
+      name: LogCallback
+      params:
+        invoke_every: *every
+        keys:
+        - dot_pr
+        save_dir:
+  afterall_callbacks:
+    energy:
+      name: EnergyCallback
+      params:
+        dis:
+        gen:
+        invoke_every: 1
+        device: *device
+        update_input: true
+        batch_size: 250
+        norm_constant:
+    discriminator:
+      name: DiscriminatorCallback
+      params:
+        dis:
+        invoke_every: 1
+        device: *device
+        update_input: true
+        batch_size: 250

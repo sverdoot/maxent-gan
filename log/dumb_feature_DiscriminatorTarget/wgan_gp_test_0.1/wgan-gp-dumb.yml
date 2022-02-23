@@ -1,0 +1,153 @@
+dir: &dir log/dumb_feature
+n_steps: &n_steps 1500
+every: &every 25
+seed:
+device: &device cuda
+total_n: &total_n 1000
+batch_size: &batch_size 1000
+weight_step: &weight_step 0.01
+step_size: &step_size 0.1
+name: &name wgan_gp_dumb
+burn_in_steps: 0
+start_sample: 0
+sub_dir: &sub_dir wgan_gp_test_0.1
+distribution: &target_distribution
+  name: DiscriminatorTarget
+gan_config:
+  dp: true
+  dataset: cifar10
+  train_transform:
+    Normalize:
+      mean: &mean [0.5, 0.5, 0.5]
+      std: &std [0.5, 0.5, 0.5]
+  prior: uniform
+  generator:
+    name: SN_DCGAN_Generator
+    params:
+      mean: *mean
+      std: *std
+    ckpt_path: checkpoints/wgan_gp/DCGAN_G_CIFAR_WGAN-GP_150001.pth
+  discriminator:
+    name: WGANDiscriminator
+    params:
+      mean: *mean
+      std: *std
+    ckpt_path: checkpoints/wgan_gp/DCGAN_D_CIFAR_WGAN-GP_150001.pth
+  thermalize:
+    true: {}
+    false:
+      log_norm_const: 3.1634721852656957
+      lipschitz_const: 10.185486975097659
+      fake_score: &fake_score -1.736105637550354
+      real_score: &real_score 2.3100808167457583
+      mean_score: &mean_score 0.2869875895977021
+feature: &feature
+  name: DumbFeature
+  params:
+    device: *device
+    dis:
+sample_params: &sample_params
+  sample: true
+  save_dir: *dir
+  sub_dir: *sub_dir
+  distribution:
+    <<: *target_distribution
+  feature:
+    <<: *feature
+  total_n: *total_n
+  batch_size: *batch_size
+  save_every: *every
+  params:
+    n_steps: *n_steps
+    save_every: *every
+    burn_in_steps: 0
+    start_sample: 0
+    n_sampling_steps: &n_sampling_steps 1
+    weight_step: *weight_step
+    step_size: *step_size
+afterall_params:
+  results_dir: *dir
+  sub_dir: *sub_dir
+  init_wandb: true
+  compute_fid: false
+  compute_is: false
+params: &params
+  sample_params: *sample_params
+  name: *name
+  feature:
+    name: discriminator
+wandb_init_params: &wandb_init_params
+  project: &wandb_project soul_gan
+  entity: &wandb_account sverdoot
+  name: *name
+  config: *params
+logging:
+  wandb:
+callbacks:
+  feature_callbacks:
+    log_weight:
+      name: LogCallback
+      params:
+        invoke_every: *every
+        keys:
+        - weight_norm
+        save_dir:
+    log_out:
+      name: LogCallback
+      params:
+        invoke_every: *every
+        keys:
+        - out
+        save_dir:
+    log_ref:
+      name: LogCallback
+      params:
+        invoke_every: *every
+        keys:
+        - ref_score
+        save_dir:
+    log_res:
+      name: LogCallback
+      params:
+        invoke_every: *every
+        keys:
+        - residual
+        save_dir:
+  afterall_callbacks:
+    energy:
+      name: EnergyCallback
+      params:
+        dis:
+        gen:
+        invoke_every: 1
+        device: *device
+        update_input: true
+        batch_size: *batch_size
+        norm_constant:
+    discriminator:
+      name: DiscriminatorCallback
+      params:
+        dis:
+        invoke_every: 1
+        device: *device
+        update_input: true
+        batch_size: *batch_size
+    wandb:
+      name: WandbCallback
+      params:
+        init_params:
+          <<: *wandb_init_params
+          reinit: false
+        invoke_every: 1
+        keys:
+        - Energy
+        - D(G(z))
+    wandb_imgs:
+      name: WandbCallback
+      params:
+        init_params:
+          <<: *wandb_init_params
+          reinit: false
+        invoke_every: 1
+        keys:
+        - imgs

@@ -1,0 +1,28 @@
+gan_config:
+  train_transform:
+    Normalize:
+      mean: &mean [0.5, 0.5, 0.5]
+      std: &std [0.5, 0.5, 0.5]
+  prior: normal
+  eval: true
+  generator:
+    name: DCGANGenerator
+    params:
+      ngpu: 1
+      mean: *mean
+      std: *std
+    ckpt_path: checkpoints/dcgan/DCGAN_G_CIFAR_199.pth
+  discriminator:
+    name: DCGANDiscriminator
+    params:
+      ngpu: 1
+      mean: *mean
+      std: *std
+    ckpt_path: checkpoints/dcgan/DCGAN_D_CIFAR_199.pth
+  thermalize:
+    true:
+      log_norm_const: 7.735251350461522
+      lipschitz_const: 22.23769677734375
+    false:
+      log_norm_const: 0.30141313938405645
+      lipschitz_const: 15.616369750976563

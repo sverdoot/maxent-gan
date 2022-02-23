@@ -1,0 +1,26 @@
+gan_config:
+  train_transform:
+    Normalize:
+      mean: &mean [0.5, 0.5, 0.5]
+      std: &std [0.5, 0.5, 0.5]
+  prior: normal
+  generator:
+    name: SN_ResNet_Generator32
+    params:
+      mean: *mean
+      std: *std
+    ckpt_path: checkpoints/sngan/ResNet_G_CIFAR_SNGAN_Hinge_50000.pth
+  discriminator:
+    name: SN_DCGAN_Discriminator
+    params:
+      mean: *mean
+      std: *std
+    thermalize: true
+    ckpt_path: checkpoints/sngan/DCGAN_D_CIFAR_SNGAN_NonSaturating_150001.pth
+  thermalize:
+    true: {}
+    false:
+      log_norm_const: 0.8444666605809482
+      lipschitz_const: 13.16558957519531
+      fake_score: -0.35012205570936206
+      real_score: 1.7809558892250061

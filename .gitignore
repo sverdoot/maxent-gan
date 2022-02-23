@@ -28,3 +28,4 @@ wandb/*
 **.npz
 **.pth
 **.pdf
+log/**/*.png

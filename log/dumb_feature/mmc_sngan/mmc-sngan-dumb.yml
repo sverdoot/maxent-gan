@@ -1,0 +1,119 @@
+dir: &dir log/dumb_feature
+n_steps: &n_steps 500
+every: &every 25
+seed:
+device: &device cuda
+total_n: &total_n 5000
+batch_size: &batch_size 600
+weight_step: &weight_step 0.01
+step_size: &step_size 0.01
+name: &name mmc_sngan_dumb
+burn_in_steps: 0
+sub_dir: &sub_dir mmc_sngan
+gan_config:
+  dp: true
+  dataset: celeba
+  train_transform:
+    Normalize:
+      mean: &mean [0.5, 0.5, 0.5]
+      std: &std [0.5, 0.5, 0.5]
+  prior: normal
+  eval: true
+  generator:
+    name: MMCSNGenerator
+    params:
+      mean: *mean
+      std: *std
+    ckpt_path: checkpoints/sngan/G_CelebA_mimicry.pth
+  discriminator:
+    name: MMCSNDiscriminator
+    params:
+      mean: *mean
+      std: *std
+      output_layer: identity
+    ckpt_path: checkpoints/sngan/D_CelebA_mimicry.pth
+  thermalize:
+    true: {}
+    false:
+      log_norm_const: -0.38988279962379796
+      lipschitz_const: 11.740827099609378
+      fake_score: &fake_score -0.4547221845388412
+      real_score: &real_score -0.023251816672272982
+      mean_score: &mean_score -0.2389870006055571
+sample_params: &sample_params
+  sample: true
+  save_dir: *dir
+  sub_dir: *sub_dir
+  feature:
+    name: DumbFeature
+    params:
+      device: *device
+      dis:
+  total_n: *total_n
+  batch_size: *batch_size
+  save_every: *every
+  params:
+    n_steps: *n_steps
+    save_every: *every
+    burn_in_steps: 0
+    n_sampling_steps: &n_sampling_steps 1
+    weight_step: *weight_step
+    step_size: *step_size
+afterall_params:
+  results_dir: *dir
+  sub_dir: *sub_dir
+  init_wandb: true
+  compute_fid: true
+  compute_is: true
+params: &params
+  sample_params: *sample_params
+  name: *name
+  feature:
+    name: dumb
+wandb_init_params: &wandb_init_params
+  project: &wandb_project soul_gan
+  entity: &wandb_account sverdoot
+  name: *name
+  config: *params
+logging:
+  wandb:
+callbacks:
+  feature_callbacks: {}
+  afterall_callbacks:
+    energy:
+      name: EnergyCallback
+      params:
+        dis:
+        gen:
+        invoke_every: 1
+        device: *device
+        update_input: true
+        batch_size: *batch_size
+        norm_constant:
+    discriminator:
+      name: DiscriminatorCallback
+      params:
+        dis:
+        invoke_every: 1
+        device: *device
+        update_input: true
+        batch_size: *batch_size
+    wandb:
+      name: WandbCallback
+      params:
+        init_params:
+          <<: *wandb_init_params
+          reinit: false
+        invoke_every: 1
+        keys:
+        - Energy
+        - D(G(z))
+    wandb_imgs:
+      name: WandbCallback
+      params:
+        init_params:
+          <<: *wandb_init_params
+          reinit: false
+        invoke_every: 1
+        keys:
+        - imgs

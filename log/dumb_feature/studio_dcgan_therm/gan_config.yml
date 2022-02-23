@@ -1,0 +1,29 @@
+gan_config:
+  train_transform:
+    Normalize:
+      mean: &mean [0.5, 0.5, 0.5]
+      std: &std [0.5, 0.5, 0.5]
+  prior: normal
+  eval: false
+  generator:
+    name: StudioGen
+    params:
+      mean: *mean
+      std: *std
+      config: DCGAN.yaml
+    ckpt_path: checkpoints/dcgan/G_CIFAR_studio_best.pth
+  discriminator:
+    name: StudioDis
+    params:
+      mean: *mean
+      std: *std
+      output_layer: sigmoid
+      config: DCGAN.yaml
+    ckpt_path: checkpoints/dcgan/D_CIFAR_studio_best.pth
+  thermalize:
+    true:
+      log_norm_const: -46.628958877173496
+      lipschitz_const: 51.11622607421875
+    false:
+      log_norm_const: 1.4911995782903529
+      lipschitz_const: 12.953924438476562

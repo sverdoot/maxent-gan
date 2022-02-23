@@ -1,0 +1,32 @@
+callbacks:
+  feature_callbacks: null
+compute_fid:
+  results_dir: log/dumb_feature
+  sub_dir: test3
+compute_is: {}
+device: cuda
+dir: log/dumb_feature
+every: 5
+logging:
+  wandb: null
+n_steps: 100
+sample:
+  batch_size: 250
+  feature:
+    name: DumbFeature
+    params:
+      device: cuda
+      dis: null
+  params:
+    burn_in_steps: 0
+    n_sampling_steps: 1
+    n_steps: 100
+    save_every: 5
+    step_size: 0.01
+    weight_step: 0.0
+  save_dir: log/dumb_feature
+  save_every: 5
+  sub_dir: test3
+  total_n: 5000
+seed: null
+sub_dir: test3
