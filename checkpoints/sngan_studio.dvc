@@ -1,0 +1,5 @@
+outs:
+- md5: b812602a7c0700b3b46313bdf8f3c761.dir
+  size: 64407030
+  nfiles: 2
+  path: sngan_studio

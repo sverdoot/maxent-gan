@@ -1,0 +1,5 @@
+outs:
+- md5: 8cb6c902002dc5d50d36bcec9b457577.dir
+  size: 25355010
+  nfiles: 2
+  path: dcgan

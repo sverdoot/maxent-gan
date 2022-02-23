@@ -10,8 +10,8 @@ thirdparty/*
 
 studiogan
 
-stats/*
-!stats/.gitkeep
+# stats/*
+# !stats/.gitkeep
 
 fig_collection/
 dump/
@@ -19,7 +19,12 @@ dump/
 # notebooks/**
 # !notebooks/.gitkeep
 
-log/*
+#log/*
 !log/.gitkeep
 
 wandb/*
+
+**.npy
+**.npz
+**.pth
+**.pdf

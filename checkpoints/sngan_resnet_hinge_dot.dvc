@@ -1,0 +1,5 @@
+outs:
+- md5: d2db29a0900ac20b1e52766cdb272d6e.dir
+  size: 17138042
+  nfiles: 1
+  path: sngan_resnet_hinge_dot

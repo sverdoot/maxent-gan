@@ -1,0 +1,5 @@
+outs:
+- md5: 74a8d6978f2a2bbcb0288cbc7cd6fee5.dir
+  size: 65820392
+  nfiles: 2
+  path: sagan_studio

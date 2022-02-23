@@ -1,0 +1,5 @@
+outs:
+- md5: c15b32db3b2e537d93f5bc9e71c02ef0.dir
+  size: 38945872
+  nfiles: 2
+  path: sngan_ns_dot

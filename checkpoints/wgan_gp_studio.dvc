@@ -1,0 +1,5 @@
+outs:
+- md5: 9cdc3c29082a5ab16b48030b9d29b72f.dir
+  size: 64107154
+  nfiles: 2
+  path: wgan_gp_studio

@@ -1,0 +1,5 @@
+outs:
+- md5: 83e4e399e4d51f48a08f67a813422d50.dir
+  size: 38840064
+  nfiles: 2
+  path: wgan_gp_dot

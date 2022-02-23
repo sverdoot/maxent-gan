@@ -1,0 +1,5 @@
+outs:
+- md5: 51f1dc84216ff902ddd9e013f279ae40.dir
+  size: 23553669
+  nfiles: 1
+  path: sngan_hinge_dot

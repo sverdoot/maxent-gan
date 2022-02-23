@@ -1,0 +1,5 @@
+outs:
+- md5: 1a095a32d0b8a07e3f8d63899b2233c3.dir
+  size: 161984204
+  nfiles: 4
+  path: dcgan_studio

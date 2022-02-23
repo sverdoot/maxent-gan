@@ -1,0 +1,5 @@
+outs:
+- md5: 5743bb9dd8c2a7b4be33826ea928adec.dir
+  size: 268517033
+  nfiles: 2
+  path: sngan_mimicry
