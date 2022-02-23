@@ -1,10 +1,9 @@
 feature: &feature
-  name: ClusterFeature
+  name: KernelPCAFeature
   params: 
     device: *device
-    clusters_path: data/cifar10/kmeans.npz
-    ref_stats_path: stats/ClusterFeature_cifar10.npz
-    version: 0 #0
+    info_path: data/cifar10/pca_rbf.npz
+    ref_stats_path: stats/KernelPCAFeature_cifar10.npz
     opt_params:
       name:
         SGD

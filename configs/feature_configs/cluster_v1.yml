@@ -2,9 +2,10 @@ feature: &feature
   name: ClusterFeature
   params: 
     device: *device
+    dis: null
     clusters_path: data/cifar10/kmeans.npz
-    ref_stats_path: stats/ClusterFeature_cifar10.npz
-    version: 0 #0
+    ref_stats_path: stats/ClusterFeature_v1_cifar10.npz
+    version: 1 #0
     opt_params:
       name:
         SGD

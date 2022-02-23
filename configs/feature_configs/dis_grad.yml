@@ -1,14 +1,13 @@
 feature: &feature
-  name: DiscriminatorFeature
+  name: DiscriminatorGradientFeature
   params: 
     device: *device
     dis: null
-    ref_score: *real_score #*mean_score
-    ref_stats_path: stats/DiscriminatorFeature_cifar10.npz
+    ref_stats_path: stats/DiscriminatorGradientFeature_cifar10.npz
     opt_params:
       name:
         SGD
       params:  
         momentum: 0.0 #0.1
         nesterov: False #True
-        weight_decay: 0.0 #1 #0.025 #0.075 #1
+        weight_decay: 0.01 #0.025 #0.075 #1

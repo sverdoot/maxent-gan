@@ -1,5 +1,5 @@
 dir: &dir log/cluster_feature
-n_steps: &n_steps 10000
+n_steps: &n_steps 1000 #0
 every: &every 25
 seed: null
 device: &device 'cuda'

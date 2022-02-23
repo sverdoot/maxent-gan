@@ -15,7 +15,7 @@ gan_config:
       std: *std
       config: SAGAN.yaml
       label: *label
-    ckpt_path: checkpoints/sagan/G_CIFAR_studio_best.pth
+    ckpt_path: checkpoints/sagan_studio/G_CIFAR_studio_best.pth
   discriminator:
     name: StudioDis
     params:
@@ -24,7 +24,7 @@ gan_config:
       output_layer: identity
       config: SAGAN.yaml
       label: *label
-    ckpt_path: checkpoints/sagan/D_CIFAR_studio_best.pth
+    ckpt_path: checkpoints/sagan_studio/D_CIFAR_studio_best.pth
   thermalize:
     true: {}
     false:

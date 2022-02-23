@@ -15,7 +15,7 @@ gan_config:
       std: *std
       config: SNGAN.yaml
       label: *label
-    ckpt_path: checkpoints/sngan/G_CIFAR_studio_current.pth
+    ckpt_path: checkpoints/sngan_studio/G_CIFAR_studio_current.pth
   discriminator:
     name: StudioDis
     params:
@@ -24,7 +24,7 @@ gan_config:
       output_layer: identity
       config: SNGAN.yaml
       label: *label
-    ckpt_path: checkpoints/sngan/D_CIFAR_studio_current.pth
+    ckpt_path: checkpoints/sngan_studio/D_CIFAR_studio_current.pth
   thermalize:
     true: {}
     false:

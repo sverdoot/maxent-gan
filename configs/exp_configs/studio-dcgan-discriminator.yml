@@ -1,0 +1,14 @@
+dir: &dir log/discriminator_feature
+n_steps: &n_steps 500 #1000
+every: &every 25
+seed: null
+device: &device 'cuda'
+total_n: &total_n 10000
+batch_size: &batch_size 500
+weight_step: &weight_step 0.01
+step_size: &step_size 0.001 #0.02
+name: &name studio_dcgan_discriminator
+burn_in_steps: &burn_in_steps 0.
+start_sample: &start_sample 0.
+sub_dir: &sub_dir studio_dcgan
+suffix: *step_size

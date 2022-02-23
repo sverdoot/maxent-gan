@@ -5,6 +5,7 @@ feature: &feature
     clusters_path: data/cifar10/kmeans_resnet34.npz
     ref_stats_path: stats/ClusterFeature_resnet34_cifar10.npz
     embedding_model: resnet34
+    version: 1
     opt_params:
       name:
         SGD

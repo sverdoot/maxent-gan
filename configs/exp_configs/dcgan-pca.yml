@@ -1,13 +1,13 @@
-dir: &dir log/cluster_feature
+dir: &dir log/pca_feature
 n_steps: &n_steps 1000
 every: &every 25
 seed: null
 device: &device 'cuda'
-total_n: &total_n 1000 #0
+total_n: &total_n 10000 #
 batch_size: &batch_size 1000
 weight_step: &weight_step 3 #0.01
 step_size: &step_size 0.01
-name: &name dcgan_cluster
+name: &name dcgan_pca
 burn_in_steps: &burn_in_steps 0.
 start_sample: &start_sample 0.
 sub_dir: &sub_dir dcgan

@@ -1,10 +1,10 @@
 feature: &feature
-  name: DiscriminatorFeature
+  name: DiscriminatorFeature_v1
   params: 
     device: *device
     dis: null
     ref_score: *real_score #*mean_score
-    ref_stats_path: stats/DiscriminatorFeature_cifar10.npz
+    ref_stats_path: stats/DiscriminatorFeature_v1_cifar10.npz
     opt_params:
       name:
         SGD

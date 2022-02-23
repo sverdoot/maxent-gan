@@ -13,7 +13,7 @@ gan_config:
       mean: *mean
       std: *std
       config: WGAN-GP.yaml
-    ckpt_path: checkpoints/wgan_gp/G_CIFAR_studio_best.pth
+    ckpt_path: checkpoints/wgan_gp_studio/G_CIFAR_studio_best.pth
   discriminator:
     name: StudioDis
     params:
@@ -21,7 +21,7 @@ gan_config:
       std: *std
       output_layer: identity
       config: WGAN-GP.yaml
-    ckpt_path: checkpoints/wgan_gp/D_CIFAR_studio_best.pth
+    ckpt_path: checkpoints/wgan_gp_studio/D_CIFAR_studio_best.pth
   thermalize:
     true: {}
     false:

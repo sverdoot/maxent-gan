@@ -11,14 +11,14 @@ gan_config:
     params:
       mean: *mean
       std: *std
-    ckpt_path: checkpoints/sngan/ResNet_G_CIFAR_SNGAN_Hinge_50000.pth
+    ckpt_path: checkpoints/sngan_resnet_hinge_dot/ResNet_G_CIFAR_SNGAN_Hinge_50000.pth
   discriminator:
     name: SN_DCGAN_Discriminator
     params:
       mean: *mean
       std: *std
     thermalize: true
-    ckpt_path: checkpoints/sngan/DCGAN_D_CIFAR_SNGAN_NonSaturating_150001.pth
+    ckpt_path: checkpoints/sngan_resnet_hinge_dot/DCGAN_D_CIFAR_SNGAN_NonSaturating_150001.pth
   thermalize:
     true: {}
     false:
