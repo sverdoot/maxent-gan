@@ -23,6 +23,7 @@ pip install poetry
 poetry config virtualenvs.create false --local
 poetry install
 ```
+
 To compute FID in TF fashion:
 
 ```zsh
@@ -121,14 +122,18 @@ chmod +x run_scripts/*.sh
 
 Download checkpoints:
 
-```bash
+<!-- ```bash
 ./run_scripts/get_ckpts.sh
 ./run_scripts/get_stats.sh
+``` -->
+
+```bash
+dvc pull
 ```
 
 To use wandb:
 
-```
+```bash
 wandb login
 ```
 
