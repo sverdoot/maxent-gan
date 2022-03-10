@@ -26,3 +26,6 @@ gan_config:
       n_hid: 128
       n_in: 2
     ckpt_path: checkpoints/mlp/D_8_gauss.pth
+  fake_score: -1.7566776394844055
+  real_score: &real_score 8.224320197105408
+  mean_score: 3.233821278810501

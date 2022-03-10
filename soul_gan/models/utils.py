@@ -126,11 +126,14 @@ class GANWrapper:
         self.label = None
 
     def load_weights(self):
-        state_dict = torch.load(Path(ROOT_DIR, self.config.generator.ckpt_path), map_location=self.device)
+        state_dict = torch.load(
+            Path(ROOT_DIR, self.config.generator.ckpt_path), map_location=self.device
+        )
         self.gen.load_state_dict(state_dict, strict=True)
 
         state_dict = torch.load(
-            Path(ROOT_DIR, self.config.discriminator.ckpt_path), map_location=self.device
+            Path(ROOT_DIR, self.config.discriminator.ckpt_path),
+            map_location=self.device,
         )
         self.dis.load_state_dict(state_dict, strict=True)
 
@@ -148,12 +151,14 @@ class GANWrapper:
     def define_prior(self):
         if self.config.prior == "normal":
             prior = torch.distributions.multivariate_normal.MultivariateNormal(
-            torch.zeros(self.gen.z_dim).to(self.device), torch.eye(self.gen.z_dim).to(self.device)
-        )
+                torch.zeros(self.gen.z_dim).to(self.device),
+                torch.eye(self.gen.z_dim).to(self.device),
+            )
             prior.project = lambda z: z
         elif self.config.prior == "uniform":
             prior = torch.distributions.uniform.Uniform(
-                -torch.ones(self.gen.z_dim).to(self.device), torch.ones(self.gen.z_dim).to(self.device)
+                -torch.ones(self.gen.z_dim).to(self.device),
+                torch.ones(self.gen.z_dim).to(self.device),
             )
             prior.project = lambda z: torch.clip(z, -1 + 1e-9, 1 - 1e-9)
             prior.log_prob = lambda z: torch.zeros(z.shape[0], device=z.device)
@@ -164,7 +169,7 @@ class GANWrapper:
     @property
     def transform(self):
         return self.dis.transform
-    
+
     @property
     def inverse_transform(self):
         return self.gen.inverse_transform
@@ -205,5 +210,3 @@ def estimate_lipschitz_const(
         lipschitz_const_est += grad_norm.item() / n_pts
 
     return lipschitz_const_est
-
-    

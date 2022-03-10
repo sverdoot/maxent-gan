@@ -4,7 +4,7 @@ from pathlib import Path
 import numpy as np
 import torch
 import torchvision
-from sklearn.cluster import MiniBatchKMeans
+from sklearn.cluster import MiniBatchKMeans, SpectralClustering
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
@@ -17,7 +17,9 @@ def parse_arguments():
     parser.add_argument(
         "--dataset", type=str, default="cifar10", choices=["cifar10", "celeba"]
     )
-    parser.add_argument("--method", type=str, default="kmeans", choices=["kmeans"])
+    parser.add_argument(
+        "--method", type=str, default="kmeans", choices=["kmeans", "spectral"]
+    )
     parser.add_argument("--norm_mean", type=float, nargs=3, default=(0.5, 0.5, 0.5))
     parser.add_argument("--norm_std", type=float, nargs=3, default=(0.5, 0.5, 0.5))
     parser.add_argument("--img_size", type=int, default=32)
@@ -95,6 +97,26 @@ def main(args):
             ):
                 closest_pts[label] = point
             ns[label] += 1
+    # elif args.method == 'spectral':
+    #     model = SpectralClustering(n_clusters=args.n_clusters)
+    #     model.fit(np_dataset)
+    #     centroids = model.cluster_centers_
+    #     distances = model.transform(centroids)
+    #     ids = np.argmin(distances, 1)
+    #     centroids = centroids[ids]
+    #     distances = model.transform(np_dataset)
+
+    #     sigmas = np.zeros(args.n_clusters)
+    #     for i, point in enumerate(np_dataset):
+    #         label = np.argmin(distances[i])
+    #         sigmas[label] = sigmas[label] + distances[i][label] ** 2
+    #         if (
+    #             distances[i][label]
+    #             < model.transform(closest_pts[None, label])[0, label]
+    #             or (closest_pts[label] == 0).all()
+    #         ):
+    #             closest_pts[label] = point
+    #         ns[label] += 1
 
     centroids = centroids[sigmas != 0]
     ns = ns[sigmas != 0]

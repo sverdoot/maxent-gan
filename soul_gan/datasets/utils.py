@@ -130,9 +130,7 @@ def get_gaussians_ring_dataset(
     sigma: float = 0.02,
     seed: Optional[int] = None,
 ) -> Dataset:
-    dataset, _ = prepare_2d_ring_data(
-        sample_size, n_modes, rad, sigma, seed
-    )
+    dataset, _ = prepare_2d_ring_data(sample_size, n_modes, rad, sigma, seed)
     mean = torch.as_tensor(mean)
     std = torch.as_tensor(std)
     dataset = IgnoreLabelDataset(

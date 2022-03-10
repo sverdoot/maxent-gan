@@ -38,7 +38,8 @@ def prepare_2d_ring_data(
     n_modes: int = 8,
     rad: float = 2,
     sigma: float = 0.02,
-    seed: Optional[int] = None) -> Tuple[np.ndarray, np.ndarray]:
+    seed: Optional[int] = None,
+) -> Tuple[np.ndarray, np.ndarray]:
     dataset = []
     for i in range(sample_size // n_modes):
         for j in range(n_modes):
@@ -51,10 +52,14 @@ def prepare_2d_ring_data(
             dataset.append(point)
     dataset = np.array(dataset, dtype=np.float32)
 
-    means = np.array([
+    means = np.array(
         [
-            rad * np.cos(2 * np.pi * i / float(n_modes)), 
-            rad * np.sin(2 * np.pi * i / float(n_modes))
-        ] for i in range(n_modes)])
+            [
+                rad * np.cos(2 * np.pi * i / float(n_modes)),
+                rad * np.sin(2 * np.pi * i / float(n_modes)),
+            ]
+            for i in range(n_modes)
+        ]
+    )
 
     return dataset, means

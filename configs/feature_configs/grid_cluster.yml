@@ -2,9 +2,10 @@ feature: &feature
   name: ClusterFeature
   params: 
     device: *device
+    dis: null
     clusters_path: data/25_gaussians_modes.npz
     ref_stats_path: stats/ClusterFeature_25_gaussians.npz
-    version: 0
+    version: *version
     opt_params:
       name:
         SGD

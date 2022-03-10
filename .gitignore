@@ -19,8 +19,9 @@ dump/
 # notebooks/**
 # !notebooks/.gitkeep
 
-log/*
-!log/.gitkeep
+# log/*
+# !log/.gitkeep
+log/
 
 wandb/*
 

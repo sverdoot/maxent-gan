@@ -1,4 +1,5 @@
 import argparse
+import subprocess
 import sys
 from pathlib import Path
 
@@ -7,9 +8,6 @@ import ruamel.yaml as yaml
 import torch
 from torch import nn
 
-
-# from pytorch_fid.fid_score import calculate_frechet_distance
-# from pytorch_fid.inception import InceptionV3
 
 sys.path.append("studiogan")
 
@@ -90,7 +88,6 @@ def main(args, config: DotConfig, device: torch.device):
 
 if __name__ == "__main__":
     args = parse_arguments()
-    import subprocess
 
     proc = subprocess.Popen(["cat", *args.configs], stdout=subprocess.PIPE)
     config = yaml.round_trip_load(proc.stdout.read())

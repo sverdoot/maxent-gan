@@ -23,7 +23,7 @@ def ula(
 
     for it in range(n_steps):
         _, grad = grad_log_prob(z, target)
-        #grad = torch.clip(grad, max=1e1)
+        # grad = torch.clip(grad, max=1e1)
         grad_norms.append(torch.norm(grad + z, dim=-1).mean().item())
         noise = torch.randn(z.shape, dtype=torch.float).to(device)
         noise_scale = (2.0 * step_size) ** 0.5
@@ -60,6 +60,8 @@ def soul(
     # n_stride_curve = params['stride_save_curve']
     # n_stride = min(n_stride_im, n_stride_curve)
 
+    it = 0
+
     def target(z):
         f = feature(gen(z), z)
         radnic_logp = feature.log_prob(f)
@@ -92,7 +94,7 @@ def soul(
             z = inter_zs[-1]
             grad_norm = grad_norms[-1]
 
-        if it % save_every == 0:
+        if it > burn_in_steps and it % save_every == 0:
             zs.append(z.data.cpu())
             xs.append(gen.inverse_transform(gen(z)).data.cpu())
 

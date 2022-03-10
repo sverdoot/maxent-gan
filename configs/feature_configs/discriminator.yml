@@ -4,7 +4,7 @@ feature: &feature
     device: *device
     dis: null
     ref_score: *real_score #*mean_score
-    ref_stats_path: stats/DiscriminatorFeature_cifar10.npz
+    ref_stats_path: stats/DiscriminatorFeature.npz
     opt_params:
       name:
         SGD

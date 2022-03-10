@@ -26,3 +26,6 @@ gan_config:
       n_hid: 256
       n_in: 2
     ckpt_path: checkpoints/mlp/D_25_gauss_wass.pth
+  fake_score: 1.120748509168625
+  real_score: &real_score 1.3069784998893739
+  mean_score: 1.2138635045289994

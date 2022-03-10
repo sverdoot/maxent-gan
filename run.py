@@ -9,10 +9,7 @@ import torch
 import torchvision
 
 
-# from pytorch_fid.fid_score import calculate_frechet_distance
-# from pytorch_fid.inception import InceptionV3
-
-sys.path.append("studiogan")
+sys.path.append("studiogan")  # noqa: E402
 
 import wandb
 
@@ -46,6 +43,7 @@ def parse_arguments():
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--step_size", type=float)
     parser.add_argument("--weight_step", type=float)
+    parser.add_argument("--feature_version", type=int)
     parser.add_argument("--suffix", type=str)
 
     args = parser.parse_args()
@@ -304,7 +302,9 @@ def main(config: DotConfig, device: torch.device, group: str):
         else:
             is_values = []
         for step in range(
-            start_step_id * config.every, config.n_steps + 1, config.every
+            start_step_id * config.every,
+            config.n_steps - int(config.burn_in_steps) + 1,
+            config.every,
         ):
             file = Path(
                 results_dir,
@@ -341,8 +341,8 @@ def main(config: DotConfig, device: torch.device, group: str):
             )
 
     if config.callbacks.afterall_callbacks:
-        gan = GANWrapper(config.gan_config, device) 
-        
+        gan = GANWrapper(config.gan_config, device)
+
         # x_final_file = Path(
         #     results_dir,
         #     "images",
@@ -387,7 +387,9 @@ def main(config: DotConfig, device: torch.device, group: str):
             results = [[] for _ in afterall_callbacks]  # []
 
         for step in range(
-            start_step_id * config.every, config.n_steps + 1, config.every
+            start_step_id * config.every,
+            config.n_steps - int(config.burn_in_steps) + 1,
+            config.every,
         ):
             x_file = Path(
                 results_dir,
@@ -430,7 +432,9 @@ def main(config: DotConfig, device: torch.device, group: str):
         else:
             fid_values = []
         for step in range(
-            start_step_id * config.every, config.n_steps + 1, config.every
+            start_step_id * config.every,
+            config.n_steps - int(config.burn_in_steps) + 1,
+            config.every,
         ):
             file = Path(
                 results_dir,
@@ -444,7 +448,11 @@ def main(config: DotConfig, device: torch.device, group: str):
             dataset = IgnoreLabelDataset(torch.utils.data.TensorDataset(dataset))
 
             # tf version
-            stat_path = Path("stats", f'{config.gan_config.dataset}', f"fid_stats_{config.gan_config.dataset}.npz")
+            stat_path = Path(
+                "stats",
+                f"{config.gan_config.dataset}",
+                f"fid_stats_{config.gan_config.dataset}.npz",
+            )
             fid = calculate_fid_given_paths(
                 (stat_path.as_posix(), file.as_posix()),
                 inception_path="thirdparty/TTUR/inception_model",
@@ -495,6 +503,11 @@ if __name__ == "__main__":
             prec=1,
             width=10,
             anchor=params["step_size"].anchor.value,
+        )
+    if args.feature_version:
+        params["version"] = yaml.scalarstring.LiteralScalarString(
+            args.feature_version,
+            anchor=params["version"].anchor.value,
         )
     if args.suffix:
         params["suffix"] = yaml.scalarstring.LiteralScalarString(

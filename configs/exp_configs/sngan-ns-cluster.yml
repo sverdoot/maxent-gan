@@ -12,3 +12,4 @@ step_size: &step_size 0.001 # 0.1
 name: &name sngan_ns_cluster
 sub_dir: &sub_dir sngan_ns
 suffix: *step_size
+version: &version '0'

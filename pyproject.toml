@@ -76,7 +76,7 @@ use_parentheses = true
 line_length = 88
 lines_after_imports = 2
 skip_glob = 'thirdparty'
-known_third_party = ["PIL", "gdown", "imageio", "numpy", "openTSNE", "pytorch_fid", "ruamel", "scipy", "sklearn", "studiogan", "tensorflow", "torch", "torch_mimicry", "torchvision", "tqdm", "umap", "yaml"]
+known_third_party = ["PIL", "gdown", "imageio", "matplotlib", "numpy", "openTSNE", "pytorch_fid", "ruamel", "scipy", "seaborn", "sklearn", "studiogan", "tensorflow", "torch", "torch_mimicry", "torchvision", "tqdm", "umap", "yaml"]
 
 [tool.flake8]
 min_python_version = "3.8.0"

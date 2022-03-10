@@ -6,14 +6,15 @@ import numpy as np
 import torch
 import torchvision
 from pytorch_fid.inception import InceptionV3
-from torch.nn import functional as F
 from torch.nn.functional import adaptive_avg_pool2d
 from torch.optim import SGD, Adam
 from torchvision import transforms
 
 from soul_gan.utils.metrics import batch_inception
 
-torch.autograd.set_detect_anomaly(True)
+
+# torch.autograd.set_detect_anomaly(True)
+
 
 class AvgHolder(object):
     cnt: int = 0
@@ -319,7 +320,9 @@ class InceptionScoreFeature(Feature):
 
 @FeatureRegistry.register()
 class DiscriminatorFeature(SoulFeature):
-    def __init__(self, dis, inverse_transform=None, callbacks=None, ref_stats_path=None, **kwargs):
+    def __init__(
+        self, dis, inverse_transform=None, callbacks=None, ref_stats_path=None, **kwargs
+    ):
         self.dis = dis
         # ref_feature = kwargs.get("ref_score", 0.5 / (1 - 0.5))
         # if isinstance(ref_feature, float):
@@ -337,14 +340,17 @@ class DiscriminatorFeature(SoulFeature):
         # print(result.mean())
         return [result]
 
+
 @FeatureRegistry.register()
 class DiscriminatorFeature_v1(SoulFeature):
-    def __init__(self, dis, inverse_transform=None, callbacks=None, ref_stats_path=None, **kwargs):
+    def __init__(
+        self, dis, inverse_transform=None, callbacks=None, ref_stats_path=None, **kwargs
+    ):
         self.dis = dis
         super().__init__(
             inverse_transform=inverse_transform,
             callbacks=callbacks,
-            ref_stats_path=ref_stats_path
+            ref_stats_path=ref_stats_path,
         )
 
     def apply(self, x: torch.FloatTensor) -> List[torch.FloatTensor]:
@@ -353,12 +359,16 @@ class DiscriminatorFeature_v1(SoulFeature):
         def get_activation(name):
             def hook(model, input, output):
                 self.activation.append(output)
+
             return hook
+
         hook = self.dis.module.main[-2].register_forward_hook(get_activation("avgpool"))
-        #hook = self.dis.module.lrelu1.register_forward_hook(get_activation("avgpool"))
+        # hook = self.dis.module.lrelu1.register_forward_hook(get_activation("avgpool"))
         self.dis(x)
         hook.remove()
-        result = torch.cat([_.to(x.device) for _ in self.activation], 0).view(len(x), -1)
+        result = torch.cat([_.to(x.device) for _ in self.activation], 0).view(
+            len(x), -1
+        )
         result = torch.sigmoid(result)
         self.activation = []
 
@@ -377,14 +387,14 @@ class IdentityFeature(SoulFeature):
 class ClusterFeature(SoulFeature):
     def __init__(
         self,
+        dis,
         clusters_path,
         ref_stats_path=None,
         inverse_transform=None,
         callbacks=None,
-        version=0,
+        version: str = "0",
         **kwargs,
     ):
-        self.radius = kwargs.get("radius", 100.0)
         self.embedding_model = kwargs.get("embedding_model", None)
         self.device = kwargs.get("device", 0)
         clusters_info = np.load(Path(clusters_path).open("rb"))
@@ -392,7 +402,9 @@ class ClusterFeature(SoulFeature):
         self.sigmas = torch.from_numpy(clusters_info["sigmas"]).float()
         self.priors = torch.from_numpy(clusters_info["priors"]).float()
         self.n_clusters = len(clusters_info["sigmas"])
+        self.eps = torch.from_numpy(clusters_info["eps"]).float()
         self.version = version
+        self.dis = dis
 
         super().__init__(
             ref_stats_path=ref_stats_path,
@@ -429,7 +441,38 @@ class ClusterFeature(SoulFeature):
 
         self.ts = None
 
-        self.h = torch.zeros_like(self.priors) # N
+        self.h = torch.zeros_like(self.priors)  # N
+
+        if self.version == "2":
+            centr = self.centroids.to(self.device)
+            theta = (centr.norm(dim=-1) ** 2).mean() / 10.0  # 20.
+            self.kernel = lambda x, y: torch.exp(
+                -torch.norm(x - y, dim=-1, p=2) ** 2 / (2 * theta)
+            )
+            self.centr_self_corr = self.kernel(centr, centr)
+
+        if self.version == "3":
+            self.activation = []
+
+            def get_activation(name):
+                def hook(model, input, output):
+                    self.activation.append(output)
+
+                return hook
+
+            hook = self.dis.layers[-3].register_forward_hook(get_activation("avgpool"))
+            self.dis(self.centroids.to(self.device))
+            self.embed_centr = torch.cat(
+                [_.to(self.device) for _ in self.activation], 0
+            ).view(*self.centroids.shape[:-1], -1)
+            self.activation = []
+            hook.remove()
+
+            theta = (self.embed_centr.norm(dim=-1) ** 2).mean() / 10.0  # 20.
+            self.kernel = lambda x, y: torch.exp(
+                -torch.norm(x - y, dim=-1, p=2) ** 2 / (2 * theta)
+            )
+            self.centr_self_corr = self.kernel(self.embed_centr, self.embed_centr)
 
     def apply(self, x: torch.FloatTensor) -> List[torch.FloatTensor]:
         if self.model:
@@ -438,13 +481,7 @@ class ClusterFeature(SoulFeature):
             self.activation = None
             x = out.squeeze(3).squeeze(2)
 
-        # if True: #self.ts is None:
-        #     pis = -dists ** 2 / (2. * sigmas ** 2) - torch.log((dists < 2. * sigmas).float().mean(0) + 1e-4)[None, :] + torch.log(self.priors.to(x.device))[None, :]
-        #     pis -= pis.max(1)[0][:, None]
-        #     pis = torch.softmax(pis, -1).detach()
-        #     self.ts = torch.multinomial(pis, 1)[:, 0].tolist()
-
-        if self.version == 0:
+        if self.version == "0":
             dists = torch.norm(
                 x.reshape(x.shape[0], -1)[:, None, :]
                 - self.centroids[None, ...].to(x.device),
@@ -453,7 +490,7 @@ class ClusterFeature(SoulFeature):
             sigmas = self.sigmas[None, :].to(x.device)
             result = torch.sigmoid(dists - 2 * sigmas)
 
-        elif self.version == 1:
+        elif self.version == "1":
             # #result = dists.min(1)[0].reshape(-1, 1) # - good but not for mode collapse
             # result = torch.exp(-dists ** 2 / (2. * sigmas **2 + 1.)) * self.priors[None, :].to(x.device)
             # #result = result / (result.sum(1)[:, None] + 1e-10) * self.n_clusters # self.n_clusters - constant for stability (helps for some reason)
@@ -473,72 +510,73 @@ class ClusterFeature(SoulFeature):
             # hyperbolic distance
             # sigmas = self.sigmas[None, :].to(x.device)
             # dists = torch.norm(
-            #     x.reshape(x.shape[0], -1)[:, None, :] / self.radius
-            #     - self.centroids[None, ...].to(x.device) / self.radius,
+            #     x.reshape(x.shape[0], -1)[:, None, :]
+            #     - self.centroids[None, ...].to(x.device),
             #     dim=-1, p=1
             # ) / 100
             # # result = torch.exp(dists) # not bad         #torch.exp(-dists / sigmas)
-
             # sigmas = self.sigmas[None, :, None].to(x.device)
-            #result = (torch.exp(-(x.reshape(len(x), -1)[:, None, :] - self.centroids[None, ...].to(x.device))**2) / 2. ).mean(1)
+            # result = (torch.exp(-(x.reshape(len(x), -1)[:, None, :] - self.centroids[None, ...].to(x.device))**2) / 2. ).mean(1)
+            # result = torch.abs(x.reshape(len(x), -1)[:, None, :] - self.centroids[None, ...].to(x.device)).mean(-1) # not bad
 
-            #result = torch.abs(x.reshape(len(x), -1)[:, None, :] - self.centroids[None, ...].to(x.device)).mean(-1) # not bad
-            result = ((x.reshape(len(x), -1)[:, None, :] - self.centroids[None, ...].to(x.device))**2).mean(-1) / len(self.centroids)
-            
-            
-        
-            #result = (dists[:, None, :] * dists[:, :, None]).reshape(len(x), -1)
-            #result = torch.cat([dists, result], 1)
-            
-            
-            #result = dists ** 2
-            #result = torch.exp(-dists**2 / sigmas **2)
-            #result = result.masked_fill(result != result.min(-1)[0][:, None], 0)
-            
-            #result = torch.exp(-(dists)** 2)
+            result = (
+                (
+                    x.reshape(len(x), -1)[:, None, :]
+                    - self.centroids[None, ...].to(x.device)
+                )
+                ** 2
+            ).sum(-1)
+            result /= len(self.centroids)
 
-            # result = torch.clip(dists, min=2 * sigmas)**2
+        elif self.version == "2":
+            x_flat = x.reshape(len(x), -1)
+            centr = self.centroids[None, :, :].to(x.device)
+            centr_corr = self.centr_self_corr[None, :].to(x.device)
+            ids = np.random.choice(np.arange(len(x)), size=len(x), replace=True)
+            result = (
+                self.kernel(x_flat, x_flat[ids].detach())[:, None]
+                + centr_corr
+                - 2.0 * self.kernel(x_flat[:, None, :], centr)
+            )
 
-            # x_norm = x.reshape(len(x), -1).norm(dim=-1) / self.radius
-            # centr_norm = self.centroids.norm(dim=-1).to(x.device) / self.radius
+            # result = dists ** 2
+            # result = torch.exp(-dists**2 / sigmas **2)
+            # result = result.masked_fill(result != result.min(-1)[0][:, None], 0)
+
+            # x_norm = x.reshape(len(x), -1).norm(dim=-1)
+            # centr_norm = self.centroids.norm(dim=-1).to(x.device)
             # z = 1. + 2 * dists**2 / (1. - x_norm**2)[:, None] / (1. - centr_norm**2)[None, :]
             # result = torch.arccosh(z)
             # sigmas = self.sigmas[None, :, None].to(x.device)
             # result = ((torch.clip(x.reshape(x.shape[0], -1)[:, None, :] - self.centroids[None, ...].to(x.device), min=2*sigmas) / sigmas)**2).sum(1)
             # result = torch.exp(-(x.reshape(x.shape[0], -1)[:, None, :] - self.centroids[None, ...].to(x.device))**2).mean(1)
 
-            # cent = self.centroids.reshape(-1, *x.shape[1:]).to(x.device)
-            # conv = F.conv2d(x, cent, padding=16, stride=2)
-            # result = conv.mean(1).reshape(len(x), -1) #conv.reshape(len(x), -1) / 10
-            # result = F.max_pool2d(conv, conv.shape[-1]).squeeze(-1).squeeze(-1) / 10.
+        elif self.version == "3":
 
-        elif self.version == 2:
-            dists = torch.norm(
-                x.reshape(x.shape[0], -1)[:, None, :]
-                - self.centroids[None, ...].to(x.device),
-                dim=-1,
+            def get_activation(name):
+                def hook(model, input, output):
+                    self.activation.append(output)
+
+                return hook
+
+            hook = self.dis.layers[-3].register_forward_hook(get_activation("avgpool"))
+            self.activation = []
+            self.dis(x)
+            embed_x = torch.cat([_.to(x.device) for _ in self.activation], 0).view(
+                len(x), -1
             )
-            # if not self.eval:
-            #     ws = dists.min(1)[1].detach()
-            #     ws = F.one_hot(ws, dists.shape[1]).float().mean(0)
-            #     dE_dh = ws - self.priors.to(x.device)
-            #     dE_dh -= dE_dh.mean(0)
-            #     self.h = self.h.to(x.device)
-            #     self.h = self.h - 0.1 * dE_dh
-            # else:
-            #     self.h = self.h.to(x.device)
+            self.activation = []
+            hook.remove()
 
-            ids = torch.min(dists, 1)[1]
-            result = (x.reshape(len(x), -1) * self.centroids[ids, :].to(x.device)).sum(-1) / 100 + self.dis(x)
-            result = result.view(-1, 1)
-
-
-            
-            #result = (x.reshape(len(x), -1)[:, None, :] * self.centroids[None, :, :].to(x.device)).sum(-1)   + self.h[None, :]
-            # ids = torch.max((x.reshape(len(x), -1)[:, None, :] * self.centroids[None, :, :].to(x.device)).sum(-1)   + self.h[None, :], 1)[1] #.reshape(-1, 1)
-            # result = dists[np.arange(len(x)), ids.tolist()].reshape(len(x), 1)
-            #du_dx = self.centroids[np.arange(len(x)), ids.tolist()]
-            #result = du_dx
+            ids = np.random.choice(np.arange(len(x)), size=len(x), replace=True)
+            result = (
+                self.kernel(embed_x, embed_x[ids].detach())[:, None]
+                + self.centr_self_corr[None, :].to(x.device)
+                - 2.0
+                * self.kernel(
+                    embed_x[:, None, :], self.embed_centr[None, :, :].to(x.device)
+                )
+            )
 
         else:
             raise KeyError
