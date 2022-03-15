@@ -114,15 +114,15 @@ class SaveImagesCallback(Callback):
 class DiscriminatorCallback(Callback):
     def __init__(
         self,
-        dis,
+        gan,
         invoke_every=1,
         update_input=True,
         device="cuda",
         batch_size: Optional[int] = None,
     ):
         self.invoke_every = invoke_every
-        self.dis = dis
-        self.transform = dis.transform
+        self.dis = gan.dis
+        self.transform = self.dis.transform
         self.update_input = update_input
         self.device = device
         self.batch_size = batch_size
@@ -166,8 +166,7 @@ class DiscriminatorCallback(Callback):
 class EnergyCallback(Callback):
     def __init__(
         self,
-        dis,
-        gen,
+        gan,
         norm_constant=1,
         invoke_every=1,
         update_input=True,
@@ -176,10 +175,10 @@ class EnergyCallback(Callback):
         log_norm_const: float = 0,
     ):
         self.invoke_every = invoke_every
-        self.dis = dis
-        self.gen = gen
+        self.dis = gan.dis
+        self.gen = gan.gen
         self.norm_constant = norm_constant
-        self.transform = dis.transform
+        self.transform = self.dis.transform
         self.update_input = update_input
         self.device = device
         self.batch_size = batch_size

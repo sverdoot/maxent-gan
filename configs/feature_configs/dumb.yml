@@ -11,7 +11,7 @@ feature: &feature
   name: DumbFeature
   params: 
     device: *device
-    dis: null
+    gan: null
     
 #   total_n: *total_n
 #   batch_size: *batch_size

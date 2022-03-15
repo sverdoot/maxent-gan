@@ -1,0 +1,5 @@
+outs:
+- md5: 27008a79548c4c5578c06420642ac90c.dir
+  size: 519772420
+  nfiles: 2
+  path: stylegan2_studio

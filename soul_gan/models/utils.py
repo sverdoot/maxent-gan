@@ -1,7 +1,6 @@
 from pathlib import Path
-from typing import Tuple
+from turtle import forward
 
-import numpy as np
 import torch
 from torch import nn
 from tqdm import trange
@@ -91,6 +90,15 @@ from .base import BaseDiscriminator, BaseGenerator, ModelRegistry
 
 #     return gen, dis
 
+class CondDataParallel(torch.nn.DataParallel):
+    label = None
+    cond = False
+    def forward(self, *inputs, **kwargs):
+        if self.cond:
+            return super().forward(*inputs, **kwargs, label=self.label)
+        else:
+            return super().forward(*inputs, **kwargs)
+        
 
 class GANWrapper:
     def __init__(self, config: DotConfig, device: torch.device):
@@ -107,8 +115,8 @@ class GANWrapper:
         self.load_weights()
 
         if config.dp:
-            self.gen = torch.nn.DataParallel(self.gen)
-            self.dis = torch.nn.DataParallel(self.dis)
+            self.gen = CondDataParallel(self.gen) #torch.nn.DataParallel(self.gen)
+            self.dis = CondDataParallel(self.dis) #torch.nn.DataParallel(self.dis)
             self.dis.transform = self.dis.module.transform
             self.dis.output_layer = self.dis.module.output_layer
             self.gen.inverse_transform = self.gen.module.inverse_transform
@@ -116,9 +124,9 @@ class GANWrapper:
             self.gen.sample_label = self.gen.module.sample_label
 
             if hasattr(self.gen.module, "label"):
-                self.gen.label = self.gen.module.label
+                self.gen.cond = self.gen.module.label
             if hasattr(self.dis.module, "label"):
-                self.dis.label = self.dis.module.label
+                self.dis.cond = self.dis.module.label
 
         self.eval()
         self.define_prior()
@@ -179,8 +187,13 @@ class GANWrapper:
         return self.gen.prior
 
     def set_label(self, label):
-        self.gen.label = label
-        self.dis.label = label
+        if self.config.dp:
+            self.gen.label = label if self.gen.cond else None
+            self.dis.label = label if self.dis.cond else None
+        else:
+            self.gen.label = label
+            self.dis.label = label
+
 
 
 def estimate_lipschitz_const(

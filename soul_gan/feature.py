@@ -321,9 +321,9 @@ class InceptionScoreFeature(Feature):
 @FeatureRegistry.register()
 class DiscriminatorFeature(SoulFeature):
     def __init__(
-        self, dis, inverse_transform=None, callbacks=None, ref_stats_path=None, **kwargs
+        self, gan, inverse_transform=None, callbacks=None, ref_stats_path=None, **kwargs
     ):
-        self.dis = dis
+        self.dis = gan.dis
         # ref_feature = kwargs.get("ref_score", 0.5 / (1 - 0.5))
         # if isinstance(ref_feature, float):
         #     ref_feature = [torch.FloatTensor([ref_feature])]
@@ -344,9 +344,9 @@ class DiscriminatorFeature(SoulFeature):
 @FeatureRegistry.register()
 class DiscriminatorFeature_v1(SoulFeature):
     def __init__(
-        self, dis, inverse_transform=None, callbacks=None, ref_stats_path=None, **kwargs
+        self, gan, inverse_transform=None, callbacks=None, ref_stats_path=None, **kwargs
     ):
-        self.dis = dis
+        self.dis = gan.dis
         super().__init__(
             inverse_transform=inverse_transform,
             callbacks=callbacks,
@@ -387,8 +387,8 @@ class IdentityFeature(SoulFeature):
 class ClusterFeature(SoulFeature):
     def __init__(
         self,
-        dis,
         clusters_path,
+        gan=None,
         ref_stats_path=None,
         inverse_transform=None,
         callbacks=None,
@@ -402,9 +402,12 @@ class ClusterFeature(SoulFeature):
         self.sigmas = torch.from_numpy(clusters_info["sigmas"]).float()
         self.priors = torch.from_numpy(clusters_info["priors"]).float()
         self.n_clusters = len(clusters_info["sigmas"])
-        self.eps = torch.from_numpy(clusters_info["eps"]).float()
+        #self.eps = torch.from_numpy(clusters_info["eps"]).float()
         self.version = version
-        self.dis = dis
+        if gan:
+            self.dis = gan.dis
+        else:
+            self.dis = None
 
         super().__init__(
             ref_stats_path=ref_stats_path,
@@ -445,7 +448,7 @@ class ClusterFeature(SoulFeature):
 
         if self.version == "2":
             centr = self.centroids.to(self.device)
-            theta = (centr.norm(dim=-1) ** 2).mean() / 10.0  # 20.
+            theta = (centr.norm(dim=-1) ** 2).mean() / 10.0
             self.kernel = lambda x, y: torch.exp(
                 -torch.norm(x - y, dim=-1, p=2) ** 2 / (2 * theta)
             )
@@ -468,7 +471,7 @@ class ClusterFeature(SoulFeature):
             self.activation = []
             hook.remove()
 
-            theta = (self.embed_centr.norm(dim=-1) ** 2).mean() / 10.0  # 20.
+            theta = (self.embed_centr.norm(dim=-1) ** 2).mean() / 10.0
             self.kernel = lambda x, y: torch.exp(
                 -torch.norm(x - y, dim=-1, p=2) ** 2 / (2 * theta)
             )
@@ -580,6 +583,93 @@ class ClusterFeature(SoulFeature):
 
         else:
             raise KeyError
+
+        return [result]
+
+
+@FeatureRegistry.register()
+class MMDFeature(SoulFeature):
+    def __init__(
+        self,
+        gan=None,
+        ref_stats_path=None,
+        inverse_transform=None,
+        callbacks=None,
+        **kwargs,
+    ):
+        self.embedding_model = kwargs.get("embedding_model", None)
+        self.device = kwargs.get("device", 0)
+
+        if gan:
+            self.dis = gan.dis
+        else:
+            self.dis = None
+
+        super().__init__(
+            ref_stats_path=ref_stats_path,
+            inverse_transform=inverse_transform,
+            callbacks=callbacks,
+            **kwargs,
+        )
+        if self.embedding_model:
+            if self.embedding_model == "resnet34":
+                model = torchvision.models.resnet34
+            elif self.embedding_model == "resnet50":
+                model = torchvision.models.resnet50
+            elif self.embedding_model == "resnet101":
+                model = torchvision.models.resnet101
+            else:
+                raise ValueError(f"Version {self.resnet_version} is not available")
+
+            self.model = model(pretrained=True).to(self.device)
+            self.activation = None
+
+            def get_activation(name):
+                def hook(model, input, output):
+                    self.activation = output
+
+                return hook
+
+            self.model.avgpool.register_forward_hook(get_activation("avgpool"))
+            # if dp:
+            #     self.model = torch.nn.DataParallel(self.model)
+            self.model.eval()
+            self.transform = transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+        else:
+            self.model = None
+
+        theta = (self.embed_centr.norm(dim=-1) ** 2).mean() / 10.0
+        self.kernel = lambda x, y: torch.exp(
+            -torch.norm(x - y, dim=-1, p=2) ** 2 / (2 * theta)
+        )
+        self.centr_self_corr = self.kernel(self.embed_centr, self.embed_centr)
+
+    def apply(self, x: torch.FloatTensor) -> List[torch.FloatTensor]:
+        if self.model:
+            self.model(self.transform(self.inverse_transform(x)))
+            out = self.activation.to(self.device)
+            self.activation = None
+            x = out.squeeze(3).squeeze(2)
+
+            def get_activation(name):
+                def hook(model, input, output):
+                    self.activation.append(output)
+
+                return hook
+
+        embed_x = torch.cat([_.to(x.device) for _ in self.activation], 0).view(
+            len(x), -1
+        )
+
+        ids = np.random.choice(np.arange(len(x)), size=len(x), replace=True)
+        result = (
+            self.kernel(embed_x, embed_x[ids].detach())[:, None]
+            + self.centr_self_corr[None, :].to(x.device)
+            - 2.0
+            * self.kernel(
+                embed_x[:, None, :], self.embed_centr[None, :, :].to(x.device)
+            )
+        )
 
         return [result]
 
@@ -732,9 +822,9 @@ class KernelPCAFeature(SoulFeature):
 @FeatureRegistry.register()
 class DiscriminatorGradientFeature(SoulFeature):
     def __init__(
-        self, dis, ref_stats_path=None, inverse_transform=None, callbacks=None, **kwargs
+        self, gan, ref_stats_path=None, inverse_transform=None, callbacks=None, **kwargs
     ):
-        self.dis = dis
+        self.dis = gan.dis
         super().__init__(
             ref_stats_path=ref_stats_path,
             inverse_transform=inverse_transform,
@@ -934,8 +1024,8 @@ class SumFeature(Feature):
 
         for feature in kwargs["features"]:
             feature_kwargs = feature["params"]
-            if "dis" in feature["params"]:
-                feature_kwargs["dis"] = kwargs.get("dis")
+            if "gan" in feature["params"]:
+                feature_kwargs["gan"] = kwargs.get("gan")
             feature = FeatureRegistry.create_feature(
                 feature["name"],
                 inverse_transform=inverse_transform,

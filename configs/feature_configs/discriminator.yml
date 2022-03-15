@@ -2,7 +2,7 @@ feature: &feature
   name: DiscriminatorFeature
   params: 
     device: *device
-    dis: null
+    gan: null
     ref_score: *real_score #*mean_score
     ref_stats_path: stats/DiscriminatorFeature.npz
     opt_params:

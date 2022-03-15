@@ -57,6 +57,9 @@ class BaseDiscriminator(nn.Module):
         else:
             self.output_layer = nn.Identity()
 
+    def get_label(self) -> torch.LongTensor:
+        return self.label.data.long()
+
 
 class BaseGenerator(nn.Module):
     def __init__(
@@ -67,3 +70,6 @@ class BaseGenerator(nn.Module):
 
     def sample_label(self, *args, **kwargs):
         return None
+
+    def get_label(self) -> torch.LongTensor:
+        return self.label.data.long()

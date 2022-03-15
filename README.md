@@ -1,6 +1,5 @@
 # Experiments on sampling from GAN with constraints
 
-
 - [Experiments on sampling from GAN with constraints](#experiments-on-sampling-from-gan-with-constraints)
   - [Getting started](#getting-started)
     - [StudioGAN:](#studiogan)
@@ -151,9 +150,19 @@ pre-commit run -a
 ## TODO:
 
 * add Runner class to hold all needed inside and pass to all other objects
-* rewrite loop in run (still, looks weird)
-* add more features and test
-* add parallelism...
-* make configs (gan_configs, not exp_configs (?)) for both freezed and non-freezed batch-norms
+* CMD central moment discrepancy
+  - gona write for 2d
+* MMD
+  - gona write feature for MMD with ResNet 
+* StyleGAN:
+  - added StuleGan2-ADA from studiogans
+* collect results in experiments forlder
+* plan experiments and maintain actual list (+ push to dvc)
+* stacked mnist
+* add last layer to configs
+
+  
+
+
 
 

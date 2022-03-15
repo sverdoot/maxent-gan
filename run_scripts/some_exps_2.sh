@@ -73,10 +73,18 @@
 
 #python run.py configs/exp_configs/dcgan-cluster.yml configs/targets/discriminator.yml configs/gan_configs/cifar-10-dcgan.yml configs/feature_configs/cluster_v1.yml configs/common.yml --step_size 0.01 --suffix v1_0.01 --weight_step 0.3 #3
 
-python run.py configs/exp_configs/wgan-gp-cluster.yml configs/targets/discriminator.yml configs/gan_configs/cifar-10-wgan-gp.yml configs/feature_configs/cluster_v1.yml configs/common.yml --step_size 0.01 --suffix v1_0.01 --weight_step 0.1
+#python run.py configs/exp_configs/wgan-gp-cluster.yml configs/targets/discriminator.yml configs/gan_configs/cifar-10-wgan-gp.yml configs/feature_configs/cluster_v1.yml configs/common.yml --step_size 0.01 --suffix v1_0.01 --weight_step 0.1
 
 # python run.py configs/exp_configs/sngan-ns-cluster.yml configs/targets/discriminator.yml configs/gan_configs/cifar-10-sngan-ns.yml configs/feature_configs/cluster_v1.yml configs/common.yml --step_size 0.01 --suffix v1_0.01 --weight_step 0.1
 
 # python run.py configs/exp_configs/studio-wgan-gp-cluster.yml configs/targets/discriminator.yml configs/gan_configs/cifar-10-studio-wgan-gp.yml configs/feature_configs/cluster_v1.yml configs/common.yml --step_size 0.01 --suffix v1_0.01 --weight_step 0.1 #3
 
 # python run.py configs/exp_configs/studio-wgan-gp-dumb.yml configs/targets/discriminator.yml configs/gan_configs/cifar-10-studio-wgan-gp.yml configs/feature_configs/dumb.yml configs/common.yml --step_size 0.01 --suffix 0.01 --weight_step 0.1
+
+
+# cluster_v2
+
+python run.py configs/exp_configs/dcgan-cluster.yml configs/targets/discriminator.yml configs/gan_configs/cifar-10-dcgan.yml configs/feature_configs/cluster.yml configs/common.yml --step_size 0.01 --suffix v2_0.01 --weight_step 0.1 --feature_version 2
+
+python run.py configs/exp_configs/dcgan-cluster.yml configs/targets/prior.yml configs/gan_configs/cifar-10-dcgan.yml configs/feature_configs/cluster.yml configs/common.yml --step_size 0.01 --suffix v2_0.01 --weight_step 0.1 --feature_version 2
+

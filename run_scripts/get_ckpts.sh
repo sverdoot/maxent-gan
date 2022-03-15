@@ -38,7 +38,11 @@
 
 # gdown --id 1Ro4yw2330kIfnKSciZKWO5kyjnFECtc7 -O checkpoints/mlp/D_25_gauss_js.pth
 
-gdown --id 18pbG772v65gF6QYhwx7S6HGfVEGYr7rz -O checkpoints/mlp/G_25_gauss_wass.pth
+# gdown --id 18pbG772v65gF6QYhwx7S6HGfVEGYr7rz -O checkpoints/mlp/G_25_gauss_wass.pth
 
-gdown --id 1k0eiU1T27Z1bQBfSKDl8vKF91gasordE -O checkpoints/mlp/D_25_gauss_wass.pth
+# gdown --id 1k0eiU1T27Z1bQBfSKDl8vKF91gasordE -O checkpoints/mlp/D_25_gauss_wass.pth
+
+gdown --id 1-A2g6uaVhqqo2IaJtry31nge34dbe7Ff -O checkpoints/stylegan2_studio/D_CIFAR_studio_best.pth
+
+gdown --id 1KV1jkKppzfiUwFa0eu-kTXTooDPOChVj -O checkpoints/stylegan2_studio/G_CIFAR_studio_best.pth
 

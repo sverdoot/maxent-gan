@@ -87,10 +87,8 @@ def main(config: DotConfig, device: torch.device, group: str):
             for _, callback in callbacks.items():
                 params = callback.params.dict
                 # HACK
-                if "dis" in params:
-                    params["dis"] = gan.dis
-                if "gen" in params:
-                    params["gen"] = gan.gen
+                if "gan" in params:
+                    params["gan"] = gan
                 if "save_dir" in params:
                     params["save_dir"] = save_dir
                 feature_callbacks.append(
@@ -100,8 +98,8 @@ def main(config: DotConfig, device: torch.device, group: str):
         feature_kwargs = config.sample_params.feature.params.dict
 
         # HACK
-        if "dis" in config.sample_params.feature.params:
-            feature_kwargs["dis"] = gan.dis
+        if "gan" in config.sample_params.feature.params:
+            feature_kwargs["gan"] = gan
 
         feature = FeatureRegistry.create_feature(
             config.sample_params.feature.name,
@@ -371,10 +369,8 @@ def main(config: DotConfig, device: torch.device, group: str):
         for _, callback in callbacks.items():
             params = callback.params.dict
             # HACK
-            if "dis" in params:
-                params["dis"] = gan.dis
-            if "gen" in params:
-                params["gen"] = gan.gen
+            if "gan" in params:
+                params["gan"] = gan
             # if "log_norm_const" in params:
             #     params["log_norm_const"] = log_norm_const
             afterall_callbacks.append(

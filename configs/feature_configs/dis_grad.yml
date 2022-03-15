@@ -2,7 +2,7 @@ feature: &feature
   name: DiscriminatorGradientFeature
   params: 
     device: *device
-    dis: null
+    gan: null
     ref_stats_path: stats/DiscriminatorGradientFeature_cifar10.npz
     opt_params:
       name:

@@ -82,8 +82,7 @@ callbacks:
     energy:
       name: EnergyCallback
       params:
-        dis: null
-        gen: null
+        gan: null
         invoke_every: *every
         device: *device
         update_input: true
@@ -108,21 +107,20 @@ callbacks:
     energy:
       name: EnergyCallback
       params:
-        dis: null
-        gen: null
+        gan: null
         invoke_every: 1
         device: *device
         update_input: true
-        batch_size: 250 #*batch_size
+        batch_size: *batch_size
         norm_constant: null
     discriminator:
       name: DiscriminatorCallback
       params:
-        dis: null
+        gan: null
         invoke_every: 1
         device: *device
         update_input: true
-        batch_size: 250 #*batch_size
+        batch_size: *batch_size
     wandb:
       name: WandbCallback
       params:

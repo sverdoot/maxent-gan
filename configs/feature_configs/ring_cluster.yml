@@ -2,7 +2,7 @@ feature: &feature
   name: ClusterFeature
   params: 
     device: *device
-    dis: null
+    gan: null
     clusters_path: data/8_gaussians_modes.npz
     ref_stats_path: stats/ClusterFeature_8_gaussians.npz
     version: *version
