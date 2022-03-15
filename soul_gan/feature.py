@@ -13,9 +13,6 @@ from torchvision import transforms
 from soul_gan.utils.metrics import batch_inception
 
 
-# torch.autograd.set_detect_anomaly(True)
-
-
 class AvgHolder(object):
     cnt: int = 0
 
@@ -65,7 +62,7 @@ class Feature(ABC):
         self.callbacks = callbacks if callbacks else []
 
         if not inverse_transform:
-            self.inverse_transform = None  # transforms.Normalize((0, 0, 0), (1, 1, 1))
+            self.inverse_transform = None
         else:
             self.inverse_transform = inverse_transform
 
@@ -278,7 +275,7 @@ class InceptionScoreFeature(Feature):
 
         self.ref_feature = kwargs.get("ref_score", [np.log(9.0)])
 
-        self.pis_mean = None  # torch.zeros(1000).to(self.device)
+        self.pis_mean = None
         self.exp_avg_coef = 0.1
 
     def init_weight(self):
@@ -324,14 +321,10 @@ class DiscriminatorFeature(SoulFeature):
         self, gan, inverse_transform=None, callbacks=None, ref_stats_path=None, **kwargs
     ):
         self.dis = gan.dis
-        # ref_feature = kwargs.get("ref_score", 0.5 / (1 - 0.5))
-        # if isinstance(ref_feature, float):
-        #     ref_feature = [torch.FloatTensor([ref_feature])]
         super().__init__(
             inverse_transform=inverse_transform,
             callbacks=callbacks,
             ref_stats_path=ref_stats_path,
-            # ref_score=ref_feature,
         )
 
     def apply(self, x: torch.FloatTensor) -> List[torch.FloatTensor]:
@@ -362,8 +355,7 @@ class DiscriminatorFeature_v1(SoulFeature):
 
             return hook
 
-        hook = self.dis.module.main[-2].register_forward_hook(get_activation("avgpool"))
-        # hook = self.dis.module.lrelu1.register_forward_hook(get_activation("avgpool"))
+        hook = self.dis.module.penult_layer.register_forward_hook(get_activation("penult_layer"))
         self.dis(x)
         hook.remove()
         result = torch.cat([_.to(x.device) for _ in self.activation], 0).view(
@@ -372,7 +364,6 @@ class DiscriminatorFeature_v1(SoulFeature):
         result = torch.sigmoid(result)
         self.activation = []
 
-        # print(result.mean())
         return [result]
 
 
@@ -384,7 +375,7 @@ class IdentityFeature(SoulFeature):
 
 
 @FeatureRegistry.register()
-class ClusterFeature(SoulFeature):
+class ClusterFeature(SoulFeature): # WIP
     def __init__(
         self,
         clusters_path,
@@ -402,7 +393,6 @@ class ClusterFeature(SoulFeature):
         self.sigmas = torch.from_numpy(clusters_info["sigmas"]).float()
         self.priors = torch.from_numpy(clusters_info["priors"]).float()
         self.n_clusters = len(clusters_info["sigmas"])
-        #self.eps = torch.from_numpy(clusters_info["eps"]).float()
         self.version = version
         if gan:
             self.dis = gan.dis
@@ -431,12 +421,9 @@ class ClusterFeature(SoulFeature):
             def get_activation(name):
                 def hook(model, input, output):
                     self.activation = output
-
                 return hook
 
             self.model.avgpool.register_forward_hook(get_activation("avgpool"))
-            # if dp:
-            #     self.model = torch.nn.DataParallel(self.model)
             self.model.eval()
             self.transform = transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
         else:
@@ -463,7 +450,7 @@ class ClusterFeature(SoulFeature):
 
                 return hook
 
-            hook = self.dis.layers[-3].register_forward_hook(get_activation("avgpool"))
+            hook = self.dis.penult_layer.register_forward_hook(get_activation("penult_layer"))
             self.dis(self.centroids.to(self.device))
             self.embed_centr = torch.cat(
                 [_.to(self.device) for _ in self.activation], 0
@@ -542,10 +529,6 @@ class ClusterFeature(SoulFeature):
                 - 2.0 * self.kernel(x_flat[:, None, :], centr)
             )
 
-            # result = dists ** 2
-            # result = torch.exp(-dists**2 / sigmas **2)
-            # result = result.masked_fill(result != result.min(-1)[0][:, None], 0)
-
             # x_norm = x.reshape(len(x), -1).norm(dim=-1)
             # centr_norm = self.centroids.norm(dim=-1).to(x.device)
             # z = 1. + 2 * dists**2 / (1. - x_norm**2)[:, None] / (1. - centr_norm**2)[None, :]
@@ -555,14 +538,12 @@ class ClusterFeature(SoulFeature):
             # result = torch.exp(-(x.reshape(x.shape[0], -1)[:, None, :] - self.centroids[None, ...].to(x.device))**2).mean(1)
 
         elif self.version == "3":
-
             def get_activation(name):
                 def hook(model, input, output):
                     self.activation.append(output)
-
                 return hook
 
-            hook = self.dis.layers[-3].register_forward_hook(get_activation("avgpool"))
+            hook = self.dis.penult_layer.register_forward_hook(get_activation("penult_layer"))
             self.activation = []
             self.dis(x)
             embed_x = torch.cat([_.to(x.device) for _ in self.activation], 0).view(
@@ -580,7 +561,6 @@ class ClusterFeature(SoulFeature):
                     embed_x[:, None, :], self.embed_centr[None, :, :].to(x.device)
                 )
             )
-
         else:
             raise KeyError
 
@@ -675,7 +655,7 @@ class MMDFeature(SoulFeature):
 
 
 @FeatureRegistry.register()
-class PCAFeature(SoulFeature):
+class PCAFeature(SoulFeature): # REMOVE
     def __init__(
         self,
         info_path,
@@ -747,7 +727,7 @@ class PCAFeature(SoulFeature):
 
 
 @FeatureRegistry.register()
-class KernelPCAFeature(SoulFeature):
+class KernelPCAFeature(SoulFeature): # REMOVE
     def __init__(
         self,
         info_path,
@@ -820,7 +800,7 @@ class KernelPCAFeature(SoulFeature):
 
 
 @FeatureRegistry.register()
-class DiscriminatorGradientFeature(SoulFeature):
+class DiscriminatorGradientFeature(SoulFeature): # REMOVE
     def __init__(
         self, gan, ref_stats_path=None, inverse_transform=None, callbacks=None, **kwargs
     ):
@@ -842,7 +822,7 @@ class DiscriminatorGradientFeature(SoulFeature):
 
 
 # @FeatureRegistry.register()
-# class IMLEFeature(SoulFeature):
+# class IMLEFeature(SoulFeature): # REMOVE
 #     def __init__(
 #         self,
 #         clusters_path,

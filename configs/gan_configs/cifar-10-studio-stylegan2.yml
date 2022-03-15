@@ -3,8 +3,8 @@ gan_config:
   dataset: cifar10
   train_transform:
     Normalize:
-      mean: &mean [0., 0., 0.] #[0.5, 0.5, 0.5]
-      std: &std [1., 1., 1.] #[0.5, 0.5, 0.5]
+      mean: &mean [0.5, 0.5, 0.5]
+      std: &std [0.5, 0.5, 0.5]
   prior: normal
   eval: true
   label: &label true

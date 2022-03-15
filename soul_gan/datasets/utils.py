@@ -12,6 +12,7 @@ from torchvision import transforms as T
 from soul_gan.utils.general_utils import DATA_DIR, IgnoreLabelDataset
 
 from .synthetic import prepare_2d_gaussian_grid_data, prepare_2d_ring_data
+from .stacked_mnist import stack_mnist
 
 
 N_CIFAR_CLASSES = 10
@@ -139,6 +140,21 @@ def get_gaussians_ring_dataset(
     return dataset
 
 
+def get_stacked_mnist_dataset(
+    sample_size: int = 60000,
+    mean: Tuple[float, float, float] = (0.5, 0.5, 0.5),
+    std: Tuple[float, float, float] = (0.5, 0.5, 0.5),
+) -> Dataset:
+    tensor = stack_mnist(sample_size)
+    mean = torch.as_tensor(mean)
+    std = torch.as_tensor(std)
+    dataset = IgnoreLabelDataset(
+        TensorDataset((tensor - mean[None, :]) / std[None, :])
+    )
+    return dataset
+    
+
+
 def get_dataset(name: str = "cifar10", *args, **kwargs) -> Dataset:
     if name == "cifar10":
         return get_cifar_dataset(*args, **kwargs)
@@ -148,5 +164,7 @@ def get_dataset(name: str = "cifar10", *args, **kwargs) -> Dataset:
         return get_gaussians_ring_dataset(*args, **kwargs)
     elif name == "celeba":
         return get_celeba_dataset(*args, **kwargs)
+    elif name == 'stacked_mnist':
+        return get_stacked_mnist_dataset(*args, **kwargs)
     else:
         raise KeyError

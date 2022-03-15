@@ -91,6 +91,10 @@ class SN_DCGAN_Discriminator(BaseDiscriminator):
 
         self.lrelu = nn.LeakyReLU(negative_slope=0.2, inplace=True)
 
+    @property
+    def penult_layer(self):
+        return self.c3_0
+    
     def forward(self, x):
         h = self.lrelu(self.c0_0(x))
         h = self.lrelu(self.c0_1(h))
@@ -101,6 +105,7 @@ class SN_DCGAN_Discriminator(BaseDiscriminator):
         h = self.lrelu(self.c3_0(h))
         h = h.view(x.size(0), -1)
         return self.l4(h)
+        
 
 
 @ModelRegistry.register()

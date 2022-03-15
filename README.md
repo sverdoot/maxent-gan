@@ -159,7 +159,9 @@ pre-commit run -a
 * collect results in experiments forlder
 * plan experiments and maintain actual list (+ push to dvc)
 * stacked mnist
-* add last layer to configs
+  - added stacked mnist dataset and prepared evrth. for checkpoint
+* defined penult layers for all except studiogans - ready for ClusterFeature V3 (run on dcgan) 
+* run some_exps2
 
   
 

@@ -66,7 +66,7 @@ class BaseGenerator(nn.Module):
         self, mean: Tuple[float, float, float], std: Tuple[float, float, float]
     ):
         super().__init__()
-        self.inverse_transform = NormalizeInverse(mean, std)
+        self.inverse_transform = transforms.Compose([NormalizeInverse(mean, std), transforms.Lambda(lambda x: torch.clip(x, 0, 1))])
 
     def sample_label(self, *args, **kwargs):
         return None

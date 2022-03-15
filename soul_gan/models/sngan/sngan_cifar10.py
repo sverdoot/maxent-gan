@@ -167,6 +167,10 @@ class Discriminator(nn.Module):
         if args.d_spectral_norm:
             self.l5 = nn.utils.spectral_norm(self.l5)
 
+    @property
+    def penult_layer(self):
+        return self.activation
+
     def forward(self, x):
         h = x
         h = self.block1(h)

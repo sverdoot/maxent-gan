@@ -35,6 +35,10 @@ class MMCSNDiscriminator(BaseDiscriminator):
         super().__init__(mean, std, output_layer)
         self.dis = sngan.SNGANDiscriminator64()
 
+    @property
+    def penult_layer(self):
+        return self.dis.activation
+
     def load_state_dict(self, state_dict, strict: bool = True):
         return self.dis.load_state_dict(state_dict["model_state_dict"], strict=strict)
 

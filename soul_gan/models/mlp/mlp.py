@@ -103,6 +103,10 @@ class MLPDiscriminator(BaseDiscriminator):
             x.device
         )
 
+    @property
+    def penult_layer(self):
+        return self.layers[-3]
+
     def forward(self, z):
         z = self.layers.forward(z)
         return z

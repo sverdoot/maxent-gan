@@ -114,7 +114,7 @@ def main(config: DotConfig, device: torch.device, group: str):
                 mean=config.gan_config.train_transform.Normalize.mean,
                 std=config.gan_config.train_transform.Normalize.std,
             )
-            # print(config.sample_params.feature.params.ref_stats_path)
+
             feature.eval = True
             stats = evaluate(
                 feature,

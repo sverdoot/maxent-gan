@@ -74,7 +74,7 @@ class WandbCallback(Callback):
                 if isinstance(info[key], np.ndarray):
                     log[key] = wandb.Image(
                         make_grid(
-                            self.img_transform(torch.from_numpy(info[key][:25])),
+                            self.img_transform(torch.clip(torch.from_numpy(info[key][:25]), 0, 1)),
                             nrow=5,
                         ),
                         caption=key,
