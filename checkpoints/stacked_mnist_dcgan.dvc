@@ -1,0 +1,5 @@
+outs:
+- md5: 1627ff74928f0feddda5ae45935c5574.dir
+  size: 25397059
+  nfiles: 2
+  path: stacked_mnist_dcgan

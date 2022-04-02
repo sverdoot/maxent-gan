@@ -18,7 +18,7 @@ gan_config:
       mean: *mean
       std: *std
     thermalize: true
-    ckpt_path: checkpoints/sngan_resnet_hinge_dot/DCGAN_D_CIFAR_SNGAN_NonSaturating_150001.pth
+    ckpt_path: checkpoints/sngan_ns_dot/DCGAN_D_CIFAR_SNGAN_NonSaturating_150001.pth
   thermalize:
     true: {}
     false:

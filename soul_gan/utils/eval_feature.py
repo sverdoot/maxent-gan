@@ -11,7 +11,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 
-sys.path.append("studiogan")
+# sys.path.append("studiogan")
 
 from soul_gan.datasets.utils import get_dataset
 from soul_gan.feature import FeatureRegistry
@@ -61,7 +61,7 @@ def main(config: DotConfig, device: torch.device):
     if "dis" in config.sample_params.feature.params:
         feature_kwargs["dis"] = gan.dis
 
-    feature = FeatureRegistry.create_feature(
+    feature = FeatureRegistry.create(
         config.sample_params.feature.name,
         inverse_transform=gan.inverse_transform,
         **feature_kwargs,

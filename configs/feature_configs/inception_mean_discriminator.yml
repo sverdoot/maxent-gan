@@ -2,6 +2,7 @@ dir: &dir log/sum_feature
 n_steps: &n_steps 2000
 every: &every 10
 seed: null
+
 device: &device cuda
 
 sample: &sample_params

@@ -49,6 +49,7 @@ def soul(
     weight_step: float = 0.1,
     step_size: float = 0.01,
     save_every: int = 10,
+    verbose=True
 ) -> Tuple[List[torch.FloatTensor], List[torch.FloatTensor]]:
     # z.requires_grad_(True)
     zs = [z.cpu()]
@@ -69,7 +70,8 @@ def soul(
         logp = radnic_logp + ref_logp
         return logp
 
-    for it in trange(1, n_steps + 2):
+    xrange = trange if verbose else range
+    for it in xrange(1, n_steps + 2):
         z.requires_grad_(True)
         avg = it > burn_in_steps or it == 1
         upd = it > burn_in_steps or it == 1

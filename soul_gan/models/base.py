@@ -21,7 +21,7 @@ class ModelRegistry:
         return inner_wrapper
 
     @classmethod
-    def create_model(cls, name: str, **kwargs) -> nn.Module:
+    def create(cls, name: str, **kwargs) -> nn.Module:
         model = cls.registry[name]
         model = model(**kwargs)
         return model
@@ -66,7 +66,12 @@ class BaseGenerator(nn.Module):
         self, mean: Tuple[float, float, float], std: Tuple[float, float, float]
     ):
         super().__init__()
-        self.inverse_transform = transforms.Compose([NormalizeInverse(mean, std), transforms.Lambda(lambda x: torch.clip(x, 0, 1))])
+        self.inverse_transform = transforms.Compose(
+            [
+                NormalizeInverse(mean, std),
+                transforms.Lambda(lambda x: torch.clip(x, 0, 1)),
+            ]
+        )
 
     def sample_label(self, *args, **kwargs):
         return None

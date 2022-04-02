@@ -3,7 +3,6 @@
 - [Experiments on sampling from GAN with constraints](#experiments-on-sampling-from-gan-with-constraints)
   - [Getting started](#getting-started)
     - [StudioGAN:](#studiogan)
-  - [Usage](#usage)
   - [TODO:](#todo)
 
 
@@ -14,20 +13,22 @@ link to gdrive with checkpoints and stats: https://drive.google.com/drive/folder
 Create environment and set dependencies:
 ```zsh
 conda create -n constrained_gan python=3.8
-conda activate constrained_gan
 ```
 
 ```zsh
-pip install poetry
-poetry config virtualenvs.create false --local
+curl -sSL https://install.python-poetry.org | python3 -
+poetry config virtualenvs.create false
+
+conda activate constrained_gan
+conda install tensorflow-gpu==2.4.1
 poetry install
 ```
 
-To compute FID in TF fashion:
+<!-- To compute FID in TF fashion:
 
 ```zsh
 conda install tensorflow-gpu
-```
+``` -->
 
 Check whether TF can see GPU:
 
@@ -117,6 +118,32 @@ Make bash scripts runable
 chmod +x run_scripts/*.sh
 ```
 
+
+<!-- ###
+mann
+
+```bash
+git clone git@github.com:wzell/mann.git thirdparty
+```
+
+```bash
+cd thirdparty/mann
+pip install -r requirements.txt
+echo \
+"from setuptools import setup
+
+setup(name='mann',
+      version='1.0',
+      packages=['mann'],
+      package_dir={'mann': './models'},)
+" \
+>> setup.py
+
+python setup.py install
+``` -->
+
+
+
 ## Usage 
 
 Download checkpoints:
@@ -151,17 +178,11 @@ pre-commit run -a
 
 * add Runner class to hold all needed inside and pass to all other objects
 * CMD central moment discrepancy
-  - gona write for 2d
-* MMD
-  - gona write feature for MMD with ResNet 
-* StyleGAN:
-  - added StuleGan2-ADA from studiogans
+  - do exps on images (ResNet)
 * collect results in experiments forlder
 * plan experiments and maintain actual list (+ push to dvc)
 * stacked mnist
-  - added stacked mnist dataset and prepared evrth. for checkpoint
-* defined penult layers for all except studiogans - ready for ClusterFeature V3 (run on dcgan) 
-* run some_exps2
+  - add model to count modes
 
   
 

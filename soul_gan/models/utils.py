@@ -32,7 +32,7 @@ from .base import BaseDiscriminator, BaseGenerator, ModelRegistry
 #     state_dict = torch.load(
 #         Path(ROOT_DIR, config.generator.ckpt_path), map_location=device
 #     )
-#     gen = ModelRegistry.create_model(
+#     gen = ModelRegistry.create(
 #         config.generator.name, **config.generator.params
 #     ).to(device)
 #     gen.load_state_dict(state_dict, strict=True)
@@ -40,7 +40,7 @@ from .base import BaseDiscriminator, BaseGenerator, ModelRegistry
 #     state_dict = torch.load(
 #         Path(ROOT_DIR, config.discriminator.ckpt_path), map_location=device
 #     )
-#     dis = ModelRegistry.create_model(
+#     dis = ModelRegistry.create(
 #         config.discriminator.name, **config.discriminator.params
 #     ).to(device)
 #     dis.load_state_dict(state_dict, strict=True)
@@ -90,48 +90,54 @@ from .base import BaseDiscriminator, BaseGenerator, ModelRegistry
 
 #     return gen, dis
 
+
 class CondDataParallel(torch.nn.DataParallel):
     label = None
     cond = False
+
     def forward(self, *inputs, **kwargs):
         if self.cond:
             return super().forward(*inputs, **kwargs, label=self.label)
         else:
             return super().forward(*inputs, **kwargs)
-        
+
 
 class GANWrapper:
-    def __init__(self, config: DotConfig, device: torch.device):
+    def __init__(self, config: DotConfig, device: torch.device, load_weights=True):
         self.config = config
         self.device = device
 
-        self.gen = ModelRegistry.create_model(
+        self.gen = ModelRegistry.create(
             config.generator.name, **config.generator.params
         ).to(device)
-        self.dis = ModelRegistry.create_model(
+        self.dis = ModelRegistry.create(
             config.discriminator.name, **config.discriminator.params
         ).to(device)
-
-        self.load_weights()
+        if load_weights:
+            self.load_weights()
 
         if config.dp:
-            self.gen = CondDataParallel(self.gen) #torch.nn.DataParallel(self.gen)
-            self.dis = CondDataParallel(self.dis) #torch.nn.DataParallel(self.dis)
+            self.gen = CondDataParallel(self.gen)
+            self.dis = CondDataParallel(self.dis)
             self.dis.transform = self.dis.module.transform
             self.dis.output_layer = self.dis.module.output_layer
             self.gen.inverse_transform = self.gen.module.inverse_transform
             self.gen.z_dim = self.gen.module.z_dim
             self.gen.sample_label = self.gen.module.sample_label
-
             if hasattr(self.gen.module, "label"):
                 self.gen.cond = self.gen.module.label
             if hasattr(self.dis.module, "label"):
                 self.dis.cond = self.dis.module.label
+            if hasattr(self.dis.module, "penult_layer"):
+                self.dis.penult_layer = self.dis.module.penult_layer
 
         self.eval()
         self.define_prior()
-
         self.label = None
+
+        for n, p in self.gen.named_parameters():
+            if 'weight' in n:
+                torch.nn.init.orthogonal_(p, gain=0.8)
 
     def load_weights(self):
         state_dict = torch.load(
@@ -193,7 +199,6 @@ class GANWrapper:
         else:
             self.gen.label = label
             self.dis.label = label
-
 
 
 def estimate_lipschitz_const(

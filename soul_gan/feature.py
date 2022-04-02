@@ -10,6 +10,9 @@ from torch.nn.functional import adaptive_avg_pool2d
 from torch.optim import SGD, Adam
 from torchvision import transforms
 
+from soul_gan.utils.cmd import CMD
+from soul_gan.utils.hooks import holder_hook, penult_layer_activation
+from soul_gan.utils.kernels import Kernel, KernelRegistry
 from soul_gan.utils.metrics import batch_inception
 
 
@@ -58,7 +61,6 @@ class Feature(ABC):
             if opt_params is not None
             else {"name": "SGD", "params": {"momentum": 0.0, "nesterov": False}}
         )
-
         self.callbacks = callbacks if callbacks else []
 
         if not inverse_transform:
@@ -176,7 +178,7 @@ class FeatureRegistry:
         return inner_wrapper
 
     @classmethod
-    def create_feature(cls, name: str, **kwargs) -> Feature:
+    def create(cls, name: str, **kwargs) -> Feature:
         exec_class = cls.registry[name]
         executor = exec_class(**kwargs)
         return executor
@@ -185,9 +187,9 @@ class FeatureRegistry:
 class SoulFeature(Feature):
     def __init__(
         self,
-        ref_stats_path=None,
         inverse_transform=None,
         callbacks=None,
+        ref_stats_path=None,
         device=0,
         ref_score=[torch.zeros(1)],
         **kwargs,
@@ -220,7 +222,6 @@ class SoulFeature(Feature):
         z: Optional[torch.FloatTensor] = None,
     ) -> Dict:
         # print(feature_out[0] + self.ref_feature[0].to(x.device), self.ref_feature[0])
-        # print(z)
         return {
             "residual": feature_out[0].mean(0).norm(dim=0).item(),
             "out": (feature_out[0].cpu().mean(0) + self.ref_feature[0]).mean(0).item(),
@@ -243,7 +244,9 @@ class SoulFeature(Feature):
     ) -> List[torch.FloatTensor]:
         result = self.apply(x)
         for i, ref in enumerate(self.ref_feature):
-            result[i] = result[i] - ref[None, :].to(x.device)
+            result[i] = torch.clip(result[i], min=-1e3, max=1e3) - ref[None, :].to(
+                x.device
+            )
         return result
 
 
@@ -251,8 +254,8 @@ class SoulFeature(Feature):
 class InceptionScoreFeature(Feature):
     def __init__(
         self,
-        callbacks: Optional[List] = None,
         inverse_transform=None,
+        callbacks: Optional[List] = None,
         mean=(0.485, 0.456, 0.406),
         std=(0.229, 0.224, 0.225),
         dp=False,
@@ -281,7 +284,6 @@ class InceptionScoreFeature(Feature):
     def init_weight(self):
         self.weight = [torch.zeros(1).to(self.device)]
 
-    # @staticmethod
     def get_useful_info(
         self, x: torch.FloatTensor, feature_out: List[torch.FloatTensor]
     ) -> Dict:
@@ -329,41 +331,6 @@ class DiscriminatorFeature(SoulFeature):
 
     def apply(self, x: torch.FloatTensor) -> List[torch.FloatTensor]:
         result = self.dis(x).view(-1, 1)
-
-        # print(result.mean())
-        return [result]
-
-
-@FeatureRegistry.register()
-class DiscriminatorFeature_v1(SoulFeature):
-    def __init__(
-        self, gan, inverse_transform=None, callbacks=None, ref_stats_path=None, **kwargs
-    ):
-        self.dis = gan.dis
-        super().__init__(
-            inverse_transform=inverse_transform,
-            callbacks=callbacks,
-            ref_stats_path=ref_stats_path,
-        )
-
-    def apply(self, x: torch.FloatTensor) -> List[torch.FloatTensor]:
-        self.activation = []
-
-        def get_activation(name):
-            def hook(model, input, output):
-                self.activation.append(output)
-
-            return hook
-
-        hook = self.dis.module.penult_layer.register_forward_hook(get_activation("penult_layer"))
-        self.dis(x)
-        hook.remove()
-        result = torch.cat([_.to(x.device) for _ in self.activation], 0).view(
-            len(x), -1
-        )
-        result = torch.sigmoid(result)
-        self.activation = []
-
         return [result]
 
 
@@ -375,25 +342,32 @@ class IdentityFeature(SoulFeature):
 
 
 @FeatureRegistry.register()
-class ClusterFeature(SoulFeature): # WIP
+class ClusterFeature(SoulFeature):
     def __init__(
         self,
         clusters_path,
-        gan=None,
-        ref_stats_path=None,
         inverse_transform=None,
         callbacks=None,
+        ref_stats_path=None,
+        *,
+        gan=None,
+        dis_emb=False,
         version: str = "0",
+        kernel="GaussianKernel",
+        n_moments=3,
         **kwargs,
     ):
         self.embedding_model = kwargs.get("embedding_model", None)
         self.device = kwargs.get("device", 0)
         clusters_info = np.load(Path(clusters_path).open("rb"))
-        self.centroids = torch.from_numpy(clusters_info["centroids"]).float()
+        # self.centroids = torch.from_numpy(clusters_info["centroids"]).float()
+        self.centroids = torch.from_numpy(clusters_info["closest_pts"]).float()
         self.sigmas = torch.from_numpy(clusters_info["sigmas"]).float()
         self.priors = torch.from_numpy(clusters_info["priors"]).float()
         self.n_clusters = len(clusters_info["sigmas"])
         self.version = version
+        self.dis_emb = dis_emb
+        self.n_moments = n_moments
         if gan:
             self.dis = gan.dis
         else:
@@ -416,151 +390,75 @@ class ClusterFeature(SoulFeature): # WIP
                 raise ValueError(f"Version {self.resnet_version} is not available")
 
             self.model = model(pretrained=True).to(self.device)
-            self.activation = None
-
-            def get_activation(name):
-                def hook(model, input, output):
-                    self.activation = output
-                return hook
-
-            self.model.avgpool.register_forward_hook(get_activation("avgpool"))
+            self.activation = []
+            self.model.avgpool.register_forward_hook(holder_hook(self.activation))
             self.model.eval()
             self.transform = transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
         else:
             self.model = None
 
-        self.ts = None
+        
+        if self.dis_emb:
+            self.embed_centr = penult_layer_activation(self.dis, self.centroids.to(self.device))
+        else:
+            self.embed_centr = self.centroids.to(self.device).reshape(len(self.centroids), -1)
 
-        self.h = torch.zeros_like(self.priors)  # N
-
+        #self.bandwidth = ((self.embed_centr ** 2).mean(0) ** 0.5) * 3
+        self.bandwidth = ((torch.norm(self.embed_centr[:, None, :] - self.embed_centr[None, :, :], dim=-1) ** 2).median() / 2) ** 0.5
+        print(self.bandwidth ** 2)
+        #d = self.embed_centr.shape[1]
+        #self.bandwidth = (((self.embed_centr[:, None, :] - self.embed_centr[None, :, :]) ** 2).reshape(-1, d).median(dim=0)[0] / 2 * d) ** 0.5
+        
         if self.version == "2":
-            centr = self.centroids.to(self.device)
-            theta = (centr.norm(dim=-1) ** 2).mean() / 10.0
-            self.kernel = lambda x, y: torch.exp(
-                -torch.norm(x - y, dim=-1, p=2) ** 2 / (2 * theta)
-            )
-            self.centr_self_corr = self.kernel(centr, centr)
-
-        if self.version == "3":
-            self.activation = []
-
-            def get_activation(name):
-                def hook(model, input, output):
-                    self.activation.append(output)
-
-                return hook
-
-            hook = self.dis.penult_layer.register_forward_hook(get_activation("penult_layer"))
-            self.dis(self.centroids.to(self.device))
-            self.embed_centr = torch.cat(
-                [_.to(self.device) for _ in self.activation], 0
-            ).view(*self.centroids.shape[:-1], -1)
-            self.activation = []
-            hook.remove()
-
-            theta = (self.embed_centr.norm(dim=-1) ** 2).mean() / 10.0
-            self.kernel = lambda x, y: torch.exp(
-                -torch.norm(x - y, dim=-1, p=2) ** 2 / (2 * theta)
-            )
-            self.centr_self_corr = self.kernel(self.embed_centr, self.embed_centr)
+            #self.bandwidth = (torch.norm(self.embed_centr[:, None] ** 2).mean(0) ** 0.5) * 3
+            self.kernel = KernelRegistry.create(kernel, bandwidth=self.bandwidth)
+            #self.centr_self_corr = self.kernel(self.embed_centr, self.embed_centr)
 
     def apply(self, x: torch.FloatTensor) -> List[torch.FloatTensor]:
         if self.model:
             self.model(self.transform(self.inverse_transform(x)))
-            out = self.activation.to(self.device)
-            self.activation = None
-            x = out.squeeze(3).squeeze(2)
+            x = torch.cat([_.to(self.device) for _ in self.activation], 0).view(
+                len(x), -1
+            )
+            self.activation = []
+        elif self.dis_emb:
+            x = penult_layer_activation(self.dis, x)
+        else:
+            x = x.reshape(len(x), -1)
 
         if self.version == "0":
+            x_ = x[:, None, :]
+            y_ = self.embed_centr[None, ...].to(
+                x.device
+            )
             dists = torch.norm(
-                x.reshape(x.shape[0], -1)[:, None, :]
-                - self.centroids[None, ...].to(x.device),
+                x_ - y_,
                 dim=-1,
             )
             sigmas = self.sigmas[None, :].to(x.device)
             result = torch.sigmoid(dists - 2 * sigmas)
-
         elif self.version == "1":
-            # #result = dists.min(1)[0].reshape(-1, 1) # - good but not for mode collapse
-            # result = torch.exp(-dists ** 2 / (2. * sigmas **2 + 1.)) * self.priors[None, :].to(x.device)
-            # #result = result / (result.sum(1)[:, None] + 1e-10) * self.n_clusters # self.n_clusters - constant for stability (helps for some reason)
-            # result = torch.log(result + 1e-10)
-            # result = dists
-            # result[dists < sigmas] = result[dists < sigmas]**2
-            # result = torch.exp(-result / sigmas)
-            # result = 1 * torch.exp(-(dists / h) ** 2)
-            # result = (dists / sigmas * sigmas.mean())[np.arange(len(x)), self.ts].reshape(-1, 1)
+            if isinstance(self.bandwidth, torch.Tensor) and self.bandwidth.ndim == 1:
+                gamma = self.bandwidth[None, None, :].to(x.device)
+            else:
+                gamma = self.bandwidth.item()
 
-            # rff
-            # w = torch.randn((len(x), len(self.centroids), self.centroids.shape[-1]), device=x.device)
-            # w = torch.randn((len(self.centroids), self.centroids.shape[-1]), device=x.device)
-            # prod = (self.w[None, :, :].to(x.device) * (x.reshape(len(x), -1)[:, None, :] - self.centroids[None, :, :].to(x.device))).sum(-1)
-            # prod = (self.w[None, :, :].to(x.device) * x.reshape(len(x), -1)[:, None, :]).sum(-1) / (self.w.norm(dim=-1).to(x.device) + 0.1)
-
-            # hyperbolic distance
-            # sigmas = self.sigmas[None, :].to(x.device)
-            # dists = torch.norm(
-            #     x.reshape(x.shape[0], -1)[:, None, :]
-            #     - self.centroids[None, ...].to(x.device),
-            #     dim=-1, p=1
-            # ) / 100
-            # # result = torch.exp(dists) # not bad         #torch.exp(-dists / sigmas)
-            # sigmas = self.sigmas[None, :, None].to(x.device)
-            # result = (torch.exp(-(x.reshape(len(x), -1)[:, None, :] - self.centroids[None, ...].to(x.device))**2) / 2. ).mean(1)
-            # result = torch.abs(x.reshape(len(x), -1)[:, None, :] - self.centroids[None, ...].to(x.device)).mean(-1) # not bad
-
-            result = (
-                (
-                    x.reshape(len(x), -1)[:, None, :]
-                    - self.centroids[None, ...].to(x.device)
-                )
-                ** 2
-            ).sum(-1)
-            result /= len(self.centroids)
-
+            result = ((
+                (x[:, None, :] - self.embed_centr[None, ...]) / gamma
+                ) ** 2).sum(-1) / 2
         elif self.version == "2":
-            x_flat = x.reshape(len(x), -1)
-            centr = self.centroids[None, :, :].to(x.device)
-            centr_corr = self.centr_self_corr[None, :].to(x.device)
             ids = np.random.choice(np.arange(len(x)), size=len(x), replace=True)
             result = (
-                self.kernel(x_flat, x_flat[ids].detach())[:, None]
-                + centr_corr
-                - 2.0 * self.kernel(x_flat[:, None, :], centr)
+                self.kernel(x, x[ids].detach())[:, None]
+                # + centr_corr
+                - 2.0 * self.kernel(x[:, None, :], self.embed_centr[None, ...])
             )
-
-            # x_norm = x.reshape(len(x), -1).norm(dim=-1)
-            # centr_norm = self.centroids.norm(dim=-1).to(x.device)
-            # z = 1. + 2 * dists**2 / (1. - x_norm**2)[:, None] / (1. - centr_norm**2)[None, :]
-            # result = torch.arccosh(z)
-            # sigmas = self.sigmas[None, :, None].to(x.device)
-            # result = ((torch.clip(x.reshape(x.shape[0], -1)[:, None, :] - self.centroids[None, ...].to(x.device), min=2*sigmas) / sigmas)**2).sum(1)
-            # result = torch.exp(-(x.reshape(x.shape[0], -1)[:, None, :] - self.centroids[None, ...].to(x.device))**2).mean(1)
-
-        elif self.version == "3":
-            def get_activation(name):
-                def hook(model, input, output):
-                    self.activation.append(output)
-                return hook
-
-            hook = self.dis.penult_layer.register_forward_hook(get_activation("penult_layer"))
-            self.activation = []
-            self.dis(x)
-            embed_x = torch.cat([_.to(x.device) for _ in self.activation], 0).view(
-                len(x), -1
-            )
-            self.activation = []
-            hook.remove()
-
-            ids = np.random.choice(np.arange(len(x)), size=len(x), replace=True)
-            result = (
-                self.kernel(embed_x, embed_x[ids].detach())[:, None]
-                + self.centr_self_corr[None, :].to(x.device)
-                - 2.0
-                * self.kernel(
-                    embed_x[:, None, :], self.embed_centr[None, :, :].to(x.device)
-                )
-            )
+        # elif self.version == "3":
+        #     result0 = (x[:, None, :] - self.embed_centr[None, ...]).reshape(len(x), -1)
+        #     result = result0
+            # m1 = x.mean(0)[None, None, :].detach()
+            # for moment_id in range(2, self.n_moments + 1):
+            #     result = torch.cat([result, result0 ** moment_id], 1)
         else:
             raise KeyError
 
@@ -571,19 +469,24 @@ class ClusterFeature(SoulFeature): # WIP
 class MMDFeature(SoulFeature):
     def __init__(
         self,
-        gan=None,
-        ref_stats_path=None,
+        dataloader,
         inverse_transform=None,
         callbacks=None,
+        ref_stats_path=None,
+        dp=False,
+        *,
+        kernel="GaussianKernel",
+        dis_emb=False,
+        gan=None,
         **kwargs,
     ):
+        self.dataloader = dataloader
+        self.dataiter = iter(dataloader)
         self.embedding_model = kwargs.get("embedding_model", None)
         self.device = kwargs.get("device", 0)
-
+        self.dis_emb = dis_emb
         if gan:
             self.dis = gan.dis
-        else:
-            self.dis = None
 
         super().__init__(
             ref_stats_path=ref_stats_path,
@@ -602,66 +505,190 @@ class MMDFeature(SoulFeature):
                 raise ValueError(f"Version {self.resnet_version} is not available")
 
             self.model = model(pretrained=True).to(self.device)
-            self.activation = None
-
-            def get_activation(name):
-                def hook(model, input, output):
-                    self.activation = output
-
-                return hook
-
-            self.model.avgpool.register_forward_hook(get_activation("avgpool"))
-            # if dp:
-            #     self.model = torch.nn.DataParallel(self.model)
+            self.activation = []
+            self.model.avgpool.register_forward_hook(holder_hook(self.activation))
+            if dp:
+                self.model = torch.nn.DataParallel(self.model)
             self.model.eval()
             self.transform = transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
         else:
             self.model = None
 
-        theta = (self.embed_centr.norm(dim=-1) ** 2).mean() / 10.0
-        self.kernel = lambda x, y: torch.exp(
-            -torch.norm(x - y, dim=-1, p=2) ** 2 / (2 * theta)
-        )
-        self.centr_self_corr = self.kernel(self.embed_centr, self.embed_centr)
+        normalazer = 0
+        n_iter = 10
+        
+        for _ in range(n_iter):
+            try:
+                x = next(self.dataiter).to(self.device)
+            except StopIteration:
+                self.dataiter = iter(dataloader)
+                x = next(self.dataiter).to(self.device)
+            if self.model:
+                self.model(self.transform(self.inverse_transform(x)))
+                x = torch.cat([_.to(x.device) for _ in self.activation], 0).view(
+                    len(x), -1
+                )
+                self.activation = []
+            elif self.dis_emb:
+                x = penult_layer_activation(self.dis, x)
+            else:
+                x = x.reshape(len(x), -1)
+            #normalazer += (x ** 2).mean(0) / n_iter
+            normalazer += (torch.norm(x[:, None, :] - x[None, ...], dim=-1) ** 2).median()
+            #d = x.shape[1]
+            #normalazer += ((x[:, None, :] - x[None, ...]) ** 2 * d).reshape(-1, d).median(dim=0)[0]
+        #normalazer = normalazer ** .5
+        normalazer = (normalazer / n_iter / 2.) ** .5
+
+        self.kernel = KernelRegistry.create(kernel, bandwidth=normalazer) #bandwidth=3 * normalazer)
 
     def apply(self, x: torch.FloatTensor) -> List[torch.FloatTensor]:
+        try:
+            batch = next(self.dataiter)
+        except StopIteration:
+            self.dataiter = iter(self.dataloader)
+            batch = next(self.dataiter)
+        batch = batch.to(x.device)
         if self.model:
             self.model(self.transform(self.inverse_transform(x)))
-            out = self.activation.to(self.device)
-            self.activation = None
-            x = out.squeeze(3).squeeze(2)
+            x = torch.cat([_.to(x.device) for _ in self.activation], 0).view(len(x), -1)
+            self.activation = []
 
-            def get_activation(name):
-                def hook(model, input, output):
-                    self.activation.append(output)
-
-                return hook
-
-        embed_x = torch.cat([_.to(x.device) for _ in self.activation], 0).view(
-            len(x), -1
-        )
+            self.model(batch)
+            batch = torch.cat([_.to(batch.device) for _ in self.activation], 0).view(
+                len(batch), -1
+            )
+            self.activation = []
+        elif self.dis_emb:
+            x = penult_layer_activation(self.dis, x)
+            batch = penult_layer_activation(self.dis, batch)
+        else:
+            x = x.reshape(len(x), -1)
+            batch = batch.reshape(len(batch), -1)
 
         ids = np.random.choice(np.arange(len(x)), size=len(x), replace=True)
+
         result = (
-            self.kernel(embed_x, embed_x[ids].detach())[:, None]
-            + self.centr_self_corr[None, :].to(x.device)
-            - 2.0
-            * self.kernel(
-                embed_x[:, None, :], self.embed_centr[None, :, :].to(x.device)
+            (
+                self.kernel(x, x[ids].detach())[:, None]
+                - 2.0 * self.kernel(x[:, None, :], batch[None, :, :].to(x.device))
             )
+            .mean(1)
+            .unsqueeze(1)
         )
 
         return [result]
 
 
 @FeatureRegistry.register()
-class PCAFeature(SoulFeature): # REMOVE
+class CMDFeature(SoulFeature):
+    def __init__(
+        self,
+        dataloader,
+        inverse_transform=None,
+        callbacks=None,
+        ref_stats_path=None,
+        dp=False,
+        *,
+        gan=None,
+        dis_emb=False,
+        n_moments=3,
+        version=0,
+        **kwargs,
+    ):
+        self.dataloader = dataloader
+        self.dataiter = iter(dataloader)
+        self.embedding_model = kwargs.get("embedding_model", None)
+        self.device = kwargs.get("device", 0)
+        self.version = version
+        self.dis_emb = dis_emb
+        if gan:
+            self.dis = gan.dis
+        super().__init__(
+            ref_stats_path=ref_stats_path,
+            inverse_transform=inverse_transform,
+            callbacks=callbacks,
+            **kwargs,
+        )
+        if self.embedding_model:
+            if self.embedding_model == "resnet34":
+                model = torchvision.models.resnet34
+            elif self.embedding_model == "resnet50":
+                model = torchvision.models.resnet50
+            elif self.embedding_model == "resnet101":
+                model = torchvision.models.resnet101
+            else:
+                raise ValueError(f"Version {self.resnet_version} is not available")
+
+            self.model = model(pretrained=True).to(self.device)
+            self.activation = []
+            self.model.avgpool.register_forward_hook(holder_hook(self.activation))
+            if dp:
+                self.model = torch.nn.DataParallel(self.model)
+            self.model.eval()
+            self.transform = transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+        else:
+            self.model = None
+
+        self.cmd = CMD(n_moments=n_moments)
+
+        # self.normalazer = None
+        self.max = None
+        self.min = None
+        n_iter = 10
+        for _ in range(n_iter):
+            try:
+                x = next(self.dataiter).to(self.device)
+            except StopIteration:
+                self.dataiter = iter(dataloader)
+                x = next(self.dataiter).to(self.device)
+            if self.model:
+                self.model(self.transform(self.inverse_transform(x)))
+                x = torch.cat([_.to(x.device) for _ in self.activation], 0).view(
+                    len(x), -1
+                )
+                self.activation = []
+            elif self.dis_emb:
+                x = penult_layer_activation(self.dis, x)
+            else:
+                x = x.reshape(len(x), -1)
+            #self.normalazer += (x ** 2).mean(0)[None, :] / n_iter
+            if self.max is None:
+                self.max = x.max(dim=0)[0]
+            else:
+                self.max = torch.max(self.max, x.max(dim=0)[0])
+            if self.min is None:
+                self.min = x.min(dim=0)[0]
+            else:
+                self.min = torch.min(self.min, x.max(dim=0)[0])
+        #self.normalazer = self.normalazer ** 0.5
+        #self.normalazer *= 10
+
+    def apply(self, x: torch.FloatTensor) -> List[torch.FloatTensor]:
+        if self.model:
+            self.model(self.transform(self.inverse_transform(x)))
+            x = torch.cat([_.to(x.device) for _ in self.activation], 0).view(len(x), -1)
+            self.activation = []
+        elif self.dis_emb:
+            x = penult_layer_activation(self.dis, x)
+        else:
+            x = x.reshape(len(x), -1)
+
+        result = self.cmd.moments(x / (self.max - self.min)[None, ...])
+
+        return [result]
+
+
+@FeatureRegistry.register()
+class PCAFeature(SoulFeature):  # REMOVE
     def __init__(
         self,
         info_path,
-        ref_stats_path=None,
         inverse_transform=None,
         callbacks=None,
+        ref_stats_path=None,
+        dp=False,
+        *,
         version=0,
         **kwargs,
     ):
@@ -690,17 +717,10 @@ class PCAFeature(SoulFeature): # REMOVE
                 raise ValueError(f"Version {self.resnet_version} is not available")
 
             self.model = model(pretrained=True).to(self.device)
-            self.activation = None
-
-            def get_activation(name):
-                def hook(model, input, output):
-                    self.activation = output
-
-                return hook
-
-            self.model.avgpool.register_forward_hook(get_activation("avgpool"))
-            # if dp:
-            #     self.model = torch.nn.DataParallel(self.model)
+            self.activation = []
+            self.model.avgpool.register_forward_hook(holder_hook(self.activation))
+            if dp:
+                self.model = torch.nn.DataParallel(self.model)
             self.model.eval()
             self.transform = transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
         else:
@@ -711,9 +731,8 @@ class PCAFeature(SoulFeature): # REMOVE
     def apply(self, x: torch.FloatTensor) -> List[torch.FloatTensor]:
         if self.model:
             self.model(self.transform(self.inverse_transform(x)))
-            out = self.activation.to(self.device)
-            self.activation = None
-            x = out.squeeze(3).squeeze(2)
+            x = torch.cat([_.to(x.device) for _ in self.activation], 0).view(len(x), -1)
+            self.activation = []
 
         result = (
             (x.reshape(len(x), -1) - self.mean[None, :].to(x.device))
@@ -727,13 +746,14 @@ class PCAFeature(SoulFeature): # REMOVE
 
 
 @FeatureRegistry.register()
-class KernelPCAFeature(SoulFeature): # REMOVE
+class KernelPCAFeature(SoulFeature):  # REMOVE
     def __init__(
         self,
         info_path,
-        ref_stats_path=None,
         inverse_transform=None,
         callbacks=None,
+        ref_stats_path=None,
+        *,
         version=0,
         **kwargs,
     ):
@@ -762,17 +782,10 @@ class KernelPCAFeature(SoulFeature): # REMOVE
                 raise ValueError(f"Version {self.resnet_version} is not available")
 
             self.model = model(pretrained=True).to(self.device)
-            self.activation = None
-
-            def get_activation(name):
-                def hook(model, input, output):
-                    self.activation = output
-
-                return hook
-
-            self.model.avgpool.register_forward_hook(get_activation("avgpool"))
-            # if dp:
-            #     self.model = torch.nn.DataParallel(self.model)
+            self.activation = []
+            self.model.avgpool.register_forward_hook(holder_hook(self.activation))
+            if dp:
+                self.model = torch.nn.DataParallel(self.model)
             self.model.eval()
             self.transform = transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
         else:
@@ -783,9 +796,8 @@ class KernelPCAFeature(SoulFeature): # REMOVE
     def apply(self, x: torch.FloatTensor) -> List[torch.FloatTensor]:
         if self.model:
             self.model(self.transform(self.inverse_transform(x)))
-            out = self.activation.to(self.device)
-            self.activation = None
-            x = out.squeeze(3).squeeze(2)
+            x = torch.cat([_.to(x.device) for _ in self.activation], 0).view(len(x), -1)
+            self.activation = []
         device = x.device
         K = torch.exp(
             -self.gamma
@@ -800,9 +812,9 @@ class KernelPCAFeature(SoulFeature): # REMOVE
 
 
 @FeatureRegistry.register()
-class DiscriminatorGradientFeature(SoulFeature): # REMOVE
+class DiscriminatorGradientFeature(SoulFeature):  # REMOVE
     def __init__(
-        self, gan, ref_stats_path=None, inverse_transform=None, callbacks=None, **kwargs
+        self, gan, inverse_transform=None, callbacks=None, ref_stats_path=None, **kwargs
     ):
         self.dis = gan.dis
         super().__init__(
@@ -819,73 +831,6 @@ class DiscriminatorGradientFeature(SoulFeature): # REMOVE
             len(x), -1
         )
         return [result]
-
-
-# @FeatureRegistry.register()
-# class IMLEFeature(SoulFeature): # REMOVE
-#     def __init__(
-#         self,
-#         clusters_path,
-#         ref_stats_path=None,
-#         inverse_transform=None,
-#         callbacks=None,
-#         **kwargs,
-#     ):
-#         self.embedding_model = kwargs.get("embedding_model", None)
-#         self.device = kwargs.get("device", 0)
-#         clusters_info = np.load(Path(clusters_path).open("rb"))
-#         self.centroids = torch.from_numpy(clusters_info["centroids"]).float()
-#         self.sigmas = torch.from_numpy(clusters_info["sigmas"]).float()
-#         self.n_clusters = len(clusters_info["sigmas"])
-
-#         super().__init__(
-#             ref_stats_path=ref_stats_path,
-#             inverse_transform=inverse_transform,
-#             callbacks=callbacks,
-#             **kwargs,
-#         )
-#         if self.embedding_model:
-#             if self.embedding_model == "resnet34":
-#                 model = torchvision.models.resnet34
-#             elif self.embedding_model == "resnet50":
-#                 model = torchvision.models.resnet50
-#             elif self.embedding_model == "resnet101":
-#                 model = torchvision.models.resnet101
-#             else:
-#                 raise ValueError(f"Version {self.resnet_version} is not available")
-
-#             self.model = model(pretrained=True).to(self.device)
-#             self.activation = None
-
-#             def get_activation(name):
-#                 def hook(model, input, output):
-#                     self.activation = output
-
-#                 return hook
-
-#             self.model.avgpool.register_forward_hook(get_activation("avgpool"))
-#             # if dp:
-#             #     self.model = torch.nn.DataParallel(self.model)
-#             self.model.eval()
-#             self.transform = transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
-#         else:
-#             self.model = None
-
-#     def apply(self, x: torch.FloatTensor) -> List[torch.FloatTensor]:
-#         if self.model:
-#             self.model(self.transform(self.inverse_transform(x)))
-#             out = self.activation.to(self.device)
-#             self.activation = None
-#             x = out.squeeze(3).squeeze(2)
-
-#         dists = torch.norm(
-#             x.reshape(x.shape[0], -1)[:, None, :]
-#             - self.centroids[None, ...].to(x.device),
-#             dim=-1,
-#         )
-#         result = torch.exp(-2 * dists ** 2)
-
-#         return [result]
 
 
 @FeatureRegistry.register()
@@ -949,11 +894,11 @@ class InceptionV3MeanFeature(Feature):
 class DumbFeature(Feature):
     def __init__(
         self,
-        n_features: int = 1,
         callbacks: Optional[List] = None,
         inverse_transform=None,
         **kwargs,
     ):
+        n_features = 1
         super().__init__(
             n_features=n_features,
             callbacks=callbacks,
@@ -988,11 +933,94 @@ class DumbFeature(Feature):
 
 
 @FeatureRegistry.register()
+class EfficientNetFeature(SoulFeature):
+    def __init__(
+        self,
+        inverse_transform=None,
+        callbacks=None,
+        ref_stats_path=None,
+        dp=False,
+        **kwargs,
+    ):
+        super().__init__(
+            ref_stats_path=ref_stats_path,
+            callbacks=callbacks,
+            inverse_transform=inverse_transform,
+            **kwargs,
+        )
+        self.model = torchvision.models.efficientnet_b3(pretrained=True).to(self.device)
+        self.activation = []
+        self.model.avgpool.register_forward_hook(holder_hook(self.activation))
+        if dp:
+            self.model = torch.nn.DataParallel(self.model)
+        self.model.eval()
+        self.transform = transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+
+    def apply(self, x: torch.FloatTensor) -> List[torch.FloatTensor]:
+        x = self.inverse_transform(self.transform(x))
+        self.model(x)
+        out = torch.cat([_.to(self.device) for _ in self.activation], 0).view(
+            len(x), -1
+        )
+        self.activation = []
+
+        return [out]
+
+
+@FeatureRegistry.register()
+class ResnetFeature(SoulFeature):
+    def __init__(
+        self,
+        inverse_transform=None,
+        callbacks=None,
+        ref_stats_path=None,
+        dp=False,
+        **kwargs,
+    ):
+        self.resnet_version = kwargs.get("resnet_version", 34)
+
+        super().__init__(
+            ref_stats_path=ref_stats_path,
+            callbacks=callbacks,
+            inverse_transform=inverse_transform,
+            **kwargs,
+        )
+        if self.resnet_version == 18:
+            model = torchvision.models.resnet18
+        elif self.resnet_version == 34:
+            model = torchvision.models.resnet34
+        elif self.resnet_version == 50:
+            model = torchvision.models.resnet50
+        elif self.resnet_version == 101:
+            model = torchvision.models.resnet101
+        else:
+            raise ValueError(f"Version {self.resnet_version} is not available")
+
+        self.model = model(pretrained=True).to(self.device)
+        self.activation = []
+        self.model.avgpool.register_forward_hook(holder_hook(self.activation))
+        if dp:
+            self.model = torch.nn.DataParallel(self.model)
+        self.model.eval()
+        self.transform = transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+
+    def apply(self, x: torch.FloatTensor) -> List[torch.FloatTensor]:
+        x = self.inverse_transform(self.transform(x))
+        self.model(x)
+        out = torch.cat([_.to(self.device) for _ in self.activation], 0).view(
+            len(x), -1
+        )
+        self.activation = []
+
+        return [out]
+
+
+@FeatureRegistry.register()
 class SumFeature(Feature):
     def __init__(
         self,
-        callbacks: Optional[List] = None,
         inverse_transform=None,
+        callbacks: Optional[List] = None,
         **kwargs,
     ):
         super().__init__(
@@ -1006,7 +1034,7 @@ class SumFeature(Feature):
             feature_kwargs = feature["params"]
             if "gan" in feature["params"]:
                 feature_kwargs["gan"] = kwargs.get("gan")
-            feature = FeatureRegistry.create_feature(
+            feature = FeatureRegistry.create(
                 feature["name"],
                 inverse_transform=inverse_transform,
                 **feature_kwargs,
@@ -1052,118 +1080,3 @@ class SumFeature(Feature):
         for feature in self.features:
             feature.weight_up(out[k : k + feature.n_features], step)
             k += feature.n_features
-
-
-@FeatureRegistry.register()
-class EfficientNetFeature(Feature):
-    def __init__(self, inverse_transform=None, callbacks=None, dp=False, **kwargs):
-        self.data_stat_path = kwargs.get("data_stat_path")
-        mean = torch.from_numpy(np.load(Path(self.data_stat_path))["mu"]).to(
-            self.device
-        )
-        self.feature_dim = mean.shape[0]
-        self.device = kwargs.get("device", 0)
-        super().__init__(
-            n_features=1,
-            callbacks=callbacks,
-            inverse_transform=inverse_transform,
-        )
-        self.model = torchvision.models.efficientnet_b3(pretrained=True).to(self.device)
-        self.activation = None
-
-        def get_activation(name):
-            def hook(model, input, output):
-                self.activation = output
-
-            return hook
-
-        self.model.avgpool.register_forward_hook(get_activation("avgpool"))
-        # if dp:
-        #     self.model = torch.nn.DataParallel(self.model)
-        self.model.eval()
-        self.transform = transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
-
-        self.ref_feature = [mean]
-
-    def init_weight(self):
-        self.weight = [torch.zeros(self.feature_dim, device=self.device)]
-
-    def get_useful_info(
-        self, x: torch.FloatTensor, feature_out: List[torch.FloatTensor]
-    ) -> Dict:
-        return {
-            "feature": feature_out[0].mean().item()
-            + self.ref_feature[0].mean().item(),  # noqa: W503
-            f"weight_{self.__class__.__name__}": torch.norm(self.weight[0]).item(),
-            "imgs": self.inverse_transform(x).detach().cpu().numpy(),
-        }
-
-    @Feature.invoke_callbacks
-    @Feature.average_feature
-    def __call__(self, x) -> List[torch.FloatTensor]:
-        x = self.inverse_transform(x)
-        x = self.transform(x)
-        self.model(x)
-        out = self.activation.to(self.device)
-        self.activation = None
-
-        out = [out.squeeze(3).squeeze(2)]
-
-        for i in range(len(out)):
-            out[i] = (out[i] - self.ref_feature[i][None, :]).float()
-
-        return out
-
-
-@FeatureRegistry.register()
-class ResnetFeature(SoulFeature):
-    def __init__(
-        self,
-        inverse_transform=None,
-        ref_stats_path=None,
-        callbacks=None,
-        dp=False,
-        **kwargs,
-    ):
-        self.resnet_version = kwargs.get("resnet_version", 34)
-
-        super().__init__(
-            ref_stats_path=ref_stats_path,
-            callbacks=callbacks,
-            inverse_transform=inverse_transform,
-            **kwargs,
-        )
-        if self.resnet_version == 18:
-            model = torchvision.models.resnet18
-        elif self.resnet_version == 34:
-            model = torchvision.models.resnet34
-        elif self.resnet_version == 50:
-            model = torchvision.models.resnet50
-        elif self.resnet_version == 101:
-            model = torchvision.models.resnet101
-        else:
-            raise ValueError(f"Version {self.resnet_version} is not available")
-
-        self.model = model(pretrained=True).to(self.device)
-        self.activation = None
-
-        def get_activation(name):
-            def hook(model, input, output):
-                self.activation = output
-
-            return hook
-
-        self.model.avgpool.register_forward_hook(get_activation("avgpool"))
-        # if dp:
-        #     self.model = torch.nn.DataParallel(self.model)
-        self.model.eval()
-        self.transform = transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
-
-    def apply(self, x: torch.FloatTensor) -> List[torch.FloatTensor]:
-        x = self.inverse_transform(self.transform(x))
-        self.model(x)
-        out = self.activation.to(self.device)
-        self.activation = None
-        out = [out.squeeze(3).squeeze(2)]
-
-        return out

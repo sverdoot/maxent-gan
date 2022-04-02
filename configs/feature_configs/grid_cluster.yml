@@ -6,6 +6,8 @@ feature: &feature
     clusters_path: data/25_gaussians_modes.npz
     ref_stats_path: stats/ClusterFeature_25_gaussians.npz
     version: *version
+    kernel: *kernel
+    dis_emb: *dis_emb
     opt_params:
       name:
         SGD

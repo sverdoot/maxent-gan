@@ -26,6 +26,8 @@ plt.rc("figure", titlesize=BIGGER_SIZE)  # fontsize of the figure title
 
 
 def plot_res(log_path, config, arange):
+    Path(log_path, "figs").mkdir(exist_ok=True)
+
     try:
         is_values = np.loadtxt(Path(log_path, "is_values.txt"))[:, 0]
         fig = plt.figure()

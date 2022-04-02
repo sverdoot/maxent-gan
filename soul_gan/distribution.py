@@ -33,7 +33,7 @@ class DistributionRegistry:
         return inner_wrapper
 
     @classmethod
-    def create_distribution(cls, name: str, **kwargs) -> Distribution:
+    def create(cls, name: str, **kwargs) -> Distribution:
         exec_class = cls.registry[name]
         executor = exec_class(**kwargs)
         return executor

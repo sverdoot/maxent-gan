@@ -18,7 +18,8 @@ def time_comp(fun):
         # w = model['weight']
         # feature = model['feature']
 
-        print("Time elapsed: ", "{:.2f}".format(dt) + "s")
+        if kwargs.get('verbose'):
+            print("Time elapsed: ", "{:.2f}".format(dt) + "s")
         # fd_name = date + '_' + params['name']
         # save_end(x, w, params, fd_name, dt, feature)
         # save_model(model, fd_name)

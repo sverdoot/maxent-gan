@@ -1,0 +1,16 @@
+feature: &feature
+  name: ClusterFeature
+  params: 
+    device: *device
+    clusters_path: data/stacked_mnist/kmeans.npz
+    ref_stats_path: stats/ClusterFeature_stacked_mnist.npz
+    gan: null
+    version: *version
+    kernel: *kernel
+    opt_params:
+      name:
+        SGD
+      params:  
+        momentum: 0.0 #0.1
+        nesterov: False #True
+        weight_decay: 0.01 #0.025 #0.075 #1

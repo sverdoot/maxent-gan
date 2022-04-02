@@ -2,16 +2,19 @@ import argparse
 import datetime
 import sys
 from pathlib import Path
+import subprocess
 
 import numpy as np
 import ruamel.yaml as yaml
 import torch
 import torchvision
+from torch.utils.data import DataLoader
 
 
 sys.path.append("studiogan")  # noqa: E402
 
 import wandb
+from vizualization.plot_results import plot_res
 
 from soul_gan.datasets.utils import get_dataset
 from soul_gan.distribution import DistributionRegistry
@@ -35,29 +38,91 @@ from soul_gan.utils.metrics.inception_score import (
 def parse_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument("configs", type=str, nargs="+")
-    parser.add_argument("--thermalize", action="store_true")
+    # parser.add_argument("--thermalize", action="store_true")
     parser.add_argument("--group", type=str)
     parser.add_argument("--seed", type=int)
-    parser.add_argument("--lipschitz_step_size", action="store_true")
+    # parser.add_argument("--lipschitz_step_size", action="store_true")
     parser.add_argument("--step_size_mul", type=float, default=1.0)
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--step_size", type=float)
     parser.add_argument("--weight_step", type=float)
     parser.add_argument("--feature_version", type=int)
+    parser.add_argument("--dis_emb", action='store_true')
+    parser.add_argument(
+        "--kernel",
+        type=str,
+        choices=["GaussianKernel", "LinearKernel", "PolynomialKernel"],
+    )
     parser.add_argument("--suffix", type=str)
 
     args = parser.parse_args()
     return args
 
 
-def main(config: DotConfig, device: torch.device, group: str):
+def create_feature(config, gan, dataloader, dataset, save_dir, device):
+    feature_callbacks = []
+    callbacks = config.callbacks.feature_callbacks
+    if callbacks:
+        for _, callback in callbacks.items():
+            params = callback.params.dict
+            # HACK
+            if "gan" in params:
+                params["gan"] = gan
+            if "save_dir" in params:
+                params["save_dir"] = save_dir
+            if "np_dataset" in params:
+                np_dataset = np.concatenate([gan.inverse_transform(batch).numpy() for batch in dataloader], 0)
+                params["np_dataset"] = np_dataset
+            feature_callbacks.append(
+                CallbackRegistry.create(callback.name, **params)
+            )
+
+    feature_kwargs = config.sample_params.feature.params.dict
     # HACK
-    # suffix = (
-    #     f'{"_therm" if config.thermalize else ""}'
-    #     + f'{"_lips" if config.lipschitz_step_size else ""}'
-    # )
+    if "gan" in config.sample_params.feature.params:
+        feature_kwargs["gan"] = gan
+    if "dataloader" in config.sample_params.feature.params:
+        feature_kwargs["dataloader"] = dataloader
+
+    feature = FeatureRegistry.create(
+        config.sample_params.feature.name,
+        callbacks=feature_callbacks,
+        inverse_transform=gan.inverse_transform,
+        **feature_kwargs,
+    )
+
+    if config.sample_params.feature.params.ref_stats_path:
+        feature.eval = True
+        stats = evaluate(
+            feature,
+            dataset,
+            config.batch_size,
+            device,
+            Path(config.sample_params.feature.params.ref_stats_path),
+        )
+        print(stats)
+        feature = FeatureRegistry.create(
+            config.sample_params.feature.name,
+            callbacks=feature_callbacks,
+            inverse_transform=gan.inverse_transform,
+            **feature_kwargs,
+        )
+    feature.eval = False
+    return feature
+
+
+def main(config: DotConfig, device: torch.device, group: str):
     suffix = f"_{config.suffix}" if config.suffix else ""
     dir_suffix = f"_{config.distribution.name}"
+
+    dataset_stuff = get_dataset(
+        config.gan_config.dataset,
+        mean=config.gan_config.train_transform.Normalize.mean,
+        std=config.gan_config.train_transform.Normalize.std,
+    )
+    dataset = dataset_stuff["dataset"]
+
+    dataloader = DataLoader(dataset, batch_size=config.data_batch_size)
 
     # sample
     if config.sample_params.sample:
@@ -81,76 +146,18 @@ def main(config: DotConfig, device: torch.device, group: str):
             Path(save_dir, "gan_config.yml").open("w"),
         )
 
-        feature_callbacks = []
-        callbacks = config.callbacks.feature_callbacks
-        if callbacks:
-            for _, callback in callbacks.items():
-                params = callback.params.dict
-                # HACK
-                if "gan" in params:
-                    params["gan"] = gan
-                if "save_dir" in params:
-                    params["save_dir"] = save_dir
-                feature_callbacks.append(
-                    CallbackRegistry.create_callback(callback.name, **params)
-                )
-
-        feature_kwargs = config.sample_params.feature.params.dict
-
-        # HACK
-        if "gan" in config.sample_params.feature.params:
-            feature_kwargs["gan"] = gan
-
-        feature = FeatureRegistry.create_feature(
-            config.sample_params.feature.name,
-            callbacks=feature_callbacks,
-            inverse_transform=gan.inverse_transform,
-            **feature_kwargs,
-        )
-
-        if config.sample_params.feature.params.ref_stats_path:
-            dataset = get_dataset(
-                config.gan_config.dataset,
-                mean=config.gan_config.train_transform.Normalize.mean,
-                std=config.gan_config.train_transform.Normalize.std,
-            )
-
-            feature.eval = True
-            stats = evaluate(
-                feature,
-                dataset,
-                config.batch_size,
-                device,
-                Path(config.sample_params.feature.params.ref_stats_path),
-            )
-            print(stats)
-            feature = FeatureRegistry.create_feature(
-                config.sample_params.feature.name,
-                callbacks=feature_callbacks,
-                inverse_transform=gan.inverse_transform,
-                **feature_kwargs,
-            )
-        feature.eval = False
+        feature = create_feature(config, gan, dataloader, dataset, save_dir, device)
 
         # HACK
         if (
-            "fid" in callbacks
+            "fid" in config.callbacks.feature_callbacks
             and config.sample_params.feature.name  # noqa: W503
             == "InceptionV3MeanFeature"  # noqa: W503
         ):
-            idx = callbacks.keys().index("fid")
+            idx = config.callbacks.feature_callbacks.keys().index("fid")
             feature.callbacks[idx].model = feature.model
 
-        # # HACK
-        # if (
-        #     "WandbCallback" in config.callbacks
-        #     and config.sample.feature.name  # noqa: W503
-        #     == "InceptionV3MeanFeature"  # noqa: W503
-        # ):
-        #     idx = config.callbacks.keys().index("FIDCallback")
-        #     feature.callbacks[idx].model = feature.model
-
-        ref_dist = DistributionRegistry.create_distribution(
+        ref_dist = DistributionRegistry.create(
             config.sample_params.distribution.name, gan=gan
         )
 
@@ -178,7 +185,7 @@ def main(config: DotConfig, device: torch.device, group: str):
 
             if config.resume:
                 latents_dir = Path(save_dir, "latents")
-                start_step_id = len(list(latents_dir.glob("*.npy")))  # - 1
+                start_step_id = len(list(latents_dir.glob("*.npy")))
                 config.sample_params.params.dict["n_steps"] = int(
                     config.sample_params.params.n_steps
                 ) - int((start_step_id - 1) * config.sample_params.save_every)
@@ -341,11 +348,6 @@ def main(config: DotConfig, device: torch.device, group: str):
     if config.callbacks.afterall_callbacks:
         gan = GANWrapper(config.gan_config, device)
 
-        # x_final_file = Path(
-        #     results_dir,
-        #     "images",
-        #     f"{config.n_steps}.npy",
-        # )
         label_file = Path(
             results_dir,
             "labels.npy",
@@ -371,16 +373,21 @@ def main(config: DotConfig, device: torch.device, group: str):
             # HACK
             if "gan" in params:
                 params["gan"] = gan
-            # if "log_norm_const" in params:
-            #     params["log_norm_const"] = log_norm_const
-            afterall_callbacks.append(
-                CallbackRegistry.create_callback(callback.name, **params)
-            )
+            if "np_dataset" in params:
+                np_dataset = np.concatenate([gan.inverse_transform(batch).numpy() for batch in dataloader], 0)
+                params["np_dataset"] = np_dataset
+            if "save_dir" in params:
+                params["save_dir"] = results_dir 
+            if "modes" in params:
+                params["modes"] = dataset_stuff["modes"]
+
+
+            afterall_callbacks.append(CallbackRegistry.create(callback.name, **params))
 
         if config.resume:
             results = np.loadtxt(Path(results_dir, "callback_results.txt")).tolist()
         else:
-            results = [[] for _ in afterall_callbacks]  # []
+            results = [[] for _ in afterall_callbacks]
 
         for step in range(
             start_step_id * config.every,
@@ -410,6 +417,7 @@ def main(config: DotConfig, device: torch.device, group: str):
                 if val is not None:
                     results[callback_id].append(val)
         results = np.array(results)
+
         np.savetxt(
             Path(
                 results_dir,
@@ -480,10 +488,13 @@ def main(config: DotConfig, device: torch.device, group: str):
             file_path.unlink()
         Path(results_dir, "labels.npy").unlink()
 
+    plot_res(
+        results_dir, config.gan_config, np.arange(0, config.n_steps + 1, config.every)
+    )
+
 
 if __name__ == "__main__":
     args = parse_arguments()
-    import subprocess
 
     params = yaml.round_trip_load(Path(args.configs[0]).open("r"))
     if args.weight_step:
@@ -505,10 +516,20 @@ if __name__ == "__main__":
             args.feature_version,
             anchor=params["version"].anchor.value,
         )
+    if args.kernel:
+        params["kernel"] = yaml.scalarstring.LiteralScalarString(
+            args.kernel,
+            anchor=params["kernel"].anchor.value,
+        )
+    if args.dis_emb:
+        params["dis_emb"] = yaml.scalarstring.LiteralScalarString(
+            args.dis_emb,
+            anchor=params["dis_emb"].anchor.value,
+        )
     if args.suffix:
         params["suffix"] = yaml.scalarstring.LiteralScalarString(
             args.suffix
-        )  # , anchor=params['suffix'].anchor.value)
+        )
     print(yaml.round_trip_dump(params))
 
     proc = subprocess.Popen("/bin/bash", stdin=subprocess.PIPE, stdout=subprocess.PIPE)
@@ -530,8 +551,8 @@ if __name__ == "__main__":
     if args.seed:
         config.seed = args.seed
     config.file_name = Path(args.configs[0]).name
-    config.thermalize = args.thermalize
-    config.lipschitz_step_size = args.lipschitz_step_size
+    # config.thermalize = args.thermalize
+    # config.lipschitz_step_size = args.lipschitz_step_size
     config.resume = args.resume
 
     device = torch.device(config.device if torch.cuda.is_available() else "cpu")

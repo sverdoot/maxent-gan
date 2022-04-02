@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 # python run.py configs/exp_configs/dcgan-cluster.yml configs/targets/prior.yml configs/gan_configs/cifar-10-dcgan.yml  configs/feature_configs/cluster.yml configs/common.yml
 
 # python run.py configs/exp_configs/wgan-gp-cluster.yml configs/targets/prior.yml configs/gan_configs/cifar-10-wgan-gp.yml  configs/feature_configs/cluster.yml configs/common.yml

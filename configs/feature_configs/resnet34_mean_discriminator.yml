@@ -3,6 +3,7 @@ sub_dir: &sub_dir test
 n_steps: &n_steps 1000
 every: &every 10
 seed: null
+
 device: &device cuda
 
 sample: &sample_params

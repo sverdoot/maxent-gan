@@ -2,10 +2,11 @@ from torch import nn
 
 from soul_gan.models.base import BaseDiscriminator, BaseGenerator, ModelRegistry
 
-    
+
 @ModelRegistry.register()
 class PresDCGANGenerator(BaseGenerator):
-    def __init__(self,
+    def __init__(
+        self,
         ngpu=1,
         nc=3,
         nz=100,
@@ -18,7 +19,7 @@ class PresDCGANGenerator(BaseGenerator):
         self.ngpu = ngpu
         self.main = nn.Sequential(
             # input is Z, going into a convolution
-            nn.ConvTranspose2d(     nz, ngf * 8, 4, 1, 0, bias=False),
+            nn.ConvTranspose2d(nz, ngf * 8, 4, 1, 0, bias=False),
             nn.BatchNorm2d(ngf * 8),
             nn.ReLU(True),
             # state size. (ngf*8) x 4 x 4
@@ -30,11 +31,11 @@ class PresDCGANGenerator(BaseGenerator):
             nn.BatchNorm2d(ngf * 2),
             nn.ReLU(True),
             # state size. (ngf*2) x 16 x 16
-            nn.ConvTranspose2d(ngf * 2,    ngf, 4, 2, 1, bias=False),
+            nn.ConvTranspose2d(ngf * 2, ngf, 4, 2, 1, bias=False),
             nn.BatchNorm2d(ngf),
             nn.ReLU(True),
             # state size. (ngf) x 32 x 32
-            nn.ConvTranspose2d(    ngf,      nc, 4, 2, 1, bias=False),
+            nn.ConvTranspose2d(ngf, nc, 4, 2, 1, bias=False),
             nn.Tanh()
             # state size. (nc) x 64 x 64
         )
@@ -83,9 +84,9 @@ class PresDCGANDiscriminator(BaseDiscriminator):
             nn.LeakyReLU(0.2, inplace=True),
             # state size. (ndf*8) x 4 x 4
             nn.Conv2d(ndf * 8, 1, 4, 1, 0, bias=False),
-            nn.Sigmoid()
+            # nn.Sigmoid(),
         )
-    
+
     @property
     def penult_layer(self):
         return self.main[-2]

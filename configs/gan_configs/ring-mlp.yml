@@ -29,3 +29,22 @@ gan_config:
   fake_score: -1.7566776394844055
   real_score: &real_score 8.224320197105408
   mean_score: 3.233821278810501
+
+
+n_epochs: &n_epochs 400
+n_dis: &n_dis 3 #10
+criterion_g: &criterion_g
+  name: JensenLoss
+criterion_d: &criterion_d
+  name: JensenLoss
+optimizer_g: &optimizer_g
+  name: Adam
+  params:
+    lr: 0.0001
+    betas: [0.5, 0.999]
+optimizer_d: &optimizer_d
+  name: Adam
+  params:
+    lr: 0.0001
+    betas: [0.5, 0.999]
+

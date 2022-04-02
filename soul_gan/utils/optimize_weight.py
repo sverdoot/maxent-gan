@@ -38,7 +38,7 @@ def main(args, config: DotConfig, device: torch.device):
     if "dis" in config.sample_params.feature.params:
         feature_kwargs["dis"] = dis
 
-    feature = FeatureRegistry.create_feature(
+    feature = FeatureRegistry.create(
         config.sample_params.feature.name,
         inverse_transform=gen.inverse_transform,
         **feature_kwargs,

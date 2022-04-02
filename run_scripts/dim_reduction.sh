@@ -1,4 +1,5 @@
-#!/bin/bash
+#!/usr/bin/env bash
+
 declare -a METHODS=(
     "pca"
     "tsne"

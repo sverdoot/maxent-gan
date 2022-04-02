@@ -13,14 +13,14 @@ gan_config:
       ngpu: 1
       mean: *mean
       std: *std
-    ckpt_path: checkpoints/dcgan/DCGAN_G_MNIST.pth
+    ckpt_path: checkpoints/stacked_mnist_dcgan/DCGAN_G_MNIST.pth
   discriminator:
     name: PresDCGANDiscriminator
     params:
       ngpu: 1
       mean: *mean
       std: *std
-    ckpt_path: checkpoints/dcgan/DCGAN_D_MNIST.pth
+    ckpt_path: checkpoints/stacked_mnist_dcgan/DCGAN_D_MNIST.pth
   thermalize:
     true: {}
     false:

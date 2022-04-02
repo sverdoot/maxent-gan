@@ -66,6 +66,9 @@ poetry-core = "1.0.4"
 torch-mimicry = {git = "https://github.com/kwotsin/mimicry.git", rev = "master"}
 flake8 = "^4.0.1"
 dvc = {extras = ["gdrive"], version = "^2.9.5"}
+tabulate = "^0.8.9"
+tensorboard = "^2.8.0"
+wrapt = "^1.14.0"
 
 [tool.isort]
 src_paths = ["soul_gan"]
@@ -76,7 +79,7 @@ use_parentheses = true
 line_length = 88
 lines_after_imports = 2
 skip_glob = 'thirdparty'
-known_third_party = ["PIL", "gdown", "imageio", "matplotlib", "numpy", "openTSNE", "pytorch_fid", "ruamel", "scipy", "seaborn", "sklearn", "studiogan", "tensorflow", "torch", "torch_mimicry", "torchvision", "tqdm", "umap", "yaml"]
+known_third_party = ["PIL", "gdown", "imageio", "matplotlib", "numpy", "openTSNE", "pytorch_fid", "ruamel", "scipy", "seaborn", "skimage", "sklearn", "studiogan", "tensorflow", "torch", "torch_mimicry", "torchvision", "tqdm", "umap", "yaml"]
 
 [tool.flake8]
 min_python_version = "3.8.0"

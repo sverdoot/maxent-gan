@@ -3,6 +3,7 @@ feature: &feature
   params: 
     device: *device
     ref_stats_path: stats/ResnetFeature34_cifar10.npz
+    dp: true
     opt_params:
       name:
         SGD

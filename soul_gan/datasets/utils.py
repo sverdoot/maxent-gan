@@ -1,6 +1,7 @@
 import zipfile
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Optional, Dict, Union, Tuple, Any
+import numpy as np
 
 import gdown
 import torch
@@ -11,8 +12,8 @@ from torchvision import transforms as T
 
 from soul_gan.utils.general_utils import DATA_DIR, IgnoreLabelDataset
 
-from .synthetic import prepare_2d_gaussian_grid_data, prepare_2d_ring_data
 from .stacked_mnist import stack_mnist
+from .synthetic import prepare_2d_gaussian_grid_data, prepare_2d_ring_data
 
 
 N_CIFAR_CLASSES = 10
@@ -65,7 +66,7 @@ def get_celeba_dataset(
     mean: Tuple[float, float, float] = (0.5, 0.5, 0.5),
     std: Tuple[float, float, float] = (0.5, 0.5, 0.5),
     img_size: int = 64,
-) -> Dataset:
+) -> Dict[str, Dataset]:
     img_folder = Path(DATA_DIR, "celeba", "img_align_celeba")
     if not img_folder.exists():
         download_celeba()
@@ -84,21 +85,21 @@ def get_celeba_dataset(
     )
     # Load the dataset from file and apply transformations
     celeba_dataset = CelebADataset(img_folder, transform)
-    return celeba_dataset
+    return {"dataset": celeba_dataset}
 
 
 def get_cifar_dataset(
     mean: Tuple[float, float, float] = (0.5, 0.5, 0.5),
     std: Tuple[float, float, float] = (0.5, 0.5, 0.5),
     img_size: int = 32,
-) -> Dataset:
+) -> Dict[str, Dataset]:
     dataset = datasets.CIFAR10(
         Path(DATA_DIR, "cifar10").as_posix(),
         download=True,
         transform=T.Compose([T.Resize(img_size), T.ToTensor(), T.Normalize(mean, std)]),
     )
     dataset = IgnoreLabelDataset(dataset)
-    return dataset
+    return {"dataset": dataset}
 
 
 def get_gaussians_grid_dataset(
@@ -110,8 +111,8 @@ def get_gaussians_grid_dataset(
     ylims: Tuple[float, float] = (-2, 2),
     sigma: float = 0.05,
     seed: Optional[int] = None,
-) -> Dataset:
-    dataset, _ = prepare_2d_gaussian_grid_data(
+) -> Dict[str, Union[Dataset, np.ndarray]]:
+    dataset, modes = prepare_2d_gaussian_grid_data(
         sample_size, n_modes, xlims, ylims, sigma, seed
     )
     mean = torch.as_tensor(mean)
@@ -119,43 +120,42 @@ def get_gaussians_grid_dataset(
     dataset = IgnoreLabelDataset(
         TensorDataset((torch.from_numpy(dataset) - mean[None, :]) / std[None, :])
     )
-    return dataset
+    return {"dataset": dataset, "modes": modes}
 
 
 def get_gaussians_ring_dataset(
     sample_size: int = 10000,
     mean: Tuple[float, float] = (0.0, 0.0),
     std: Tuple[float, float] = (1.0, 1.0),
-    n_modes: int = 25,
+    n_modes: int = 8,
     rad: float = 2,
     sigma: float = 0.02,
     seed: Optional[int] = None,
-) -> Dataset:
-    dataset, _ = prepare_2d_ring_data(sample_size, n_modes, rad, sigma, seed)
+) -> Dict[str, Union[Dataset, np.ndarray]]:
+    dataset, modes = prepare_2d_ring_data(sample_size, n_modes, rad, sigma, seed)
     mean = torch.as_tensor(mean)
     std = torch.as_tensor(std)
     dataset = IgnoreLabelDataset(
         TensorDataset((torch.from_numpy(dataset) - mean[None, :]) / std[None, :])
     )
-    return dataset
+    return {"dataset": dataset, "modes": modes}
 
 
 def get_stacked_mnist_dataset(
     sample_size: int = 60000,
     mean: Tuple[float, float, float] = (0.5, 0.5, 0.5),
     std: Tuple[float, float, float] = (0.5, 0.5, 0.5),
-) -> Dataset:
+) -> Dict[str, Dataset]:
     tensor = stack_mnist(sample_size)
     mean = torch.as_tensor(mean)
     std = torch.as_tensor(std)
-    dataset = IgnoreLabelDataset(
-        TensorDataset((tensor - mean[None, :]) / std[None, :])
-    )
-    return dataset
-    
+    transform = T.Normalize(mean, std)
+    tensor = transform(tensor)
+    dataset = IgnoreLabelDataset(TensorDataset(tensor))
+    return {"dataset": dataset}
 
 
-def get_dataset(name: str = "cifar10", *args, **kwargs) -> Dataset:
+def get_dataset(name: str = "cifar10", *args, **kwargs) -> Dict[str, Any]:
     if name == "cifar10":
         return get_cifar_dataset(*args, **kwargs)
     elif name == "gaussians_grid":
@@ -164,7 +164,7 @@ def get_dataset(name: str = "cifar10", *args, **kwargs) -> Dataset:
         return get_gaussians_ring_dataset(*args, **kwargs)
     elif name == "celeba":
         return get_celeba_dataset(*args, **kwargs)
-    elif name == 'stacked_mnist':
+    elif name == "stacked_mnist":
         return get_stacked_mnist_dataset(*args, **kwargs)
     else:
         raise KeyError

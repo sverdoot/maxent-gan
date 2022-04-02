@@ -28,15 +28,25 @@ class StudioGen(BaseGenerator):
             fromlist=["something"],
         )
 
-        if cfg.MODEL.backbone == 'stylegan2':
-            try: # HACK
+        if cfg.MODEL.backbone == "stylegan2":
+            try:  # HACK
                 cfg.STYLEGAN = cfg.STYLEGAN2
             except Exception:
                 pass
-            channel_base, channel_max = 32768 if cfg.MODEL.backbone == "stylegan3" or cfg.DATA.img_size >= 512 or \
-                                    cfg.DATA.name in ["CIFAR10", "CIFAR100"] else 16384, 512
+            channel_base, channel_max = (
+                32768
+                if cfg.MODEL.backbone == "stylegan3"
+                or cfg.DATA.img_size >= 512
+                or cfg.DATA.name in ["CIFAR10", "CIFAR100"]
+                else 16384,
+                512,
+            )
             gen_c_dim = cfg.DATA.num_classes if cfg.MODEL.g_cond_mtd == "cAdaIN" else 0
-            dis_c_dim = cfg.DATA.num_classes if cfg.MODEL.d_cond_mtd in cfg.STYLEGAN.cond_type else 0
+            dis_c_dim = (
+                cfg.DATA.num_classes
+                if cfg.MODEL.d_cond_mtd in cfg.STYLEGAN.cond_type
+                else 0
+            )
             # if RUN.mixed_precision:
             #     num_fp16_res = 4
             #     conv_clamp = 256
@@ -51,10 +61,14 @@ class StudioGen(BaseGenerator):
                 img_resolution=cfg.DATA.img_size,
                 img_channels=cfg.DATA.img_channels,
                 mapping_kwargs={"num_layers": cfg.STYLEGAN.mapping_network},
-                synthesis_kwargs={"channel_base": channel_base, "channel_max": channel_max, \
-                "num_fp16_res": num_fp16_res, "conv_clamp": conv_clamp},
-                MODEL=cfg.MODEL)
-
+                synthesis_kwargs={
+                    "channel_base": channel_base,
+                    "channel_max": channel_max,
+                    "num_fp16_res": num_fp16_res,
+                    "conv_clamp": conv_clamp,
+                },
+                MODEL=cfg.MODEL,
+            )
 
         else:
             self.gen = module.Generator(
@@ -70,7 +84,7 @@ class StudioGen(BaseGenerator):
                 g_depth=cfg.MODEL.g_depth,
                 mixed_precision=False,  # cfg.RUN.mixed_precision,
                 MODULES=cfg.MODULES,
-                MODEL=cfg.MODEL
+                MODEL=cfg.MODEL,
             )
         self.z_dim = self.gen.z_dim
         self.label = label
@@ -88,7 +102,7 @@ class StudioGen(BaseGenerator):
     def forward(self, x, label=None):
         label = label.to(x.device) if label is not None else self.label.to(x.device)
 
-        if self.cfg.MODEL.backbone.startswith('stylegan'):
+        if self.cfg.MODEL.backbone.startswith("stylegan"):
             label = F.one_hot(label, num_classes=self.cfg.DATA.num_classes)
         return self.gen.forward(x, label)
 
@@ -109,15 +123,25 @@ class StudioDis(BaseDiscriminator):
             fromlist=["something"],
         )
 
-        if cfg.MODEL.backbone == 'stylegan2':
-            try: # HACK
+        if cfg.MODEL.backbone == "stylegan2":
+            try:  # HACK
                 cfg.STYLEGAN = cfg.STYLEGAN2
             except Exception:
                 pass
-            channel_base, channel_max = 32768 if cfg.MODEL.backbone == "stylegan3" or cfg.DATA.img_size >= 512 or \
-                                    cfg.DATA.name in ["CIFAR10", "CIFAR100"] else 16384, 512
+            channel_base, channel_max = (
+                32768
+                if cfg.MODEL.backbone == "stylegan3"
+                or cfg.DATA.img_size >= 512
+                or cfg.DATA.name in ["CIFAR10", "CIFAR100"]
+                else 16384,
+                512,
+            )
             gen_c_dim = cfg.DATA.num_classes if cfg.MODEL.g_cond_mtd == "cAdaIN" else 0
-            dis_c_dim = cfg.DATA.num_classes if cfg.MODEL.d_cond_mtd in cfg.STYLEGAN.cond_type else 0
+            dis_c_dim = (
+                cfg.DATA.num_classes
+                if cfg.MODEL.d_cond_mtd in cfg.STYLEGAN.cond_type
+                else 0
+            )
             # if RUN.mixed_precision:
             #     num_fp16_res = 4
             #     conv_clamp = 256
@@ -145,7 +169,8 @@ class StudioDis(BaseDiscriminator):
                 epilogue_kwargs={
                     "mbstd_group_size": cfg.STYLEGAN.d_epilogue_mbstd_group_size
                 },
-                MODEL=cfg.MODEL)
+                MODEL=cfg.MODEL,
+            )
 
         else:
             self.dis = module.Discriminator(
@@ -163,7 +188,7 @@ class StudioDis(BaseDiscriminator):
                 d_depth=cfg.MODEL.d_depth,
                 mixed_precision=False,  # cfg.RUN.mixed_precision,
                 MODULES=cfg.MODULES,
-                MODEL=cfg.MODEL
+                MODEL=cfg.MODEL,
             )
         self.label = label
 
