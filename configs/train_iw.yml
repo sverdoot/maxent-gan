@@ -1,0 +1,81 @@
+# seed: 42
+
+# sample
+sample_params: 
+    feature: *feature
+    distribution: *target_distribution
+
+    params:
+      n_steps: *sample_steps
+      weight_step: *weight_step
+      step_size: *step_size
+      n_sampling_steps: 1
+      verbose: false
+      save_every: 1
+      collect_imgs: false
+      
+# train
+train_params:
+  n_epochs: *n_epochs
+  optimizer_g: *optimizer_g
+  optimizer_d: *optimizer_d
+  criterion_g: *criterion_g
+  criterion_d: *criterion_g
+  device: *device
+  save_dir: *dir
+  sub_dir: *sub_dir
+  trainer_kwargs: 
+    <<: *trainer_kwargs
+    importance_sampling: true
+
+# afterall
+afterall_params:
+    results_dir: *dir
+    sub_dir: *sub_dir
+    init_wandb: false #true
+    
+    remove_chains: false #true
+
+
+callbacks:
+  train_callbacks: &train_callbacks
+    log_callback:
+      name: TrainLogCallback
+      params:
+        invoke_every: 1 #10
+    fid_callback:
+      name: FIDCallback
+      params:
+        data_stat_path: stats/cifar10/fid_stats_cifar10.npz
+        invoke_every: 5
+        dp: true
+        batch_size: 256
+    img_callback:
+      name: PlotImagesCallback
+      params:
+        invoke_every: 1
+    log_fid:
+      name: LogCallback
+      params:
+        invoke_every: 5
+        keys:
+          - fid
+        save_dir: null
+        resume: *resume
+        
+    log_imgs:
+      name: LogCallback
+      params:
+        invoke_every: 1
+        keys:
+          - grid
+        save_dir: null
+        resume: *resume
+    ckpt:
+      name: CheckpointCallback
+      params:
+        gan: true
+        invoke_every: *n_epochs
+        save_dir: null
+
+  feature_callbacks: &feature_callbacks {}

@@ -1,6 +1,12 @@
 gan_config:
   dp: false
-  dataset: gaussians_ring
+  dataset: 
+    name: gaussians_ring
+    params:
+      sigma: &sigma 0.02 # 0.05
+      n_modes: 8
+      rad: 2.0
+      sample_size: 25600
   train_transform:
     Normalize:
       mean: &mean [0., 0.]
@@ -16,7 +22,7 @@ gan_config:
       n_layers: 2
       n_hid: 128
       n_out: 2
-    ckpt_path: checkpoints/mlp/G_8_gauss.pth
+    ckpt_path: log/dumb_feature_PriorTarget_train/mlp_ring_0.1_46/checkpoints/g_500.pth #checkpoints/mlp/G_8_gauss.pth
   discriminator:
     name: MLPDiscriminator
     params:
@@ -25,14 +31,14 @@ gan_config:
       n_layers: 2
       n_hid: 128
       n_in: 2
-    ckpt_path: checkpoints/mlp/D_8_gauss.pth
+    ckpt_path: log/dumb_feature_PriorTarget_train/mlp_ring_0.1_46/checkpoints/d_500.pth #checkpoints/mlp/D_8_gauss.pth
   fake_score: -1.7566776394844055
   real_score: &real_score 8.224320197105408
   mean_score: 3.233821278810501
 
 
-n_epochs: &n_epochs 400
-n_dis: &n_dis 3 #10
+train_batch_size: 256
+n_epochs: &n_epochs 500
 criterion_g: &criterion_g
   name: JensenLoss
 criterion_d: &criterion_d
@@ -41,10 +47,17 @@ optimizer_g: &optimizer_g
   name: Adam
   params:
     lr: 0.0001
-    betas: [0.5, 0.999]
+    betas: [0.5, 0.99]
 optimizer_d: &optimizer_d
   name: Adam
   params:
     lr: 0.0001
-    betas: [0.5, 0.999]
+    betas: [0.5, 0.99]
+trainer_kwargs: &trainer_kwargs
+  n_dis: 1
+  sample_size: 5000
+  grad_acc_steps: 1
+  sample_steps: &sample_steps 5
+
+range: &range [-2.5, 2.5]
 

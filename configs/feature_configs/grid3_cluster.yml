@@ -1,0 +1,17 @@
+feature: &feature
+  name: ClusterFeature
+  params: 
+    device: *device
+    gan: null
+    clusters_path: data/125_gaussians_modes.npz
+    ref_stats_path: stats/ClusterFeature_125_gaussians.npz
+    version: *version
+    kernel: *kernel
+    dis_emb: *dis_emb
+    opt_params:
+      name:
+        SGD
+      params:  
+        momentum: 0.0 #0.1
+        nesterov: False #True
+        weight_decay: 0.01 #0.025 #0.075 #1

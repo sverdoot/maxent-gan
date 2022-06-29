@@ -1,0 +1,2 @@
+sampling: &sampling ula
+mcmc_args: &mcmc_args {}

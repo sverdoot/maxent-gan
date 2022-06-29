@@ -1,0 +1,52 @@
+# sample
+sample_params: &sample_params
+  sample: false
+  save_dir: *dir
+  sub_dir: *sub_dir
+
+  distribution:
+    <<: *target_distribution
+  
+  feature:
+    <<: *feature
+
+  total_n: *total_n
+  batch_size: *batch_size
+  save_every: *every
+
+  params:
+    n_steps: *n_steps
+    save_every: *every
+    burn_in_steps: *burn_in_steps
+    start_sample: *start_sample
+
+    n_sampling_steps: &n_sampling_steps 1
+    weight_step: *weight_step
+    step_size: *step_size
+
+# afterall
+afterall_params:
+    results_dir: *dir
+    sub_dir: *sub_dir
+    init_wandb: true
+    
+    compute_is: false
+    compute_fid:  true
+    remove_chains: true
+
+params: &params
+    sample_params: *sample_params
+    name: *name
+
+wandb_init_params: &wandb_init_params
+  project: &wandb_project maxent_gan
+  entity: &wandb_account sverdoot
+  name: *name
+  config: *params
+
+logging:
+  wandb: null
+
+callbacks:
+  afterall_callbacks: &afterall_callbacks
+    {}

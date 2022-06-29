@@ -1,7 +1,8 @@
 dir: &dir log/discriminator_feature
 n_steps: &n_steps 500 #1000
-every: &every 25
+every: &every 50
 seed: null
+sweet_init: &sweet_init false
 
 device: &device 'cuda'
 total_n: &total_n 10000

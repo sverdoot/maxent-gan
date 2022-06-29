@@ -1,11 +1,12 @@
 dir: &dir log/cluster_feature
 n_steps: &n_steps 1000
-every: &every 25
+every: &every 50
 seed: null
+sweet_init: &sweet_init false
 
 device: &device 'cuda'
 total_n: &total_n 10000
-batch_size: &batch_size 500 #750
+batch_size: &batch_size 400 #750
 data_batch_size: *batch_size
 weight_step: &weight_step 1 #0.5 #0.5 #0.01
 step_size: &step_size 0.01 # 0.1
@@ -16,3 +17,4 @@ sub_dir: &sub_dir snresnet
 suffix: *step_size
 version: &version '0'
 kernel: &kernel GaussianKernel
+dis_emb: &dis_emb False

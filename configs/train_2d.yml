@@ -1,7 +1,22 @@
+# sample
+sample_params: 
+    feature: *feature
+    distribution: *target_distribution
+
+    params:
+      n_steps: *sample_steps #25
+      weight_step: *weight_step
+      step_size: *step_size
+      n_sampling_steps: 1
+      verbose: false
+      save_every: 1
+      weight_upd_every: 5
+      feature_reset_every: 1
+      sweet_init: *sweet_init
+      
 # train
 train_params:
   n_epochs: *n_epochs
-  n_dis: *n_dis
   optimizer_g: *optimizer_g
   optimizer_d: *optimizer_d
   criterion_g: *criterion_g
@@ -9,45 +24,11 @@ train_params:
   device: *device
   save_dir: *dir
   sub_dir: *sub_dir
-  
+  trainer_kwargs: 
+    <<: *trainer_kwargs
+    importance_sampling: false
+    # sample_steps: *sample_steps
 
-# sample
-sample_params: 
-    feature: *feature
-    distribution: *target_distribution
-
-    params:
-      n_steps: 5 #25
-      weight_step: *weight_step
-      step_size: *step_size
-      verbose: false
-
-
-# sample
-# sample_params: &sample_params
-#   sample: true
-#   save_dir: *dir
-#   sub_dir: *sub_dir
-
-#   distribution:
-#     <<: *target_distribution
-  
-#   feature:
-#     <<: *feature
-
-#   total_n: *total_n
-#   batch_size: *batch_size
-#   save_every: *every
-
-#   params:
-#     n_steps: *n_steps
-#     save_every: *every
-#     burn_in_steps: *burn_in_steps
-#     start_sample: *start_sample
-
-#     n_sampling_steps: &n_sampling_steps 1
-#     weight_step: *weight_step
-#     step_size: *step_size
 
 # afterall
 afterall_params:
@@ -70,6 +51,55 @@ callbacks:
         modes: true
         invoke_every: 10
         every: 1
+        save_dir: null
+        range: *range
+    plot2d_dis:
+      name: Plot2dEnergyCallback
+      params:
+        gan: true
+        invoke_every: 10
+        every: 1
+        save_dir: null
+    emd:
+      name: EMDCallback
+      params:
+        np_dataset: true
+        invoke_every: 100
+        update_input: true 
+    hqr_js:
+      name: HQRCallback
+      params:
+        np_dataset: true
+        modes: true
+        sigma: *sigma
+        invoke_every: *n_epochs
+        update_input: true  
+    log_emd:
+      name: LogCallback
+      params:
+        invoke_every: 100
+        keys:
+          - EMD
+        save_dir: null
+    log_hqr:
+      name: LogCallback
+      params:
+        invoke_every: *n_epochs
+        keys:
+          - HQR
+        save_dir: null
+    log_jsd:
+      name: LogCallback
+      params:
+        invoke_every: *n_epochs
+        keys:
+          - JSD
+        save_dir: null
+    ckpt:
+      name: CheckpointCallback
+      params:
+        gan: true
+        invoke_every: *n_epochs
         save_dir: null
 
   feature_callbacks: &feature_callbacks {}
@@ -139,38 +169,31 @@ callbacks:
     #     save_dir: null
     
 
-  afterall_callbacks: &afterall_callbacks
-    energy:
-      name: EnergyCallback
-      params:
-        gan: null
-        invoke_every: 1
-        device: *device
-        update_input: true
-        batch_size: 250 #*batch_size
-        norm_constant: null
-    discriminator:
-      name: DiscriminatorCallback
-      params:
-        gan: null
-        invoke_every: 1
-        device: *device
-        update_input: true
-        batch_size: 250 #*batch_size
-    # emd:
-    #   name: EMDCallback
-    #   params:
-    #     np_dataset: true
-    #     invoke_every: 40
-    #     update_input: true
-    plot2d:
-      name: Plot2dCallback
-      params:
-        modes: true
-        invoke_every: 20
-        every: *every
-        save_dir: null
-
+  # afterall_callbacks: &afterall_callbacks
+  #   energy:
+  #     name: EnergyCallback
+  #     params:
+  #       gan: null
+  #       invoke_every: 1
+  #       device: *device
+  #       update_input: true
+  #       batch_size: 250 #*batch_size
+  #       norm_constant: null
+  #   discriminator:
+  #     name: DiscriminatorCallback
+  #     params:
+  #       gan: null
+  #       invoke_every: 1
+  #       device: *device
+  #       update_input: true
+  #       batch_size: 250 #*batch_size
+  #   plot2d:
+  #     name: Plot2dCallback
+  #     params:
+  #       modes: true
+  #       invoke_every: 20
+  #       every: *every
+  #       save_dir: null
 
     # wandb:
     #   name: WandbCallback

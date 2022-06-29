@@ -42,18 +42,25 @@ If FID computation stucks that might be caused by conflict with scipy. Try runni
 
 ### StudioGAN:
 
+
 ```zsh
-git clone https://github.com/POSTECH-CVLab/PyTorch-StudioGAN.git thirdparty/studiogan && mv thirdparty/studiogan/src thirdparty/studiogan/studiogan
+./scripts/install_studiogan.sh
 ```
 
+<!-- ```zsh
+git clone https://github.com/POSTECH-CVLab/PyTorch-StudioGAN.git thirdparty/studiogan 
+cd thirdparty/studiogan 
+git checkout cce0c6ab9584deb8dbf289e6192c125b201aa3d6
+mv src studiogan
+```
 
 ```zsh
-touch thirdparty/studiogan/studiogan/__init__.py
+touch studiogan/__init__.py
 
 echo "import sys
 
 sys.path.append('.')
-from . import config, utils" >> thirdparty/studiogan/studiogan/__init__.py
+from . import config, utils" >> studiogan/__init__.py
 
 echo \
 "from setuptools import setup, find_packages
@@ -61,16 +68,18 @@ echo \
 setup(name='studiogan',
       version='1.0',
       packages=find_packages())" \
->> thirdparty/studiogan/setup.py
+>> setup.py
 ```
 
 ```zsh
-pip install -e thirdparty/studiogan
+pip install -e .
 ```
 
 ```zsh
-echo "tqdm ninja h5py kornia matplotlib pandas sklearn scipy seaborn wandb PyYaml click requests pyspng imageio-ffmpeg prdc" >> thirdparty/studiogan/requirements.txt
+echo "tqdm ninja h5py kornia matplotlib pandas sklearn scipy seaborn wandb PyYaml click requests pyspng imageio-ffmpeg prdc" >> requirements.txt
+cd ../..
 ```
+
 
 ```zsh 
 poetry add `cat thirdparty/studiogan/requirements.txt`
@@ -79,7 +88,7 @@ poetry add `cat thirdparty/studiogan/requirements.txt`
 Create symbolik link
 ```zsh
 ln -s thirdparty/studiogan/studiogan studiogan
-```
+``` -->
 
 To use StudioGAN as is following is needed:
 
@@ -87,7 +96,7 @@ To use StudioGAN as is following is needed:
 import sys
 from pathlib import Path
 
-from soul_gan.utils.general_utils import ROOT_DIR
+from maxent_gan.utils.general_utils import ROOT_DIR
 
 sys.path.append(Path(ROOT_DIR, 'studiogan'))
 ```
@@ -115,7 +124,7 @@ cifar = dset.CIFAR10(root='data/cifar10', download=True)
 Make bash scripts runable 
 
 ```zsh
-chmod +x run_scripts/*.sh
+chmod +x scripts/*.sh
 ```
 
 
@@ -149,8 +158,8 @@ python setup.py install
 Download checkpoints:
 
 <!-- ```bash
-./run_scripts/get_ckpts.sh
-./run_scripts/get_stats.sh
+./scripts/get_ckpts.sh
+./scripts/get_stats.sh
 ``` -->
 
 ```bash

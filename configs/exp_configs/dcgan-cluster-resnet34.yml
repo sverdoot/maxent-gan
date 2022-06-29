@@ -1,10 +1,11 @@
 dir: &dir log/cluster_resnet34_feature
 n_steps: &n_steps 1000
-every: &every 25
+every: &every 50
 seed: null
+sweet_init: &sweet_init false
 
 device: &device 'cuda'
-total_n: &total_n 10000 #10000 #
+total_n: &total_n 10000
 batch_size: &batch_size 1000
 
 
@@ -18,3 +19,4 @@ sub_dir: &sub_dir dcgan
 suffix: *step_size
 version: &version '0'
 kernel: &kernel GaussianKernel
+dis_emb: &dis_emb False

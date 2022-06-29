@@ -76,6 +76,14 @@ callbacks:
         np_dataset: true
         invoke_every: *n_steps #40
         update_input: true
+    hqr_js:
+      name: HQRCallback
+      params:
+        np_dataset: true
+        modes: true
+        sigma: *sigma
+        invoke_every: *n_steps
+        update_input: true
     log_energy:
       name: LogCallback
       params:
@@ -96,6 +104,20 @@ callbacks:
         invoke_every: *every
         keys:
           - EMD
+        save_dir: null
+    log_hqr:
+      name: LogCallback
+      params:
+        invoke_every: *every
+        keys:
+          - HQR
+        save_dir: null
+    log_jsd:
+      name: LogCallback
+      params:
+        invoke_every: *every
+        keys:
+          - JSD
         save_dir: null
     
 

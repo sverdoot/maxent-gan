@@ -1,38 +1,38 @@
 import argparse
 import datetime
+import subprocess
 import sys
 from pathlib import Path
-import subprocess
 
 import numpy as np
 import ruamel.yaml as yaml
 import torch
 import torchvision
-from torch.utils.data import DataLoader
-
-
-sys.path.append("studiogan")  # noqa: E402
-
 import wandb
+from torch.utils.data import DataLoader
 from vizualization.plot_results import plot_res
 
-from soul_gan.datasets.utils import get_dataset
-from soul_gan.distribution import DistributionRegistry
-from soul_gan.feature import FeatureRegistry
-from soul_gan.models.studiogans import StudioDis, StudioGen  # noqa: F401
-from soul_gan.models.utils import GANWrapper
-from soul_gan.sample import soul
-from soul_gan.utils.callbacks import CallbackRegistry
-from soul_gan.utils.eval_feature import evaluate
-from soul_gan.utils.general_utils import DotConfig  # isort:block
-from soul_gan.utils.general_utils import IgnoreLabelDataset, random_seed
-from soul_gan.utils.metrics.compute_fid_tf import calculate_fid_given_paths
-from soul_gan.utils.metrics.inception_score import (
+from maxent_gan.datasets.utils import get_dataset
+from maxent_gan.distribution import DistributionRegistry
+from maxent_gan.feature.utils import create_feature
+from maxent_gan.sample import MaxEntSampler
+from maxent_gan.utils.callbacks import CallbackRegistry
+from maxent_gan.utils.general_utils import DotConfig, IgnoreLabelDataset, random_seed
+from maxent_gan.utils.metrics.compute_fid_tf import calculate_fid_given_paths
+from maxent_gan.utils.metrics.inception_score import (
     MEAN_TRASFORM,
     N_GEN_IMAGES,
     STD_TRANSFORM,
     get_inception_score,
 )
+
+
+sys.path.append("studiogan")  # noqa: E402
+from maxent_gan.models.studiogans import (  # noqa: F401, E402  isort: skip
+    StudioDis,  # noqa: F401, E402  isort: skip
+    StudioGen,  # noqa: F401, E402  isort: skip
+)
+from maxent_gan.models.utils import GANWrapper  # noqa: F401, E402  isort: skip
 
 
 def parse_arguments():
@@ -47,7 +47,8 @@ def parse_arguments():
     parser.add_argument("--step_size", type=float)
     parser.add_argument("--weight_step", type=float)
     parser.add_argument("--feature_version", type=int)
-    parser.add_argument("--dis_emb", action='store_true')
+    parser.add_argument("--dis_emb", action="store_true")
+    parser.add_argument("--sweet_init", action="store_true")
     parser.add_argument(
         "--kernel",
         type=str,
@@ -59,66 +60,15 @@ def parse_arguments():
     return args
 
 
-def create_feature(config, gan, dataloader, dataset, save_dir, device):
-    feature_callbacks = []
-    callbacks = config.callbacks.feature_callbacks
-    if callbacks:
-        for _, callback in callbacks.items():
-            params = callback.params.dict
-            # HACK
-            if "gan" in params:
-                params["gan"] = gan
-            if "save_dir" in params:
-                params["save_dir"] = save_dir
-            if "np_dataset" in params:
-                np_dataset = np.concatenate([gan.inverse_transform(batch).numpy() for batch in dataloader], 0)
-                params["np_dataset"] = np_dataset
-            feature_callbacks.append(
-                CallbackRegistry.create(callback.name, **params)
-            )
-
-    feature_kwargs = config.sample_params.feature.params.dict
-    # HACK
-    if "gan" in config.sample_params.feature.params:
-        feature_kwargs["gan"] = gan
-    if "dataloader" in config.sample_params.feature.params:
-        feature_kwargs["dataloader"] = dataloader
-
-    feature = FeatureRegistry.create(
-        config.sample_params.feature.name,
-        callbacks=feature_callbacks,
-        inverse_transform=gan.inverse_transform,
-        **feature_kwargs,
-    )
-
-    if config.sample_params.feature.params.ref_stats_path:
-        feature.eval = True
-        stats = evaluate(
-            feature,
-            dataset,
-            config.batch_size,
-            device,
-            Path(config.sample_params.feature.params.ref_stats_path),
-        )
-        print(stats)
-        feature = FeatureRegistry.create(
-            config.sample_params.feature.name,
-            callbacks=feature_callbacks,
-            inverse_transform=gan.inverse_transform,
-            **feature_kwargs,
-        )
-    feature.eval = False
-    return feature
-
-
 def main(config: DotConfig, device: torch.device, group: str):
     suffix = f"_{config.suffix}" if config.suffix else ""
     dir_suffix = f"_{config.distribution.name}"
 
     dataset_stuff = get_dataset(
-        config.gan_config.dataset,
+        config.gan_config.dataset.name,
         mean=config.gan_config.train_transform.Normalize.mean,
         std=config.gan_config.train_transform.Normalize.std,
+        **config.gan_config.dataset.params,
     )
     dataset = dataset_stuff["dataset"]
 
@@ -146,7 +96,9 @@ def main(config: DotConfig, device: torch.device, group: str):
             Path(save_dir, "gan_config.yml").open("w"),
         )
 
-        feature = create_feature(config, gan, dataloader, dataset, save_dir, device)
+        feature = create_feature(
+            config, gan, dataloader, dataset_stuff, save_dir, device
+        )
 
         # HACK
         if (
@@ -212,15 +164,18 @@ def main(config: DotConfig, device: torch.device, group: str):
 
             gan.set_label(label)
 
-            if config.lipschitz_step_size:
-                config.sample_params.params.dict["step_size"] = (
-                    args.step_size_mul
-                    / config.gan_config.thermalize.dict[config.thermalize][
-                        "lipschitz_const"
-                    ]
-                )
+            # if config.lipschitz_step_size:
+            #     config.sample_params.params.dict["step_size"] = (
+            #         args.step_size_mul
+            #         / config.gan_config.thermalize.dict[config.thermalize][
+            #             "lipschitz_const"
+            #         ]
+            #     )
 
-            zs, xs = soul(z, gan.gen, ref_dist, feature, **config.sample_params.params)
+            sampler = MaxEntSampler(
+                gan.gen, ref_dist, feature, **config.sample_params.params
+            )
+            zs, xs, _, _ = sampler(z)
 
             zs = torch.stack(zs, 0)
             xs = torch.stack(xs, 0)
@@ -374,13 +329,14 @@ def main(config: DotConfig, device: torch.device, group: str):
             if "gan" in params:
                 params["gan"] = gan
             if "np_dataset" in params:
-                np_dataset = np.concatenate([gan.inverse_transform(batch).numpy() for batch in dataloader], 0)
+                np_dataset = np.concatenate(
+                    [gan.inverse_transform(batch).numpy() for batch in dataloader], 0
+                )
                 params["np_dataset"] = np_dataset
             if "save_dir" in params:
-                params["save_dir"] = results_dir 
+                params["save_dir"] = results_dir
             if "modes" in params:
                 params["modes"] = dataset_stuff["modes"]
-
 
             afterall_callbacks.append(CallbackRegistry.create(callback.name, **params))
 
@@ -454,8 +410,8 @@ def main(config: DotConfig, device: torch.device, group: str):
             # tf version
             stat_path = Path(
                 "stats",
-                f"{config.gan_config.dataset}",
-                f"fid_stats_{config.gan_config.dataset}.npz",
+                f"{config.gan_config.dataset.name}",
+                f"fid_stats_{config.gan_config.dataset.name}.npz",
             )
             fid = calculate_fid_given_paths(
                 (stat_path.as_posix(), file.as_posix()),
@@ -493,10 +449,7 @@ def main(config: DotConfig, device: torch.device, group: str):
     )
 
 
-if __name__ == "__main__":
-    args = parse_arguments()
-
-    params = yaml.round_trip_load(Path(args.configs[0]).open("r"))
+def reset_anchors(args: argparse.Namespace, params: yaml.YAMLObject):
     if args.weight_step:
         params["weight_step"] = yaml.scalarfloat.ScalarFloat(
             args.weight_step,
@@ -526,10 +479,25 @@ if __name__ == "__main__":
             args.dis_emb,
             anchor=params["dis_emb"].anchor.value,
         )
-    if args.suffix:
-        params["suffix"] = yaml.scalarstring.LiteralScalarString(
-            args.suffix
+    if args.sweet_init:
+        params["sweet_init"] = yaml.scalarstring.LiteralScalarString(
+            args.sweet_init,
+            anchor=params["sweet_init"].anchor.value,
         )
+    if args.resume:
+        params["resume"] = yaml.scalarstring.LiteralScalarString(
+            args.resume,
+            anchor=params["resume"].anchor.value,
+        )
+    if args.suffix:
+        params["suffix"] = yaml.scalarstring.LiteralScalarString(args.suffix)
+
+
+if __name__ == "__main__":
+    args = parse_arguments()
+    print(args.configs)
+    params = yaml.round_trip_load(Path(args.configs[0]).open("r"))
+    reset_anchors(args, params)
     print(yaml.round_trip_dump(params))
 
     proc = subprocess.Popen("/bin/bash", stdin=subprocess.PIPE, stdout=subprocess.PIPE)

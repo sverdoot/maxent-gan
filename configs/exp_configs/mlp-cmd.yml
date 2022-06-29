@@ -1,7 +1,8 @@
 dir: &dir log/cmd_feature
 n_steps: &n_steps 1000 #0
-every: &every 25
+every: &every 50
 seed: null
+sweet_init: &sweet_init false
 batch_size: &batch_size 2000
 
 

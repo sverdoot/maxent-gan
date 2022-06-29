@@ -48,7 +48,7 @@ compute_is:
 
 
 wandb_init_params: &wandb_init_params
-  project: &wandb_project soul_gan
+  project: &wandb_project maxent_gan
   entity: &wandb_account sverdoot
   name: &name resnet34_discriminator_feature
   config: *sample_params

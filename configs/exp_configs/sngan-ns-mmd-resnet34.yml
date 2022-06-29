@@ -1,0 +1,20 @@
+dir: &dir log/mmd_resnet34_feature
+n_steps: &n_steps 1000
+every: &every 50
+seed: null
+sweet_init: &sweet_init false
+
+device: &device 'cuda'
+total_n: &total_n 1000 # 10000
+batch_size: &batch_size 1000
+data_batch_size: 100 #*batch_size
+weight_step: &weight_step 0.1 # 0.1
+step_size: &step_size 0.003
+name: &name sngan_ns_mmd_resnet34
+burn_in_steps: &burn_in_steps 0.
+start_sample: &start_sample 0. #10
+sub_dir: &sub_dir sngan_ns
+suffix: *step_size
+
+kernel: &kernel GaussianKernel
+dis_emb: &dis_emb False

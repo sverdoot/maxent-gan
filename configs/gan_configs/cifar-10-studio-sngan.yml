@@ -1,6 +1,8 @@
 gan_config:
   dp: false #true
-  dataset: cifar10
+  dataset: 
+    name: cifar10
+    params: {}
   train_transform:
     Normalize:
       mean: &mean [0.5, 0.5, 0.5]

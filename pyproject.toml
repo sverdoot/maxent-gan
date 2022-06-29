@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "soul_gan"
+name = "maxent_gan"
 version = "0.0.1"
 description = ""
 authors = []
@@ -71,7 +71,7 @@ tensorboard = "^2.8.0"
 wrapt = "^1.14.0"
 
 [tool.isort]
-src_paths = ["soul_gan"]
+src_paths = ["maxent_gan"]
 multi_line_output = 3
 include_trailing_comma = true
 force_grid_wrap = 0
@@ -79,7 +79,7 @@ use_parentheses = true
 line_length = 88
 lines_after_imports = 2
 skip_glob = 'thirdparty'
-known_third_party = ["PIL", "gdown", "imageio", "matplotlib", "numpy", "openTSNE", "pytorch_fid", "ruamel", "scipy", "seaborn", "skimage", "sklearn", "studiogan", "tensorflow", "torch", "torch_mimicry", "torchvision", "tqdm", "umap", "yaml"]
+known_third_party = ["PIL", "gdown", "imageio", "matplotlib", "numpy", "openTSNE", "ot", "pyro", "pytorch_fid", "ruamel", "scipy", "seaborn", "skimage", "sklearn", "studiogan", "tensorflow", "torch", "torch_mimicry", "torchvision", "tqdm", "umap", "yaml"]
 
 [tool.flake8]
 min_python_version = "3.8.0"
@@ -116,6 +116,6 @@ extend-ignore = """
 extend-exclude = """
     # Frozen and not subject to change in this repo:
     thirdparty/*,
-    soul_gan/utils/metrics/compute_fid_tf.py,
+    maxent_gan/utils/metrics/compute_fid_tf.py,
     # # External to the project's coding standards:
     """

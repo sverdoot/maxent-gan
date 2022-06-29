@@ -1,6 +1,11 @@
 gan_config:
   dp: false
-  dataset: gaussians_grid
+  dataset: 
+    name: gaussians_grid
+    params:
+      sigma: &sigma 0.05
+      n_modes: 25
+      sample_size: 25600
   train_transform:
     Normalize:
       mean: &mean [0., 0.]
@@ -29,3 +34,29 @@ gan_config:
   fake_score: -0.04662973267026246
   real_score: &real_score 0.2734628602862358
   mean_score: 0.11341656380798666
+
+
+train_batch_size: 256
+n_epochs: &n_epochs 500 #1000
+criterion_g: &criterion_g
+  name: JensenLoss
+criterion_d: &criterion_d
+  name: JensenLoss
+optimizer_g: &optimizer_g
+  name: Adam
+  params:
+    lr: 0.0001
+    betas: [0.5, 0.99]
+optimizer_d: &optimizer_d
+  name: Adam
+  params:
+    lr: 0.0003
+    betas: [0.5, 0.99]
+trainer_kwargs: &trainer_kwargs
+  n_dis: 1
+  sample_size: 5000
+  grad_acc_steps: 1
+  sample_steps: &sample_steps 5
+
+range: &range [-2.5, 2.5]
+

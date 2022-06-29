@@ -1,0 +1,5 @@
+outs:
+- md5: bc1c22c2e25cfaecbcfccdd2826266a2.dir
+  size: 64040414
+  nfiles: 2
+  path: dcgan_mimicry

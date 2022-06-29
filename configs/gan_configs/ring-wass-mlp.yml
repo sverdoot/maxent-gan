@@ -1,0 +1,54 @@
+gan_config:
+  dp: false
+  dataset: 
+    name: gaussians_ring
+    params:
+      sigma: 0.02 # 0.05
+      n_modes: 8
+  train_transform:
+    Normalize:
+      mean: &mean [0., 0.]
+      std: &std [1., 1.]
+  prior: normal
+  eval: true
+  generator:
+    name: MLPGenerator
+    params:
+      mean: *mean
+      std: *std
+      z_dim: 256
+      n_layers: 2
+      n_hid: 128
+      n_out: 2
+    ckpt_path: null
+  discriminator:
+    name: MLPDiscriminator
+    params:
+      mean: *mean
+      std: *std
+      n_layers: 2
+      n_hid: 128
+      n_in: 2
+    ckpt_path: null
+
+train_batch_size: 128 #1024 #256
+n_epochs: &n_epochs 250 #0
+criterion_g: &criterion_g
+  name: Wasserstein1Loss
+criterion_d: &criterion_d
+  name: Wasserstein1Loss
+optimizer_g: &optimizer_g
+  name: Adam
+  params:
+    lr: 0.0001 # 3
+    betas: [0.5, 0.999]
+optimizer_d: &optimizer_d
+  name: Adam
+  params:
+    lr: 0.0001
+    betas: [0.5, 0.999]
+trainer_kwargs: &trainer_kwargs
+  n_dis: 3 #10
+  sample_size: 5000
+  grad_acc_steps: 1 #4
+  gp_coef: 1 #0.01

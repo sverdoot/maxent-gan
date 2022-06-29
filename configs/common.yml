@@ -22,7 +22,11 @@ sample_params: &sample_params
 
     n_sampling_steps: &n_sampling_steps 1
     weight_step: *weight_step
-    step_size: *step_size
+    
+    sampling: ula
+    mcmc_args:
+      step_size: *step_size
+      
 
 # afterall
 afterall_params:
@@ -37,11 +41,9 @@ afterall_params:
 params: &params
     sample_params: *sample_params
     name: *name
-    feature:
-      name: discriminator
 
 wandb_init_params: &wandb_init_params
-  project: &wandb_project soul_gan
+  project: &wandb_project maxent_gan
   entity: &wandb_account sverdoot
   name: *name
   config: *params

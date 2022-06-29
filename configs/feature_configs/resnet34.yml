@@ -2,7 +2,7 @@ feature: &feature
   name: ResnetFeature
   params: 
     device: *device
-    ref_stats_path: stats/ResnetFeature34_cifar10.npz
+    ref_stats_path: stats/ResnetFeature34.npz
     dp: true
     opt_params:
       name:

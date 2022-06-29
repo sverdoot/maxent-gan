@@ -1,6 +1,8 @@
 gan_config:
   dp: true
-  dataset: celeba
+  dataset: 
+    name: celeba
+    params: {}
   train_transform:
     Normalize:
       mean: &mean [0.5, 0.5, 0.5]

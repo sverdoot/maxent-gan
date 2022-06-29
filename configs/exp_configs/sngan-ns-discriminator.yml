@@ -1,11 +1,12 @@
 dir: &dir log/discriminator_feature
-n_steps: &n_steps 500 #300
-every: &every 25
+n_steps: &n_steps 1000 #300
+every: &every 50
 seed: null
+sweet_init: &sweet_init false
 
 device: &device 'cuda'
-total_n: &total_n 10000
-batch_size: &batch_size 1000 #500
+total_n: &total_n 1000
+batch_size: &batch_size 1000
 data_batch_size: *batch_size
 weight_step: &weight_step 0.01
 step_size: &step_size 0.001

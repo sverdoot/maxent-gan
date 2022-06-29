@@ -1,0 +1,20 @@
+dir: &dir log/cmd_resnet34_feature
+n_steps: &n_steps 1000
+every: &every 50
+seed: null
+sweet_init: &sweet_init false
+
+device: &device 'cuda'
+total_n: &total_n 10000
+batch_size: &batch_size 300 #750
+data_batch_size: *batch_size
+weight_step: &weight_step 1 #0.5 #0.5 #0.01
+step_size: &step_size 0.01 # 0.1
+name: &name snresnet_cmd_resnet34
+burn_in_steps: &burn_in_steps 0.
+start_sample: &start_sample 0.
+sub_dir: &sub_dir snresnet
+suffix: *step_size
+version: &version '0'
+kernel: &kernel GaussianKernel
+dis_emb: &dis_emb False

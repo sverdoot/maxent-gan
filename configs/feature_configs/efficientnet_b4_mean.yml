@@ -45,7 +45,7 @@ params: &params
       name: efficientnetb4_mean
 
 wandb_init_params: &wandb_init_params
-  project: &wandb_project soul_gan
+  project: &wandb_project maxent_gan
   entity: &wandb_account sverdoot
   name: *name
   config: *params

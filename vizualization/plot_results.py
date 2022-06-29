@@ -6,14 +6,14 @@ import ruamel.yaml as yaml
 import seaborn as sns
 from matplotlib import pyplot as plt
 
-from soul_gan.utils.general_utils import ROOT_DIR, DotConfig
+from maxent_gan.utils.general_utils import ROOT_DIR, DotConfig
 
 
 sns.set_theme()
 
-SMALL_SIZE = 14
-MEDIUM_SIZE = 16
-BIGGER_SIZE = 18
+SMALL_SIZE = 20
+MEDIUM_SIZE = 22
+BIGGER_SIZE = 24
 
 plt.rc("font", size=SMALL_SIZE)  # controls default text sizes
 plt.rc("axes", titlesize=MEDIUM_SIZE)  # fontsize of the axes title
@@ -27,6 +27,7 @@ plt.rc("figure", titlesize=BIGGER_SIZE)  # fontsize of the figure title
 
 def plot_res(log_path, config, arange):
     Path(log_path, "figs").mkdir(exist_ok=True)
+    print(log_path)
 
     try:
         is_values = np.loadtxt(Path(log_path, "is_values.txt"))[:, 0]
@@ -276,3 +277,8 @@ def main(args):
 
         arange = np.arange(0, n_steps + 1, every)
         plot_res(gan_logpath, gan_config, arange)
+
+
+if __name__ == "__main__":
+    args = parse_arguments()
+    main(args)

@@ -17,4 +17,4 @@ repos:
     hooks:
     - id: flake8
       language_version: python3.8
-      args: ['--ignore=E129,E2,E203', '--max-line-length=100']
+      args: ['--ignore=E129,E2,E203,W503', '--max-line-length=100']

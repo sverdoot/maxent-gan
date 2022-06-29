@@ -1,0 +1,19 @@
+feature: &feature
+  name: MMDFeature
+  params: 
+    device: *device
+    ref_stats_path: stats/MMDFeature_cifar10.npz
+    embedding_model: resnet34
+    dp: true
+    dataloader: true
+    kernel: *kernel
+    dis_emb: *dis_emb
+    opt_params:
+      name:
+        SGD
+      params:  
+        # momentum: 0.1
+        # nesterov: True
+        momentum: 0.0 #0.1
+        nesterov: False #True
+        weight_decay: 0.01 #0.025 #0.075 #1

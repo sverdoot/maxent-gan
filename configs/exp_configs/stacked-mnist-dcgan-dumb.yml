@@ -1,13 +1,14 @@
 dir: &dir log/dumb_feature
 n_steps: &n_steps 1000
-every: &every 25
+every: &every 50
 seed: null
+sweet_init: &sweet_init false
 
 device: &device 'cuda'
 total_n: &total_n 10000
 batch_size: &batch_size 1000
 data_batch_size: *batch_size
-weight_step: &weight_step 3 #0.01
+weight_step: &weight_step 0.1 #0.01
 step_size: &step_size 0.01
 name: &name stacked_mnist_dcgan_dumb
 burn_in_steps: &burn_in_steps 0.

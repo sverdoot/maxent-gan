@@ -1,18 +1,22 @@
 gan_config:
   dp: true
-  dataset: cifar10
+  dataset: 
+    name: cifar10
+    params: {}
   train_transform:
     Normalize:
       mean: &mean [0.5, 0.5, 0.5]
       std: &std [0.5, 0.5, 0.5]
   prior: normal
   eval: false
+  label: &label true
   generator:
     name: StudioGen
     params:
       mean: *mean
       std: *std
       config: WGAN-GP.yaml
+      label: *label
     ckpt_path: checkpoints/wgan_gp_studio/G_CIFAR_studio_best.pth
   discriminator:
     name: StudioDis
@@ -21,6 +25,7 @@ gan_config:
       std: *std
       output_layer: identity
       config: WGAN-GP.yaml
+      label: *label
     ckpt_path: checkpoints/wgan_gp_studio/D_CIFAR_studio_best.pth
   thermalize:
     true: {}

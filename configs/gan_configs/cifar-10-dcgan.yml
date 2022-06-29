@@ -1,6 +1,8 @@
 gan_config:
   dp: true
-  dataset: cifar10
+  dataset: 
+    name: cifar10
+    params: {}
   train_transform:
     Normalize:
       mean: &mean [0.5, 0.5, 0.5]
@@ -13,14 +15,14 @@ gan_config:
       ngpu: 1
       mean: *mean
       std: *std
-    ckpt_path: checkpoints/dcgan/DCGAN_G_CIFAR_199.pth
+    ckpt_path: log/dumb_feature_PriorTarget_train/dcgan_0.01_44/checkpoints/g_200.pth #checkpoints/dcgan/DCGAN_G_CIFAR_199.pth
   discriminator:
     name: DCGANDiscriminator
     params:
       ngpu: 1
       mean: *mean
       std: *std
-    ckpt_path: checkpoints/dcgan/DCGAN_D_CIFAR_199.pth
+    ckpt_path: log/dumb_feature_PriorTarget_train/dcgan_0.01_44/checkpoints/d_200.pth #checkpoints/dcgan/DCGAN_D_CIFAR_199.pth
   thermalize:
     true: {}
     false:
@@ -29,3 +31,27 @@ gan_config:
       fake_score: -4.945679950714111
       real_score: &real_score -0.43365247461013495
       mean_score: -2.689666212662123
+
+
+train_batch_size: &train_batch_size 64 #256 #128
+n_epochs: &n_epochs 200 #150 #0
+criterion_g: &criterion_g
+  name: JensenNSLoss
+criterion_d: &criterion_d
+  name: JensenNSLoss
+optimizer_g: &optimizer_g
+  name: Adam
+  params:
+    lr: &g_lr 0.0003
+    betas: [0.5, 0.999]
+optimizer_d: &optimizer_d
+  name: Adam
+  params:
+    lr: 0.0003
+    betas: [0.5, 0.999]
+trainer_kwargs: &trainer_kwargs
+  n_dis: 1
+  sample_size: 10000 #512 #5000
+  grad_acc_steps: 1
+  sample_steps: &sample_steps 1
+  alpha: 300

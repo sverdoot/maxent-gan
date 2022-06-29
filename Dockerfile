@@ -2,7 +2,7 @@ ARG UBUNTU=18.04
 
 FROM ubuntu:$UBUNTU
 
-ARG PROJ="soul_gan"
+ARG PROJ="maxent_gan"
 ARG PYTHON="3.8"
 
 RUN apt-get update && apt-get install -y \
@@ -49,4 +49,4 @@ RUN poetry install
 RUN mkdir -p dump
 RUN mkdir -p figs
 RUN mkdir -p logs
-RUN chmod +x ./run_scripts/*
+RUN chmod +x ./scripts/*
