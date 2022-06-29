@@ -3,11 +3,12 @@ from typing import Callable, Dict, Optional, Tuple, Union
 import numpy as np
 import torch
 from torch.distributions import Categorical
+from torch.distributions import Distribution as torchDist
 from torch.distributions import MultivariateNormal as MNormal
 from torch.distributions import Normal
 from tqdm import trange
 
-from .distribution import Distribution, torchDist
+from .distribution import Distribution
 
 
 class MCMCRegistry:

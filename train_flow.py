@@ -1,6 +1,5 @@
 import datetime
 import logging
-import random
 import re
 import subprocess
 import sys
@@ -65,11 +64,6 @@ def main(config: DotConfig, device: torch.device, group: str):
         **config.gan_config.dataset.params,
     )
     dataset = dataset_stuff["dataset"]
-
-    def seed_worker(worker_id):
-        worker_seed = torch.initial_seed() % 2 ** 32
-        np.random.seed(worker_seed)
-        random.seed(worker_seed)
 
     g = torch.Generator()
     g.manual_seed(config.seed)

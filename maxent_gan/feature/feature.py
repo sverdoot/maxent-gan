@@ -379,13 +379,6 @@ class DiscriminatorFeature(Feature):
 
 
 @FeatureRegistry.register()
-class IdentityFeature(Feature):
-    def apply(self, x: torch.FloatTensor) -> List[torch.FloatTensor]:
-        result = x.reshape(x.shape[0], -1)
-        return [result]
-
-
-@FeatureRegistry.register()
 class ClusterFeature(Feature):
     def __init__(
         self,
@@ -462,7 +455,6 @@ class ClusterFeature(Feature):
         ) ** 0.5
         print(self.bandwidth ** 2)
         # d = self.embed_centr.shape[1]
-        # self.bandwidth = (((self.embed_centr[:, None, :] - self.embed_centr[None, :, :]) ** 2).reshape(-1, d).median(dim=0)[0] / 2 * d) ** 0.5
 
         if self.version == "2":
             # self.bandwidth = (torch.norm(self.embed_centr[:, None] ** 2).mean(0) ** 0.5) * 3
@@ -594,9 +586,6 @@ class MMDFeature(Feature):
                 .cpu()
                 .numpy()
             )
-            # normalazer += (torch.norm(x[:, None, :] - x[None, ...], dim=-1) ** 2).median()
-            # d = x.shape[1]
-            # normalazer += ((x[:, None, :] - x[None, ...]) ** 2 * d).reshape(-1, d).median(dim=0)[0]
         # normalazer = normalazer ** .5
         sq_dists = np.concatenate(sq_dists, axis=0)
         normalazer = (np.median(sq_dists) / n_iter / 2.0) ** 0.5

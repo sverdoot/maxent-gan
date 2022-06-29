@@ -11,7 +11,7 @@ total_n: &total_n 10000 #
 batch_size: &batch_size 250
 data_batch_size: *batch_size
 weight_step: &weight_step 0.1
-step_size: &step_size 0.01
+step_size: &step_size 0.001
 name: &name mmc_dcgan_inception
 sub_dir: &sub_dir mmc_dcgan
 suffix: *step_size

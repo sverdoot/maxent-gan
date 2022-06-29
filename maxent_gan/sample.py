@@ -3,9 +3,10 @@ from typing import Dict, List, Optional, Tuple, Union
 import torch
 from scipy.optimize import minimize
 from torch import nn
+from torch.distributions import Distribution as torchDist
 from tqdm import trange
 
-from .distribution import Distribution, MaxEntTarget, torchDist
+from .distribution import Distribution, MaxEntTarget
 from .feature import BaseFeature
 from .mcmc import MCMCRegistry
 from .utils import time_comp_cls
@@ -66,18 +67,6 @@ class MaxEntSampler:
     @property
     def ref_dist(self):
         return self._ref_dist
-
-    # def _target(self, z, data_batch: Optional[torch.FloatTensor] = None):
-    #     f = self.feature(self.gen(z), z)
-    #     radnic_logp = self.feature.log_prob(f)
-    #     ref_logp = self.ref_dist.log_prob(z, data_batch=data_batch)
-    #     if not isinstance(radnic_logp, torch.Tensor):
-    #         radnic_logp = torch.zeros_like(ref_logp, device=ref_logp.device)
-
-    #     logp = radnic_logp + ref_logp
-    #     self.radnic_logps.append(radnic_logp.detach())
-    #     self.ref_logps.append(ref_logp.detach())
-    #     return logp
 
     def step(
         self,

@@ -1,6 +1,6 @@
-# Experiments on sampling from GAN with constraints
+# Experiments on sampling from GAN with probabilistic constraints
 
-- [Experiments on sampling from GAN with constraints](#experiments-on-sampling-from-gan-with-constraints)
+- [Experiments on sampling from GAN with probabilistic constraints](#experiments-on-sampling-from-gan-with-probabilistic-constraints)
   - [Getting started](#getting-started)
     - [StudioGAN:](#studiogan)
   - [TODO:](#todo)
