@@ -1,4 +1,4 @@
 sampling: &sampling ex2mcmc
 mcmc_args: &mcmc_args
   n_particles: 25
-  target_acceptance: 0.66
+  target_acceptance: 0.67

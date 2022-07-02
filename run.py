@@ -1,5 +1,6 @@
 import argparse
 import datetime
+import logging
 import subprocess
 import sys
 from pathlib import Path
@@ -34,14 +35,15 @@ from maxent_gan.models.studiogans import (  # noqa: F401, E402  isort: skip
 )
 from maxent_gan.models.utils import GANWrapper  # noqa: F401, E402  isort: skip
 
+FORMAT = "%(asctime)s %(message)s"
+logging.basicConfig(format=FORMAT, level=logging.INFO)
+
 
 def parse_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument("configs", type=str, nargs="+")
-    # parser.add_argument("--thermalize", action="store_true")
     parser.add_argument("--group", type=str)
     parser.add_argument("--seed", type=int)
-    # parser.add_argument("--lipschitz_step_size", action="store_true")
     parser.add_argument("--step_size_mul", type=float, default=1.0)
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--step_size", type=float)
@@ -71,7 +73,6 @@ def main(config: DotConfig, device: torch.device, group: str):
         **config.gan_config.dataset.params,
     )
     dataset = dataset_stuff["dataset"]
-
     dataloader = DataLoader(dataset, batch_size=config.data_batch_size)
 
     # sample
@@ -143,7 +144,7 @@ def main(config: DotConfig, device: torch.device, group: str):
                 ) - int((start_step_id - 1) * config.sample_params.save_every)
                 z = torch.from_numpy(
                     np.load(sorted(list(latents_dir.glob("*.npy")))[-1])[
-                        i : i + batch_size  # config.sample_params.batch_size
+                        i : i + batch_size
                     ]
                 ).to(device)
                 try:
@@ -283,7 +284,7 @@ def main(config: DotConfig, device: torch.device, group: str):
                 model,
                 resize=True,
                 device=device,
-                batch_size=50,  # 100,
+                batch_size=50,
                 splits=max(1, len(images) // N_GEN_IMAGES),
             )
 
@@ -311,15 +312,6 @@ def main(config: DotConfig, device: torch.device, group: str):
             label = np.load(label_file)
         except Exception:
             label = np.random.randint(0, 10 - 1, 10000)
-
-        # need to check correctness
-        # log_norm_const = harmonic_mean_estimate(
-        #     dis,
-        #     np.load(x_final_file),
-        #     label,
-        #     device,
-        #     batch_size=config.batch_size,
-        # )
 
         afterall_callbacks = []
         callbacks = config.callbacks.afterall_callbacks
@@ -519,8 +511,6 @@ if __name__ == "__main__":
     if args.seed:
         config.seed = args.seed
     config.file_name = Path(args.configs[0]).name
-    # config.thermalize = args.thermalize
-    # config.lipschitz_step_size = args.lipschitz_step_size
     config.resume = args.resume
 
     device = torch.device(config.device if torch.cuda.is_available() else "cpu")

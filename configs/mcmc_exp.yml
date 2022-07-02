@@ -24,7 +24,7 @@ sample_params: &sample_params
     weight_step: *weight_step
     
     sampling: *sampling
-    mcmc_args: 
+    mcmc_args:
       <<: *mcmc_args
       step_size: *step_size
 
@@ -35,9 +35,9 @@ afterall_params:
     sub_dir: *sub_dir
     init_wandb: true
     
-    compute_is: false
-    compute_fid:  false #true
-    remove_chains: true
+    compute_is: true
+    compute_fid:  true
+    remove_chains: false
 
 params: &params
     sample_params: *sample_params
@@ -56,58 +56,57 @@ logging:
 
 callbacks:
   feature_callbacks: &feature_callbacks
-    # log_weight:
-    #   name: LogCallback
-    #   params:
-    #     invoke_every: *every
-    #     keys:
-    #       - weight_norm
-    #     save_dir: null
-    # log_out:
-    #   name: LogCallback
-    #   params:
-    #     invoke_every: *every
-    #     keys:
-    #       - out
-    #     save_dir: null
-    # log_ref:
-    #   name: LogCallback
-    #   params:
-    #     invoke_every: *every
-    #     keys:
-    #       - ref_score
-    #     save_dir: null
-    # log_res:
-    #   name: LogCallback
-    #   params:
-    #     invoke_every: *every
-    #     keys:
-    #       - residual
-    #     save_dir: null
-    # energy:
-    #   name: EnergyCallback
-    #   params:
-    #     gan: null
-    #     invoke_every: *every
-    #     device: *device
-    #     update_input: true
-    #     # batch_size: *batch_size
-    #     norm_constant: null
-    # log_energy:
-    #   name: LogCallback
-    #   params:
-    #     invoke_every: *every
-    #     keys:
-    #       - Energy
-    #     save_dir: null
-    # log_dot_pr:
-    #   name: LogCallback
-    #   params:
-    #     invoke_every: *every
-    #     keys:
-    #       - dot_pr
-    #     save_dir: null
-    {}
+    log_weight:
+      name: LogCallback
+      params:
+        invoke_every: *every
+        keys:
+          - weight_norm
+        save_dir: null
+    log_out:
+      name: LogCallback
+      params:
+        invoke_every: *every
+        keys:
+          - out
+        save_dir: null
+    log_ref:
+      name: LogCallback
+      params:
+        invoke_every: *every
+        keys:
+          - ref_score
+        save_dir: null
+    log_res:
+      name: LogCallback
+      params:
+        invoke_every: *every
+        keys:
+          - residual
+        save_dir: null
+    energy:
+      name: EnergyCallback
+      params:
+        gan: null
+        invoke_every: *every
+        device: *device
+        update_input: true
+        # batch_size: *batch_size
+        norm_constant: null
+    log_energy:
+      name: LogCallback
+      params:
+        invoke_every: *every
+        keys:
+          - Energy
+        save_dir: null
+    log_dot_pr:
+      name: LogCallback
+      params:
+        invoke_every: *every
+        keys:
+          - dot_pr
+        save_dir: null
 
   afterall_callbacks: &afterall_callbacks
     energy:
@@ -146,15 +145,3 @@ callbacks:
         invoke_every: 1
         keys:
           - imgs
-
-    img_callback:
-      name: PlotImagesCallback
-      params:
-        invoke_every: 5
-    log_imgs:
-      name: LogCallback
-      params:
-        invoke_every: 5
-        keys:
-          - grid
-        save_dir: null

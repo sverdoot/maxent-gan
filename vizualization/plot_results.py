@@ -170,7 +170,7 @@ def plot_res(log_path, config, arange):
 
         plt.xlabel("Iteration")
         plt.ylabel(
-            r"$\hat{\mathbb{E}}_{\pi_{\theta}}\Vert F(G(z)))-\pi_{data}(F)\Vert$"
+            r"$\Vert\hat{\mathbb{E}}_{\pi_{\theta}} F(G(z)))-\pi_{data}(F)\Vert$"
         )
         # plt.axhline(config.thermalize[False]['real_score'], linestyle='--', \
         # label='avg real score', color='r')

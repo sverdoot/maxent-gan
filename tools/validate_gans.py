@@ -55,8 +55,6 @@ def main(args):
         raw_config = ruamel.yaml.round_trip_load(config_path.open("r"))
         config = DotConfig(raw_config["gan_config"])
 
-        # raw_config["gan_config"] = {} #["thermalize"] = {True: {}, False: {}}
-
         dataset = get_dataset(
             config.dataset,
             mean=config.train_transform.Normalize.mean,

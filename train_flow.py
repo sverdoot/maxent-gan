@@ -15,6 +15,7 @@ from torch.utils.data import ConcatDataset, DataLoader
 from maxent_gan.datasets.utils import get_dataset
 from maxent_gan.distribution import DistributionRegistry
 from maxent_gan.feature.utils import create_feature
+from maxent_gan.models.flow.real_nvp import RNVP
 from maxent_gan.sample import MaxEntSampler
 from maxent_gan.utils.callbacks import CallbackRegistry
 from maxent_gan.utils.general_utils import DotConfig, random_seed, seed_worker
@@ -148,8 +149,6 @@ def main(config: DotConfig, device: torch.device, group: str):
             **config.sample_params.params,
         )
 
-    from maxent_gan.models.flow.real_nvp import RNVP
-
     flow = RNVP(5, gan.gen.z_dim).to(device)
     optimizer_flow = Adam(
         flow.parameters(), lr=1e-4, betas=(0.5, 0.999), weight_decay=1e-4
@@ -170,7 +169,6 @@ def main(config: DotConfig, device: torch.device, group: str):
         start_epoch=start_epoch,
         **train_config.trainer_kwargs,
     )
-
     trainer.train(n_epochs=train_config.n_epochs)
 
 

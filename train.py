@@ -56,7 +56,6 @@ def main(config: DotConfig, device: torch.device, group: str):
         **config.gan_config.dataset.params,
     )
     dataset = dataset_stuff["dataset"]
-
     dataloader = DataLoader(
         dataset,
         batch_size=config.train_batch_size,

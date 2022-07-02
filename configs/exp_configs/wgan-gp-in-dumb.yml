@@ -7,11 +7,11 @@ sweet_init: &sweet_init false
 device: &device 'cuda'
 burn_in_steps: &burn_in_steps 0.0
 start_sample: &start_sample 0.0
-total_n: &total_n 2000 #10000 #
-batch_size: &batch_size 750
+total_n: &total_n 2000 #
+batch_size: &batch_size 1000 #750
 data_batch_size: *batch_size
 weight_step: &weight_step 0.1
 step_size: &step_size 0.01
-name: &name mmc_dcgan_dumb
-sub_dir: &sub_dir mmc_dcgan
+name: &name wgan_gp_in_dumb
+sub_dir: &sub_dir wgan_gp_in
 suffix: *step_size

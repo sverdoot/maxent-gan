@@ -49,4 +49,4 @@ RUN poetry install
 RUN mkdir -p dump
 RUN mkdir -p figs
 RUN mkdir -p logs
-RUN chmod +x ./scripts/*
+RUN chmod +x -R ./scripts/*

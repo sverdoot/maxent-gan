@@ -124,7 +124,7 @@ cifar = dset.CIFAR10(root='data/cifar10', download=True)
 Make bash scripts runable 
 
 ```zsh
-chmod +x scripts/*.sh
+chmod +x -R scripts/*.sh
 ```
 
 

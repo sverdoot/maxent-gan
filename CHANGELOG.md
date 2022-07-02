@@ -9,3 +9,11 @@
 * Updated code for MaxEntSampler (```maxent_gan.sample.MaxEntSampler```)
 * Updated code for distributions (```maxent_gan.distribution```)
 * Added ```docs/revival_log.md``` for logging experiments
+
+## 02/07/22
+
+* Added changes to MCMC (```maxent_gan.mcmc```): made more computationally efficient and added masks to returns
+* Fixed feature output averaging for MCMC methods different from ULA (```maxent_gan.feature.feature.BaseFeature```) for propoer weight updates
+* Corresponding changes to MaxEntSampler (```maxent_gan.sample.MaxEntSampler```))
+* Added WGAN-GP (with Instance Normalization) (```checkpoints/wgan_gp_in```))
+* Updated ```docs/revival_log.md```

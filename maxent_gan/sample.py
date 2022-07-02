@@ -6,10 +6,10 @@ from torch import nn
 from torch.distributions import Distribution as torchDist
 from tqdm import trange
 
-from .distribution import Distribution, MaxEntTarget
-from .feature import BaseFeature
-from .mcmc import MCMCRegistry
-from .utils import time_comp_cls
+from maxent_gan.distribution import Distribution, MaxEntTarget
+from maxent_gan.feature import BaseFeature
+from maxent_gan.mcmc import MCMCRegistry
+from maxent_gan.utils import time_comp_cls
 
 
 class MaxEntSampler:
@@ -75,7 +75,10 @@ class MaxEntSampler:
         data_batch: Optional[torch.FloatTensor] = None,
         meta=None,
     ) -> Tuple[torch.Tensor, Dict]:
+        z = z.clone()
         z.requires_grad_(True)
+        z.grad = None
+
         avg = (it > self.burn_in_steps or it == 1) and it % self.weight_avg_every == 0
 
         upd = (it > self.burn_in_steps or it == 1) and it % self.weight_upd_every == 0
@@ -84,9 +87,7 @@ class MaxEntSampler:
         ) and it % self.feature_reset_every == 0
 
         if upd:
-            self.feature.weight_up(
-                self.feature.avg_feature.data, self.weight_step
-            )  # , grad_norm)
+            self.feature.weight_up(self.feature.avg_feature.data, self.weight_step)
         if reset:
             self.feature.avg_feature.reset()
 
@@ -94,11 +95,11 @@ class MaxEntSampler:
             self.feature.avg_weight.upd(self.feature.weight)
 
         proposal = self.gen.prior
-        if isinstance(proposal, torch.distributions.MultivariateNormal):
-            proposal = torch.distributions.MultivariateNormal(
-                torch.zeros(z.shape[-1]).to(z.device),
-                2 * torch.eye(z.shape[-1]).to(z.device),
-            )
+        # if isinstance(proposal, torch.distributions.MultivariateNormal):
+        proposal = torch.distributions.MultivariateNormal(
+            torch.zeros(z.shape[-1]).to(z.device),
+            torch.eye(z.shape[-1]).to(z.device),
+        )
 
         self._ref_dist.data_batch = data_batch
         pts, meta = self.mcmc(
@@ -113,8 +114,11 @@ class MaxEntSampler:
             meta=meta,
         )
 
-        for key in self.mcmc_args.keys() & meta.keys():
-            self.mcmc_args.update(key, meta[key][-1])
+        self.mcmc_args.update(
+            {key: meta[key][-1] for key in self.mcmc_args.keys() & meta.keys()}
+        )
+
+        self.feature.average_feature(meta["mask"])
 
         return pts[-1], meta
 

@@ -1,3 +1,5 @@
 sampling: &sampling mala
 mcmc_args: &mcmc_args 
-  target_acceptance: 0.66
+  target_acceptance: 0.67
+target_call_per_step: 2
+

@@ -70,6 +70,8 @@ class BaseFeature(ABC):
         self.init_weight()
         self.init_optimizer()
 
+        self.output_history = []
+
     @classmethod
     def __name__(cls):
         return cls.__name__
@@ -92,7 +94,6 @@ class BaseFeature(ABC):
     def log_prob(self, out: List[torch.FloatTensor]) -> torch.FloatTensor:
         lik_f = 0
         for feature_id in range(len(out)):
-            # lik_f -= (out[feature_id] @ self.weight[feature_id][None, :]).sum(1)
             lik_f -= torch.einsum("ab,b->a", out[feature_id], self.weight[feature_id])
 
         return lik_f
@@ -121,15 +122,35 @@ class BaseFeature(ABC):
         self.init_weight()
         self.init_optimizer()
 
-    @staticmethod
-    def average_feature(feature_method: Callable) -> Callable:
-        # @wraps
-        def with_avg(self, *args, **kwargs):
-            out = feature_method(self, *args, **kwargs)
+    # @staticmethod
+    # def average_feature(feature_method: Callable) -> Callable:
+    #     # @wraps
+    #     def with_avg(self, *args, **kwargs):
+    #         out = feature_method(self, *args, **kwargs)
+    #         self.avg_feature.upd([x.mean(0) for x in out])
+    #         return out
+
+    #     return with_avg
+
+    def average_feature(self, masks: List[torch.BoolTensor]):
+        if isinstance(masks, torch.Tensor) and masks.ndim == 1:
+            masks = [masks]
+        for step_id, mask in enumerate(masks[::-1], start=1):
+            out = self.output_history[step_id]
+            for i in range(len(out)):
+                out[i][mask] = self.output_history[step_id - 1][i][mask]
             self.avg_feature.upd([x.mean(0) for x in out])
+        self.output_history = self.output_history[:-1]
+
+    @staticmethod
+    def collect_feature(feature_method: Callable) -> Callable:
+        # @wraps
+        def wrapped(self, *args, **kwargs):
+            out = feature_method(self, *args, **kwargs)
+            self.output_history.append(out)
             return out
 
-        return with_avg
+        return wrapped
 
     @staticmethod
     def get_useful_info(
@@ -244,7 +265,7 @@ class Feature(BaseFeature):
             )
         return result
 
-    @BaseFeature.average_feature
+    @BaseFeature.collect_feature
     @BaseFeature.invoke_callbacks
     def __call__(
         self, x: torch.FloatTensor, z: Optional[torch.FloatTensor] = None
@@ -298,7 +319,7 @@ class Feature(BaseFeature):
 #             "imgs": self.inverse_transform(x).detach().cpu().numpy(),
 #         }
 
-#     @BaseFeature.average_feature
+#     @BaseFeature.collect_feature
 #     @BaseFeature.invoke_callbacks
 #     def __call__(self, x) -> List[torch.FloatTensor]:
 #         x = self.inverse_transform(x)
@@ -356,8 +377,9 @@ class InceptionFeature(Feature):
         if self.upsample:
             x = self.up(x)
         logits = self.model(x)
-        entr = torch.distributions.Categorical(logits=logits).entropy()
-        return [torch.cat([logits, entr[:, None]], -1)]
+        dist = torch.distributions.Categorical(logits=logits)
+        entr = dist.entropy()
+        return [torch.cat([dist.logits / logits.shape[-1], entr[:, None]], -1)]
 
 
 @FeatureRegistry.register()
@@ -928,7 +950,7 @@ class InceptionV3MeanFeature(BaseFeature):
         }
 
     @BaseFeature.invoke_callbacks
-    @BaseFeature.average_feature
+    @BaseFeature.collect_feature
     def __call__(self, x) -> List[torch.FloatTensor]:
         x = self.inverse_transform(x)
         pred = self.model(x)[0]
@@ -979,7 +1001,7 @@ class DumbFeature(BaseFeature):
         }
 
     @BaseFeature.invoke_callbacks
-    @BaseFeature.average_feature
+    @BaseFeature.collect_feature
     def __call__(
         self, x, z: Optional[torch.FloatTensor] = None
     ) -> List[torch.FloatTensor]:
@@ -1110,7 +1132,7 @@ class SumFeature(BaseFeature):
             feature.init_weight()
 
     @BaseFeature.invoke_callbacks
-    @BaseFeature.average_feature
+    @BaseFeature.collect_feature
     def __call__(self, x: torch.FloatTensor):
         outs = []
         for feature in self.features:

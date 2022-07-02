@@ -1,0 +1,4 @@
+sampling: &sampling hmc
+mcmc_args: &mcmc_args 
+  target_acceptance: 0.67
+  leapfrog_steps: 1
