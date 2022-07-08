@@ -36,7 +36,6 @@ afterall_params:
     
     compute_is: false
     compute_fid:  true
-    remove_chains: true
 
 params: &params
     sample_params: *sample_params

@@ -108,7 +108,7 @@ class BaseFeature(ABC):
                 group["lr"] = np.abs(step)
 
             if isinstance(grad, torch.Tensor):  # noqa: F632
-                self.weight[i].grad = grad
+                self.weight[i].grad = grad.to(self.weight[i].device)
         if self.opt:
             self.opt.step()
 
@@ -121,6 +121,7 @@ class BaseFeature(ABC):
         self.avg_feature.reset()
         self.init_weight()
         self.init_optimizer()
+        self.output_history = []
 
     # @staticmethod
     # def average_feature(feature_method: Callable) -> Callable:
@@ -147,7 +148,7 @@ class BaseFeature(ABC):
         # @wraps
         def wrapped(self, *args, **kwargs):
             out = feature_method(self, *args, **kwargs)
-            self.output_history.append(out)
+            self.output_history.append([x.detach().cpu() for x in out])
             return out
 
         return wrapped
@@ -266,8 +267,13 @@ class Feature(BaseFeature):
         return result
 
     @BaseFeature.collect_feature
-    @BaseFeature.invoke_callbacks
     def __call__(
+        self, x: torch.FloatTensor, z: Optional[torch.FloatTensor] = None
+    ) -> List[torch.FloatTensor]:
+        return self.process_batch(x, z)
+
+    @BaseFeature.invoke_callbacks
+    def process_batch(
         self, x: torch.FloatTensor, z: Optional[torch.FloatTensor] = None
     ) -> List[torch.FloatTensor]:
         result = self.apply_and_shift(x)

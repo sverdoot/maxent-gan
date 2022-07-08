@@ -17,8 +17,8 @@ class Callback(ABC):
     cnt: int = 0
 
     @abstractmethod
-    def invoke(self):
-        pass
+    def invoke(self, info: Dict[str, Union[float, np.ndarray]]):
+        raise NotImplementedError
 
     def reset(self):
         self.cnt = 0

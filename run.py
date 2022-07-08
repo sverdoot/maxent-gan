@@ -14,8 +14,9 @@ from torch.utils.data import DataLoader
 from vizualization.plot_results import plot_res
 
 from maxent_gan.datasets.utils import get_dataset
-from maxent_gan.distribution import DistributionRegistry
-from maxent_gan.feature.utils import create_feature
+from maxent_gan.distribution import Distribution, DistributionRegistry
+from maxent_gan.feature import BaseFeature, create_feature
+from maxent_gan.models.utils import GANWrapper
 from maxent_gan.sample import MaxEntSampler
 from maxent_gan.utils.callbacks import CallbackRegistry
 from maxent_gan.utils.general_utils import DotConfig, IgnoreLabelDataset, random_seed
@@ -33,7 +34,6 @@ from maxent_gan.models.studiogans import (  # noqa: F401, E402  isort: skip
     StudioDis,  # noqa: F401, E402  isort: skip
     StudioGen,  # noqa: F401, E402  isort: skip
 )
-from maxent_gan.models.utils import GANWrapper  # noqa: F401, E402  isort: skip
 
 FORMAT = "%(asctime)s %(message)s"
 logging.basicConfig(format=FORMAT, level=logging.INFO)
@@ -62,22 +62,52 @@ def parse_arguments():
     return args
 
 
+def define_sampler(
+    config: DotConfig,
+    gan: GANWrapper,
+    ref_dist: Distribution,
+    feature: BaseFeature,
+    save_dir: Path,
+):
+    sampler_callbacks = []
+    callbacks = config.callbacks.sampler_callbacks
+    if callbacks:
+        for _, callback in callbacks.items():
+            params = callback.params.dict
+            # HACK
+            if "save_dir" in params:
+                params["save_dir"] = save_dir
+            sampler_callbacks.append(CallbackRegistry.create(callback.name, **params))
+    sampler = MaxEntSampler(
+        gan.gen,
+        ref_dist,
+        feature,
+        **config.sample_params.params,
+        callbacks=sampler_callbacks,
+    )
+
+    return sampler
+
+
 def main(config: DotConfig, device: torch.device, group: str):
     suffix = f"_{config.suffix}" if config.suffix else ""
     dir_suffix = f"_{config.distribution.name}"
 
-    dataset_stuff = get_dataset(
+    dataset_info = get_dataset(
         config.gan_config.dataset.name,
         mean=config.gan_config.train_transform.Normalize.mean,
         std=config.gan_config.train_transform.Normalize.std,
         **config.gan_config.dataset.params,
     )
-    dataset = dataset_stuff["dataset"]
+    dataset = dataset_info["dataset"]
     dataloader = DataLoader(dataset, batch_size=config.data_batch_size)
 
     # sample
     if config.sample_params.sample:
         gan = GANWrapper(config.gan_config, device)
+        ref_dist = DistributionRegistry.create(
+            config.sample_params.distribution.name, gan=gan
+        )
 
         if config.sample_params.sub_dir:
             save_dir = Path(
@@ -98,7 +128,7 @@ def main(config: DotConfig, device: torch.device, group: str):
         )
 
         feature = create_feature(
-            config, gan, dataloader, dataset_stuff, save_dir, device
+            config, gan, dataloader, dataset_info, save_dir, device
         )
 
         # HACK
@@ -110,10 +140,6 @@ def main(config: DotConfig, device: torch.device, group: str):
             idx = config.callbacks.feature_callbacks.keys().index("fid")
             feature.callbacks[idx].model = feature.model
 
-        ref_dist = DistributionRegistry.create(
-            config.sample_params.distribution.name, gan=gan
-        )
-
         if config.seed is not None:
             random_seed(config.seed)
         total_sample_z = []
@@ -121,48 +147,51 @@ def main(config: DotConfig, device: torch.device, group: str):
         total_labels = []
         weights = []
 
-        for i in range(
-            0, config.sample_params.total_n, config.sample_params.batch_size
+        labels = None
+        if config.resume:
+            latents_dir = Path(save_dir, "latents")
+            lat_paths = sorted(
+                latents_dir.glob("*.npy"), key=lambda x: int(x.stem.split("_")[-1])
+            )
+            latent_path = lat_paths[-1]
+            start_step = int(latent_path.stem.split("_")[-1])
+            start_step_id = start_step // config.sample_params.save_every
+            config.sample_params.params.dict["n_steps"] = (
+                config.sample_params.params.n_steps - start_step
+            )
+            start_latents = torch.from_numpy(np.load(latent_path))
+            if Path(save_dir, "labels.npy").exists():
+                labels = torch.from_numpy(np.load(Path(save_dir, "labels.npy")))
+        else:
+            start_latents = gan.prior.sample((config.sample_params.total_n,)).cpu()
+            start_step_id = 0
+
+        if labels is None:
+            labels = torch.LongTensor(
+                np.random.randint(
+                    0,
+                    dataset_info.get("n_classes", 10) - 1,
+                    config.sample_params.total_n,
+                )
+            )
+
+        sampler = define_sampler(config, gan, ref_dist, feature, save_dir)
+
+        for i, start, label in zip(
+            range(0, config.sample_params.total_n, config.sample_params.batch_size),
+            torch.split(start_latents, config.sample_params.batch_size),
+            torch.split(labels, config.sample_params.batch_size),
         ):
             print(i)
-            batch_size = min(
-                config.sample_params.total_n - i,
-                config.sample_params.batch_size,
-            )
+
             if i > 0:
                 feature.reset()
             if wandb.run is not None:
                 run = wandb.run
                 run.config.update({"group": f"{group}"})
                 run.config.update({"name": f"{group}_{i}"}, allow_val_change=True)
-
-            if config.resume:
-                latents_dir = Path(save_dir, "latents")
-                start_step_id = len(list(latents_dir.glob("*.npy")))
-                config.sample_params.params.dict["n_steps"] = int(
-                    config.sample_params.params.n_steps
-                ) - int((start_step_id - 1) * config.sample_params.save_every)
-                z = torch.from_numpy(
-                    np.load(sorted(list(latents_dir.glob("*.npy")))[-1])[
-                        i : i + batch_size
-                    ]
-                ).to(device)
-                try:
-                    label = torch.from_numpy(np.load(Path(save_dir, "labels.npy"))).to(
-                        device
-                    )
-                except Exception:
-                    label = torch.LongTensor(np.random.randint(0, 10 - 1, len(z))).to(
-                        z.device
-                    )
-            else:
-                z = gan.prior.sample((batch_size,))
-                # HACK
-                label = torch.LongTensor(np.random.randint(0, 10 - 1, len(z))).to(
-                    z.device
-                )
-                start_step_id = 0
-
+            start = start.to(device)
+            label = label.to(device)
             gan.set_label(label)
 
             # if config.lipschitz_step_size:
@@ -173,13 +202,14 @@ def main(config: DotConfig, device: torch.device, group: str):
             #         ]
             #     )
 
-            sampler = MaxEntSampler(
-                gan.gen, ref_dist, feature, **config.sample_params.params
-            )
-            zs, xs, _, _ = sampler(z)
+            # sampler = MaxEntSampler(
+            #     gan.gen, ref_dist, feature, **config.sample_params.params
+            # )
+            zs, xs, _, _ = sampler(start)
+            gan.gen.input = gan.gen.output = gan.dis.input = gan.dis.output = None
 
-            zs = torch.stack(zs, 0)
-            xs = torch.stack(xs, 0)
+            zs = torch.stack(zs, 0).cpu()
+            xs = torch.stack(xs, 0).cpu()
             print(zs.shape)
             total_sample_z.append(zs)
             total_sample_x.append(xs)
@@ -201,18 +231,18 @@ def main(config: DotConfig, device: torch.device, group: str):
         imgs_dir.mkdir(exist_ok=True)
         latents_dir = Path(save_dir, "latents")
         latents_dir.mkdir(exist_ok=True)
-        for slice_id in range(start_step_id, total_sample_x.shape[0]):
+        for slice_id in range(total_sample_x.shape[0]):
             np.save(
                 Path(
                     imgs_dir,
-                    f"{(slice_id) * config.sample_params.save_every}.npy",
+                    f"{(slice_id + start_step_id) * config.sample_params.save_every}.npy",
                 ),
                 total_sample_x[slice_id].cpu().numpy(),
             )
             np.save(
                 Path(
                     latents_dir,
-                    f"{(slice_id) * config.sample_params.save_every}.npy",
+                    f"{(slice_id + start_step_id) * config.sample_params.save_every}.npy",
                 ),
                 total_sample_z[slice_id].cpu().numpy(),
             )
@@ -243,7 +273,7 @@ def main(config: DotConfig, device: torch.device, group: str):
     assert Path(results_dir).exists()
 
     if config.resume:
-        start_step_id = np.loadtxt(Path(results_dir, "fid_values.txt"))  # - 1
+        start_step_id = len(np.loadtxt(Path(results_dir, "fid_values.txt")))  # - 1
     else:
         start_step_id = 0
 
@@ -328,7 +358,7 @@ def main(config: DotConfig, device: torch.device, group: str):
             if "save_dir" in params:
                 params["save_dir"] = results_dir
             if "modes" in params:
-                params["modes"] = dataset_stuff["modes"]
+                params["modes"] = dataset_info["modes"]
 
             afterall_callbacks.append(CallbackRegistry.create(callback.name, **params))
 
@@ -377,7 +407,6 @@ def main(config: DotConfig, device: torch.device, group: str):
     if config.afterall_params.compute_fid:
         # model = InceptionV3().to(device)
         # model.eval()
-        # stats = np.load("stats/fid_stats_cifar10_train.npz")
 
         if config.resume:
             fid_values = np.loadtxt(Path(results_dir, "fid_values.txt")).tolist()
@@ -429,12 +458,23 @@ def main(config: DotConfig, device: torch.device, group: str):
                 ),
                 fid_values,
             )
-    if config.afterall_params.remove_chains:
-        for file_path in Path(results_dir, "images").glob("*.npy"):
+    if not config.afterall_params.get("save_chains", False):
+        im_paths = sorted(
+            Path(results_dir, "images").glob("*.npy"),
+            key=lambda x: int(x.stem.split("_")[-1]),
+        )
+        lat_paths = sorted(
+            Path(results_dir, "latents").glob("*.npy"),
+            key=lambda x: int(x.stem.split("_")[-1]),
+        )
+        for file_path in im_paths[:-1]:
             file_path.unlink()
-        for file_path in Path(results_dir, "latents").glob("*.npy"):
+        for file_path in lat_paths[:-1]:
             file_path.unlink()
-        Path(results_dir, "labels.npy").unlink()
+        if not config.afterall_params.get("save_last_slice", False):
+            im_paths[-1].unlink()
+            lat_paths[-1].unlink()
+            Path(results_dir, "labels.npy").unlink()
 
     plot_res(
         results_dir, config.gan_config, np.arange(0, config.n_steps + 1, config.every)
@@ -477,10 +517,13 @@ def reset_anchors(args: argparse.Namespace, params: yaml.YAMLObject):
             anchor=params["sweet_init"].anchor.value,
         )
     if args.resume:
-        params["resume"] = yaml.scalarstring.LiteralScalarString(
-            args.resume,
-            anchor=params["resume"].anchor.value,
-        )
+        if "resume" in params:
+            params["resume"] = yaml.scalarstring.LiteralScalarString(
+                args.resume,
+                anchor=params["resume"].anchor.value,
+            )
+        else:
+            params["resume"] = args.resume
     if args.suffix:
         params["suffix"] = yaml.scalarstring.LiteralScalarString(args.suffix)
 
@@ -508,7 +551,8 @@ if __name__ == "__main__":
     )
     config = yaml.round_trip_load(out.decode("utf-8"))
     config = DotConfig(config)
-    if args.seed:
+
+    if args.seed is not None:
         config.seed = args.seed
     config.file_name = Path(args.configs[0]).name
     config.resume = args.resume

@@ -232,7 +232,7 @@ def plot_res(log_path, config, arange):
         plt.ylabel(r"$\langle \theta, F(G(z)) \rangle + U(z)$")
         # plt.axhline(config.thermalize[False]['real_score'], linestyle='--', \
         # label='avg real score', color='r')
-        plt.title("Energy of dist with constraint")
+        plt.title("Energy of MaxEnt model")
         plt.legend()
         fig.tight_layout()
         plt.savefig(Path(log_path, "figs", f"{log_path.name}_sum.png"))

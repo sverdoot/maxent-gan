@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, Iterable, List, Optional, Tuple, Union
 
 import torch
 from scipy.optimize import minimize
@@ -10,6 +10,7 @@ from maxent_gan.distribution import Distribution, MaxEntTarget
 from maxent_gan.feature import BaseFeature
 from maxent_gan.mcmc import MCMCRegistry
 from maxent_gan.utils import time_comp_cls
+from maxent_gan.utils.callbacks import Callback
 
 
 class MaxEntSampler:
@@ -35,6 +36,7 @@ class MaxEntSampler:
         collect_imgs: bool = True,
         sampling: str = "ula",
         mcmc_args: Optional[Dict] = None,
+        callbacks: Optional[Iterable[Callback]] = None,
     ):
         self.gen = gen
         self._ref_dist = ref_dist
@@ -51,6 +53,7 @@ class MaxEntSampler:
         self.weight_avg_every = weight_avg_every
         self.feature_reset_every = feature_reset_every
         self.collect_imgs = collect_imgs
+        self.callbacks = callbacks or []
 
         self.sampling = sampling
         self.mcmc_args: Dict = mcmc_args or dict()
@@ -58,8 +61,8 @@ class MaxEntSampler:
         self.radnic_logps = []
         self.ref_logps = []
 
-        if sweet_init:
-            self.find_sweet_init()
+        # if sweet_init:
+        #     self.find_sweet_init()
 
         self.mcmc = MCMCRegistry()
         self.target = MaxEntTarget(gen, feature, ref_dist, batch_size=batch_size)
@@ -73,7 +76,8 @@ class MaxEntSampler:
         z: torch.Tensor,
         it: int = 1,
         data_batch: Optional[torch.FloatTensor] = None,
-        meta=None,
+        meta: Optional[Dict] = None,
+        keep_graph: bool = False,
     ) -> Tuple[torch.Tensor, Dict]:
         z = z.clone()
         z.requires_grad_(True)
@@ -112,12 +116,12 @@ class MaxEntSampler:
             project=self.ref_dist.project,
             **self.mcmc_args,
             meta=meta,
+            keep_graph=keep_graph,
         )
 
         self.mcmc_args.update(
             {key: meta[key][-1] for key in self.mcmc_args.keys() & meta.keys()}
         )
-
         self.feature.average_feature(meta["mask"])
 
         return pts[-1], meta
@@ -129,9 +133,12 @@ class MaxEntSampler:
         n_steps: Optional[int] = None,
         data_batch: Optional[torch.FloatTensor] = None,
         collect_imgs: Optional[bool] = None,
+        keep_graph: bool = False,
     ) -> Tuple[List, List, List, List]:
         n_steps = n_steps or self.n_steps
         collect_imgs = collect_imgs or self.collect_imgs
+        # z = z.clone().detach().requires_grad_()
+        # z.grad = None
         zs = [z.cpu()]
         xs = []
         meta = dict()
@@ -143,66 +150,75 @@ class MaxEntSampler:
         it = 0
         self.feature.avg_feature.reset()
         for it in self.trange(1, n_steps + 2):
-            new_z, meta = self.step(z, it, data_batch, meta=meta)
+            new_z, meta = self.step(z, it, data_batch, meta=meta, keep_graph=keep_graph)
             if it > self.start_sample:
                 z = new_z
 
             if it > self.burn_in_steps and it % self.save_every == 0:
-                zs.append(z.data.cpu())
+                if keep_graph:
+                    zs.append(z.cpu())
+                else:
+                    zs.append(z.detach().cpu())
                 if collect_imgs:
-                    xs.append(self.gen.inverse_transform(self.gen(z)).data.cpu())
+                    xs.append(
+                        self.gen.inverse_transform(self.gen(z.detach())).detach().cpu()
+                    )
 
-        self.target.log_prob(z, data_batch)
+            for callback in self.callbacks:
+                callback.invoke(self.mcmc_args)
+
+        self.target.log_prob(z.detach(), data_batch)
 
         return zs, xs, self.target.ref_logps, self.target.radnic_logps
 
-    def find_sweet_init(
-        self, n_steps: int = 100, batch_size: int = 256, burn_in: int = 50
-    ):
-        z = self.gen.prior.sample((batch_size,))
-        z.requires_grad_(True)
-        device = z.device
-        pts, meta = self.mcmc(
-            self.sampling,
-            z,
-            self.target,
-            proposal=None,
-            n_samples=self.n_sampling_steps,
-            burn_in=burn_in,
-            project=self.ref_dist.project,
-            **self.mcmc_args,
-        )
+    # DON'T REMOVE ME
+    # def find_sweet_init(
+    #     self, n_steps: int = 100, batch_size: int = 256, burn_in: int = 50
+    # ):
+    #     z = self.gen.prior.sample((batch_size,))
+    #     z.requires_grad_(True)
+    #     device = z.device
+    #     pts, meta = self.mcmc(
+    #         self.sampling,
+    #         z,
+    #         self.target,
+    #         proposal=None,
+    #         n_samples=self.n_sampling_steps,
+    #         burn_in=burn_in,
+    #         project=self.ref_dist.project,
+    #         **self.mcmc_args,
+    #     )
 
-        weights = self.feature.weight
-        out = self.feature(self.gen(pts))
-        self.feature.avg_feature.reset()
-        out = [f_vals.detach() for f_vals in out]
-        for i, (f_vals, weight) in enumerate(zip(out, weights)):
-            rad_nic_p = torch.zeros(1)
-            grad = torch.zeros(weight.shape)
+    #     weights = self.feature.weight
+    #     out = self.feature(self.gen(pts))
+    #     self.feature.avg_feature.reset()
+    #     out = [f_vals.detach() for f_vals in out]
+    #     for i, (f_vals, weight) in enumerate(zip(out, weights)):
+    #         rad_nic_p = torch.zeros(1)
+    #         grad = torch.zeros(weight.shape)
 
-            def objective(weight):
-                weight = torch.from_numpy(weight).float().to(device)
-                lik_f = -torch.einsum("ab,b->a", f_vals, weight)
-                nonlocal rad_nic_p
-                rad_nic_p = torch.exp(lik_f)
-                return rad_nic_p.sum().cpu()
+    #         def objective(weight):
+    #             weight = torch.from_numpy(weight).float().to(device)
+    #             lik_f = -torch.einsum("ab,b->a", f_vals, weight)
+    #             nonlocal rad_nic_p
+    #             rad_nic_p = torch.exp(lik_f)
+    #             return rad_nic_p.sum().cpu()
 
-            def jac(weight):
-                weight = torch.from_numpy(weight).float().to(device)
-                nonlocal grad
-                grad = -f_vals * rad_nic_p[:, None]
-                return grad.sum(0).cpu()
+    #         def jac(weight):
+    #             weight = torch.from_numpy(weight).float().to(device)
+    #             nonlocal grad
+    #             grad = -f_vals * rad_nic_p[:, None]
+    #             return grad.sum(0).cpu()
 
-            def hess(weight):
-                weight = torch.from_numpy(weight).float().to(device)
-                weight = [weight]
-                sec = torch.einsum("ab,ac->abc", f_vals, grad)
-                return sec.sum(0).cpu()
+    #         def hess(weight):
+    #             weight = torch.from_numpy(weight).float().to(device)
+    #             weight = [weight]
+    #             sec = torch.einsum("ab,ac->abc", f_vals, grad)
+    #             return sec.sum(0).cpu()
 
-            x0 = weight.detach().cpu().numpy()
-            res = minimize(objective, x0=x0, jac=jac, hess=hess, method="Newton-CG")
-            weights[i] = torch.from_numpy(res.x).to(z.device)
-        print(weights)
-        self.feature.weights = weights
-        return weights
+    #         x0 = weight.detach().cpu().numpy()
+    #         res = minimize(objective, x0=x0, jac=jac, hess=hess, method="Newton-CG")
+    #         weights[i] = torch.from_numpy(res.x).to(z.device)
+    #     print(weights)
+    #     self.feature.weights = weights
+    #     return weights

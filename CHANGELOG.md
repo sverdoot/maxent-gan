@@ -17,3 +17,12 @@
 * Corresponding changes to MaxEntSampler (```maxent_gan.sample.MaxEntSampler```))
 * Added WGAN-GP (with Instance Normalization) (```checkpoints/wgan_gp_in```))
 * Updated ```docs/revival_log.md```
+
+## 04/07/22
+
+* More efficient target log prob computation: eliminate repeats of ```model.forward``` for same inputs (```maxent_gan.models.base.MemoryModel```)
+* Fixed bug with seed in ```run.py```
+
+## 07/07/22
+
+* Added training with "meta-objective" (backprop through sampling in the latent space) (```train_meta.py```, ```maxent_gan.utils.train.trainer_meta```) 

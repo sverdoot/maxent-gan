@@ -37,7 +37,8 @@ afterall_params:
     
     compute_is: true
     compute_fid:  true
-    remove_chains: false
+    # remove_chains: false
+    save_last_slice: true
 
 params: &params
     sample_params: *sample_params
@@ -106,6 +107,15 @@ callbacks:
         invoke_every: *every
         keys:
           - dot_pr
+        save_dir: null
+
+  sampler_callbacks: &sampler_callbacks
+    log_step_size:
+      name: LogCallback
+      params:
+        invoke_every: *every
+        keys:
+          - step_size
         save_dir: null
 
   afterall_callbacks: &afterall_callbacks

@@ -56,6 +56,10 @@ class BaseDiscriminator(nn.Module):
             self.output_layer = nn.Sigmoid()
         else:
             self.output_layer = nn.Identity()
+        # self.input = None
+        # self.output = None
+        # self.register_forward_hook(forward_memory_hook)
+        # self.register_backward_hook(backward_hook)
 
     def get_label(self) -> torch.LongTensor:
         return self.label.data.long()
@@ -72,9 +76,29 @@ class BaseGenerator(nn.Module):
                 transforms.Lambda(lambda x: torch.clip(x, 0, 1)),
             ]
         )
+        # self.input = None
+        # self.output = None
+        # self.register_forward_hook(forward_memory_hook)
 
     def sample_label(self, *args, **kwargs):
         return None
 
     def get_label(self) -> torch.LongTensor:
         return self.label.data.long()
+
+
+class MemoryModel(nn.Module):
+    def __init__(self, module: nn.Module):
+        super().__init__()
+        self.module = module
+        self.input = None
+        self.output = None
+
+    def forward(self, input):
+        if self.input is not None and torch.equal(self.input, input):
+            output = self.output
+        else:
+            output = self.module.forward(input)
+            self.output = output
+            self.input = input
+        return output

@@ -19,7 +19,7 @@ studiogan
 fig_collection/
 dump/
 
-# notebooks/**
+notebooks/drafts/
 # !notebooks/.gitkeep
 
 # log/*

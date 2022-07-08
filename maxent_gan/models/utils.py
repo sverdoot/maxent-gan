@@ -7,7 +7,7 @@ from tqdm import trange
 
 from maxent_gan.utils.general_utils import ROOT_DIR, DotConfig
 
-from .base import ModelRegistry
+from .base import MemoryModel, ModelRegistry
 
 
 class CondDataParallel(torch.nn.DataParallel):
@@ -22,7 +22,9 @@ class CondDataParallel(torch.nn.DataParallel):
 
 
 class GANWrapper:
-    def __init__(self, config: DotConfig, device: torch.device, load_weights=True):
+    def __init__(
+        self, config: DotConfig, device: torch.device, load_weights=True, eval=True
+    ):
         self.config = config
         self.device = device
 
@@ -56,7 +58,29 @@ class GANWrapper:
                 self.dis.penult_layer = self.dis.module.penult_layer
         self.dp = config.dp
 
-        self.eval()
+        if eval:
+            self.gen = MemoryModel(self.gen)
+            self.dis = MemoryModel(self.dis)
+
+        dis_attrs = ["transform", "output_layer", "label", "penult_layer"]
+        self.dis.__dict__.update(
+            {attr: self.dis.module.__dict__.get(attr) for attr in dis_attrs}
+        )
+        gen_attrs = ["inverse_transform", "z_dim", "label"]
+        self.gen.__dict__.update(
+            {attr: self.gen.module.__dict__.get(attr) for attr in gen_attrs}
+        )
+        self.gen.sample_label = self.gen.module.sample_label
+        if hasattr(self.gen.module, "label"):
+            self.gen.cond = self.gen.module.label
+        if hasattr(self.dis.module, "label"):
+            self.dis.cond = self.dis.module.label
+
+        self.dis.transform = self.dis.module.transform
+        print(f"Transform: {self.dis.transform}")
+
+        if eval:
+            self.eval()
         self.define_prior()
         self.label = None
 

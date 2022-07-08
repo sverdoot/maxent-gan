@@ -101,6 +101,7 @@ def get_cifar_dataset(
     dataset = datasets.CIFAR10(
         Path(DATA_DIR, "cifar10").as_posix(),
         download=True,
+        train=False,
         transform=T.Compose([T.Resize(img_size), T.ToTensor(), T.Normalize(mean, std)]),
     )
     dataset = IgnoreLabelDataset(dataset)

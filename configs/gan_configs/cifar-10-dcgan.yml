@@ -53,5 +53,6 @@ trainer_kwargs: &trainer_kwargs
   n_dis: 1
   sample_size: 10000 #512 #5000
   grad_acc_steps: 1
-  sample_steps: &sample_steps 1
+  # sample_steps: &sample_steps 1
+  sample_steps: &sample_steps 2 #4
   alpha: 300

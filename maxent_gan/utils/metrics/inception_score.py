@@ -18,7 +18,6 @@ from torch.nn import functional as F
 from torchvision.models.inception import inception_v3
 from yaml import Loader
 
-from maxent_gan.models.utils import GANWrapper
 from maxent_gan.utils.callbacks import Callback, CallbackRegistry
 
 
@@ -183,6 +182,7 @@ if __name__ == "__main__":
     device = torch.device(args.device)
 
     if args.gan_config:
+        from maxent_gan.models.utils import GANWrapper
         from maxent_gan.utils.general_utils import DotConfig
 
         gan_config = DotConfig(

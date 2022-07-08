@@ -15,10 +15,9 @@ from torch.utils.data import ConcatDataset, DataLoader
 from maxent_gan.datasets.utils import get_dataset
 from maxent_gan.distribution import DistributionRegistry
 from maxent_gan.feature.utils import create_feature
-from maxent_gan.models.flow.real_nvp import RNVP
 from maxent_gan.sample import MaxEntSampler
 from maxent_gan.train.loss import LossRegistry
-from maxent_gan.train.trainer import Trainer
+from maxent_gan.train.trainer_meta import Trainer
 from maxent_gan.utils.callbacks import CallbackRegistry
 from maxent_gan.utils.general_utils import DotConfig, random_seed, seed_worker
 
@@ -27,8 +26,9 @@ sys.path.append("studiogan")  # noqa: E402
 from maxent_gan.models.studiogans import (  # noqa: F401, E402  isort: skip
     StudioDis,  # noqa: F401, E402  isort: skip
     StudioGen,  # noqa: F401, E402  isort: skip
-)
+)  # noqa: F401, E402  isort: skip
 from maxent_gan.models.utils import GANWrapper  # noqa: F401, E402  isort: skip
+
 
 torch.backends.cudnn.benchmark = False
 torch.backends.cudnn.deterministic = True
@@ -94,7 +94,9 @@ def main(config: DotConfig, device: torch.device, group: str):
         config["resume"] = False
         start_epoch = 0
     print(f"Start from epoch: {start_epoch}")
-    gan = GANWrapper(config.gan_config, device=device, load_weights=config.resume)
+    gan = GANWrapper(
+        config.gan_config, device=device, load_weights=config.resume, eval=False
+    )
     gan.gen.train()
     gan.dis.train()
 
@@ -132,26 +134,21 @@ def main(config: DotConfig, device: torch.device, group: str):
     ref_dist = DistributionRegistry.create(
         config.sample_params.distribution.name, gan=gan
     )
-    if (
-        config.sample_params.distribution.name == "PriorTarget"
-        and config.feature.name == "DumbFeature"
-    ):
-        sampler = None
-    else:
-        feature_dataloader = DataLoader(dataset, batch_size=config.data_batch_size)
-        feature = create_feature(
-            config, gan, feature_dataloader, dataset_stuff, save_dir, device
-        )
-        sampler = MaxEntSampler(
-            gen=gan.gen,
-            ref_dist=ref_dist,
-            feature=feature,
-            **config.sample_params.params,
-        )
-
-    flow = RNVP(5, gan.gen.z_dim).to(device)
-    optimizer_flow = Adam(
-        flow.parameters(), lr=1e-4, betas=(0.5, 0.999), weight_decay=1e-4
+    # if (
+    #     config.sample_params.distribution.name == "PriorTarget"
+    #     and config.feature.name == "DumbFeature"
+    # ):
+    #     sampler = None
+    # else:
+    feature_dataloader = DataLoader(dataset, batch_size=config.data_batch_size)
+    feature = create_feature(
+        config, gan, feature_dataloader, dataset_stuff, save_dir, device
+    )
+    sampler = MaxEntSampler(
+        gen=gan.gen,
+        ref_dist=ref_dist,
+        feature=feature,
+        **config.sample_params.params,
     )
 
     trainer = Trainer(
@@ -161,8 +158,6 @@ def main(config: DotConfig, device: torch.device, group: str):
         criterion_g,
         criterion_d,
         dataloader,
-        flow=flow,
-        optimizer_flow=optimizer_flow,
         device=device,
         callbacks=train_callbacks,
         sampler=sampler,
@@ -197,6 +192,7 @@ if __name__ == "__main__":
 
     if args.seed:
         config.seed = args.seed
+
     config.file_name = Path(args.configs[0]).name
     config.resume = args.resume
 

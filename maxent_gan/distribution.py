@@ -1,7 +1,9 @@
 from abc import ABC, abstractmethod
-from typing import Callable, Dict, Optional, Tuple, Union
+from typing import Callable, Dict, Optional
 
 import torch
+
+from maxent_gan.feature.feature import BaseFeature
 
 
 class Distribution(ABC):
@@ -53,16 +55,23 @@ class PriorTarget(Distribution):
 
 @DistributionRegistry.register()
 class DiscriminatorTarget(Distribution):
-    def __init__(self, gan, batch_size=None):
+    def __init__(self, gan, batch_size: Optional[int] = None):
         self.gan = gan
         self.proposal = gan.prior
         self.batch_size = batch_size
+        self.device = next(self.gan.gen.parameters()).device
 
     def log_prob(self, z: torch.FloatTensor, **kwargs) -> torch.FloatTensor:
         batch_size = kwargs.get("batch_size", self.batch_size or len(z))
-        log_prob = torch.empty((0,), device=z.device)
-        for chunk in torch.split(z, batch_size):
-            dgz = self.gan.dis(self.gan.gen(chunk)).squeeze()
+        log_prob = torch.empty((0,), device=self.device)
+        for chunk_id, chunk in enumerate(torch.split(z, batch_size)):
+            if "x" in kwargs:
+                x = kwargs["x"][chunk_id * batch_size : (chunk_id + 1) * batch_size].to(
+                    self.device
+                )
+            else:
+                x = self.gan.gen(chunk.to(self.device))
+            dgz = self.gan.dis(x).squeeze()
             logp_z = self.proposal.log_prob(chunk)
             if dgz.shape != logp_z.shape:
                 raise Exception
@@ -79,7 +88,7 @@ class CondTarget(Distribution):
         self,
         gan,
         data_batch: Optional[torch.FloatTensor] = None,
-        batch_size=None,
+        batch_size: Optional[int] = None,
     ):
         self.gan = gan
         self.proposal = gan.prior
@@ -121,8 +130,15 @@ class CondTarget(Distribution):
 
 @DistributionRegistry.register()
 class MaxEntTarget(Distribution):
-    def __init__(self, gen, feature, ref_dist, batch_size=None):
+    def __init__(
+        self,
+        gen,
+        feature: BaseFeature,
+        ref_dist: Distribution,
+        batch_size: Optional[int] = None,
+    ):
         self.gen = gen
+        self.device = next(self.gen.parameters()).device
         self.feature = feature
         self.ref_dist = ref_dist
         self.proposal = gen.prior
@@ -137,34 +153,39 @@ class MaxEntTarget(Distribution):
         **kwargs,
     ) -> torch.FloatTensor:
         batch_size = kwargs.get("batch_size", self.batch_size or len(z))
-        log_prob = torch.empty((0,), device=z.device)
+        log_prob = torch.empty((0,), device=self.device)
+        feature_out = [torch.empty((0,))] * self.feature.n_features
 
         for chunk in torch.split(z, batch_size):
-            f = self.feature(self.gen(chunk), chunk)
+            chunk = chunk.to(self.device)
+            x = self.gen(chunk)
+            f = self.feature(x=x, z=chunk)
             radnic_logp = self.feature.log_prob(f)
-            ref_logp = self.ref_dist.log_prob(chunk, data_batch=data_batch)
+            ref_logp = self.ref_dist.log_prob(chunk, x=x, data_batch=data_batch)
             if not isinstance(radnic_logp, torch.Tensor):
                 radnic_logp = torch.zeros_like(ref_logp, device=ref_logp.device)
             log_prob = torch.cat([log_prob, radnic_logp + ref_logp])
-
-            self.radnic_logps.append(radnic_logp.detach())
-            self.ref_logps.append(ref_logp.detach())
-
+            feature_out = [
+                torch.cat([x, y.detach().cpu()]) for x, y in zip(feature_out, f)
+            ]
+        self.feature.output_history.append(feature_out)
+        # self.radnic_logps.append(radnic_logp.detach())
+        # self.ref_logps.append(ref_logp.detach())
         return log_prob
 
     def project(self, z):
         return self.proposal.project(z)
 
 
-def grad_log_prob(
-    point: torch.FloatTensor,
-    log_dens: Union[Distribution, Callable],
-    # x: Optional[Any] = None,
-) -> Tuple[torch.FloatTensor, torch.FloatTensor]:
-    point = point.detach().requires_grad_()
-    log_prob = log_dens(point)
-    grad = torch.autograd.grad(log_prob.sum(), point)[0]
-    return log_prob, grad
+# def grad_log_prob(
+#     point: torch.FloatTensor,
+#     log_dens: Union[Distribution, Callable],
+#     # x: Optional[Any] = None,
+# ) -> Tuple[torch.FloatTensor, torch.FloatTensor]:
+#     point = point.detach().requires_grad_()
+#     log_prob = log_dens(point)
+#     grad = torch.autograd.grad(log_prob.sum(), point)[0]
+#     return log_prob, grad
 
 
 # def estimate_log_norm_constant(

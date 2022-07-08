@@ -9,7 +9,8 @@ from torch.distributions import MultivariateNormal as MNormal
 
 # class ConditionalDenseNN(nn.Module):
 #     """
-#     An implementation of a simple dense feedforward network taking a context variable, for use in, e.g.,
+#     An implementation of a simple dense feedforward network taking a context variable, for use
+#       in, e.g.,
 #     some conditional flows such as :class:`pyro.distributions.transforms.ConditionalAffineCoupling`.
 
 #     Example usage:
@@ -110,9 +111,12 @@ from torch.distributions import MultivariateNormal as MNormal
 
 # class DenseNN(ConditionalDenseNN):
 #     """
-#     An implementation of a simple dense feedforward network, for use in, e.g., some conditional flows such as
-#     :class:`pyro.distributions.transforms.ConditionalPlanarFlow` and other unconditional flows such as
-#     :class:`pyro.distributions.transforms.AffineCoupling` that do not require an autoregressive network.
+#     An implementation of a simple dense feedforward network, for use in, e.g., some conditional
+#       flows such as
+#     :class:`pyro.distributions.transforms.ConditionalPlanarFlow` and other unconditional flows
+#       such as
+#     :class:`pyro.distributions.transforms.AffineCoupling` that do not require an autoregressive
+#       network.
 
 #     Example usage:
 
@@ -127,10 +131,13 @@ from torch.distributions import MultivariateNormal as MNormal
 #     :param hidden_dims: the dimensionality of the hidden units per layer
 #     :type hidden_dims: list[int]
 #     :param param_dims: shape the output into parameters of dimension (p_n,) for p_n in param_dims
-#         when p_n > 1 and dimension () when p_n == 1. The default is [1, 1], i.e. output two parameters of dimension ().
+#         when p_n > 1 and dimension () when p_n == 1. The default is [1, 1], i.e. output two
+#       parameters of dimension ().
 #     :type param_dims: list[int]
-#     :param nonlinearity: The nonlinearity to use in the feedforward network such as torch.nn.ReLU(). Note that no
-#         nonlinearity is applied to the final network output, so the output is an unbounded real number.
+#     :param nonlinearity: The nonlinearity to use in the feedforward network such as
+#       torch.nn.ReLU(). Note that no
+#         nonlinearity is applied to the final network output, so the output is an unbounded
+#         real number.
 #     :type nonlinearity: torch.nn.module
 
 #     """
