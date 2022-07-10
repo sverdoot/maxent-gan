@@ -11,7 +11,7 @@ import torch
 import torchvision
 import wandb
 from torch.utils.data import DataLoader
-from vizualization.plot_results import plot_res
+from tools.vizualization.plot_results import plot_res
 
 from maxent_gan.datasets.utils import get_dataset
 from maxent_gan.distribution import Distribution, DistributionRegistry
