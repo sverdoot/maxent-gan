@@ -1,6 +1,7 @@
 **__pycache__
 **__ipynb_checkpoints__
 **.egg-info
+**.vscode
 
 data/*
 !data/.gitkeep
