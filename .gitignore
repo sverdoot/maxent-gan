@@ -16,6 +16,7 @@ studiogan
 
 fig_collection/
 dump/
+figs/
 
 notebooks/drafts/
 # !notebooks/.gitkeep
