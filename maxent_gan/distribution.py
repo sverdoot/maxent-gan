@@ -62,6 +62,8 @@ class DiscriminatorTarget(Distribution):
         self.device = next(self.gan.gen.parameters()).device
 
     def log_prob(self, z: torch.FloatTensor, **kwargs) -> torch.FloatTensor:
+        init_shape = z.shape
+        z = z.reshape(-1, init_shape[-1])
         batch_size = kwargs.get("batch_size", self.batch_size or len(z))
         log_prob = torch.empty((0,), device=self.device)
         for chunk_id, chunk in enumerate(torch.split(z, batch_size)):
@@ -73,10 +75,10 @@ class DiscriminatorTarget(Distribution):
                 x = self.gan.gen(chunk.to(self.device))
             dgz = self.gan.dis(x).squeeze()
             logp_z = self.proposal.log_prob(chunk)
-            if dgz.shape != logp_z.shape:
-                raise Exception
+            # if dgz.shape != logp_z.shape:
+            #     raise Exception
             log_prob = torch.cat([log_prob, (logp_z + dgz) / 1.0])
-        return log_prob
+        return log_prob.reshape(init_shape[:-1])
 
     def project(self, z):
         return self.proposal.project(z)
@@ -152,6 +154,8 @@ class MaxEntTarget(Distribution):
         data_batch: Optional[torch.FloatTensor] = None,
         **kwargs,
     ) -> torch.FloatTensor:
+        init_shape = z.shape
+        z = z.reshape(-1, init_shape[-1])
         batch_size = kwargs.get("batch_size", self.batch_size or len(z))
         log_prob = torch.empty((0,), device=self.device)
         feature_out = [torch.empty((0,))] * self.feature.n_features
@@ -171,7 +175,7 @@ class MaxEntTarget(Distribution):
         self.feature.output_history.append(feature_out)
         # self.radnic_logps.append(radnic_logp.detach())
         # self.ref_logps.append(ref_logp.detach())
-        return log_prob
+        return log_prob.reshape(init_shape[:-1])
 
     def project(self, z):
         return self.proposal.project(z)

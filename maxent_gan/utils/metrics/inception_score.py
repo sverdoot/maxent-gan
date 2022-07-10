@@ -3,6 +3,7 @@ Code is partially borrowed from repository https://github.com/sbarratt/inception
 """
 
 import argparse
+import logging
 from pathlib import Path
 from typing import Dict, Iterable, Optional, Tuple, Union
 
@@ -53,7 +54,8 @@ class InceptionScoreCallback(Callback):
     @torch.no_grad()
     def invoke(self, info: Dict[str, Union[float, np.ndarray]]):
         score = None
-        if self.cnt % self.invoke_every == 0:
+        step = info.get("step", self.cnt)
+        if step % self.invoke_every == 0:
             imgs = torch.from_numpy(info["imgs"]).to(self.device)
             imgs = self.transform(imgs)
             pis = []
@@ -70,7 +72,8 @@ class InceptionScoreCallback(Callback):
 
             if self.update_input:
                 info["inception_score"] = score
-            print(f"IS: {score}")
+            logger = logging.getLogger()
+            logger.info(f"\nIS: {score}")
         self.cnt += 1
         return score
 

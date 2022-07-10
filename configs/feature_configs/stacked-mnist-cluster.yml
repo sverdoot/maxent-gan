@@ -7,6 +7,7 @@ feature: &feature
     gan: null
     version: *version
     kernel: *kernel
+    batch_size: *batch_size
     opt_params:
       name:
         SGD

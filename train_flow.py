@@ -195,7 +195,7 @@ if __name__ == "__main__":
     config = yaml.round_trip_load(out.decode("utf-8"))
     config = DotConfig(config)
 
-    if args.seed:
+    if args.seed is not None:
         config.seed = args.seed
     config.file_name = Path(args.configs[0]).name
     config.resume = args.resume

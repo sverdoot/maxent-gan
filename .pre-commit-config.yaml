@@ -3,18 +3,22 @@ repos:
     rev: v2.2.0
     hooks:
     - id: seed-isort-config
+      exclude: ^maxent_gan/utils/metrics/compute_fid_tf.py
 -   repo: https://github.com/pre-commit/mirrors-isort
     rev: v5.9.3
     hooks:
     - id: isort
+      exclude: ^maxent_gan/utils/metrics/compute_fid_tf.py
 -   repo: https://github.com/ambv/black
     rev: 21.10b0
     hooks:
     - id: black
       language_version: python3.8
+      exclude: ^maxent_gan/utils/metrics/compute_fid_tf.py
 -   repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v2.3.0
     hooks:
     - id: flake8
+      exclude: ^maxent_gan/utils/metrics/compute_fid_tf.py
       language_version: python3.8
       args: ['--ignore=E129,E2,E203,W503', '--max-line-length=100']

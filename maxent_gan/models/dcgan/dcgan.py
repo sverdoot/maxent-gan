@@ -91,5 +91,4 @@ class DCGANDiscriminator(BaseDiscriminator):
             output = nn.parallel.data_parallel(self.main, input, range(self.ngpu))
         else:
             output = self.main(input)
-
         return output.view(-1, 1).squeeze(1)

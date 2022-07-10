@@ -4,6 +4,7 @@ feature: &feature
     device: *device
     info_path: data/cifar10/pca_rbf.npz
     ref_stats_path: stats/KernelPCAFeature_cifar10.npz
+    batch_size: *batch_size
     opt_params:
       name:
         SGD

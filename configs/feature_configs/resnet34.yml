@@ -4,6 +4,7 @@ feature: &feature
     device: *device
     ref_stats_path: stats/ResnetFeature34.npz
     dp: true
+    batch_size: *batch_size
     opt_params:
       name:
         SGD

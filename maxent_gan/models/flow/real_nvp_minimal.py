@@ -13,6 +13,7 @@ class RealNVPProposal(nn.Module):
         hidden: int = 32,
         num_blocks: int = 4,
     ):
+        device = torch.device(device)
         super().__init__()
 
         self.prior = MNormal(torch.zeros(dim).to(device), torch.eye(dim).to(device))

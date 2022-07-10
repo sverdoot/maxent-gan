@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Union
 
 import numpy as np
 import torch
@@ -48,11 +48,13 @@ class BaseFeature(ABC):
         n_features: int = 1,
         callbacks: Optional[List] = None,
         inverse_transform=None,
-        device="cuda",
+        device: Union[str, int, torch.device] = 0,
         opt_params: Optional[Dict[str, Any]] = None,
+        batch_size: Optional[int] = None,
     ):
+        self.device = torch.device(device)
+        self.batch_size = batch_size
         self.n_features = n_features
-        self.device = device
         self.avg_weight = AvgHolder([0] * n_features)
         self.avg_feature = AvgHolder([0] * n_features)
         self.opt_params = (
@@ -211,11 +213,11 @@ class Feature(BaseFeature):
         inverse_transform=None,
         callbacks=None,
         ref_stats_path=None,
-        device=0,
+        device: Union[str, int, torch.device] = 0,
         ref_score=[torch.zeros(1)],
+        batch_size: Optional[int] = None,
         **kwargs,
     ):
-        self.device = device
         if ref_stats_path and Path(ref_stats_path).exists():
             ref_stats = np.load(Path(ref_stats_path).open("rb"))
             self.ref_feature = [torch.from_numpy(ref_stats["arr_0"]).float()]
@@ -228,6 +230,8 @@ class Feature(BaseFeature):
             inverse_transform=inverse_transform,
             callbacks=callbacks,
             opt_params=kwargs.get("opt_params", None),
+            device=device,
+            batch_size=batch_size,
         )
 
     def init_weight(self):
@@ -242,7 +246,6 @@ class Feature(BaseFeature):
         feature_out: List[torch.FloatTensor],
         z: Optional[torch.FloatTensor] = None,
     ) -> Dict:
-        # print(feature_out[0] + self.ref_feature[0].to(x.device), self.ref_feature[0])
         return {
             "residual": feature_out[0].mean(0).norm(dim=0).item(),
             "out": (feature_out[0].cpu().mean(0) + self.ref_feature[0]).mean(0).item(),
@@ -270,7 +273,13 @@ class Feature(BaseFeature):
     def __call__(
         self, x: torch.FloatTensor, z: Optional[torch.FloatTensor] = None
     ) -> List[torch.FloatTensor]:
-        return self.process_batch(x, z)
+        batch_size = self.batch_size or len(x)
+        result = [torch.empty(0, r.shape[0], device=x.device) for r in self.ref_feature]
+        for i, x_batch in enumerate(x.split(batch_size)):
+            z_batch = None if z is None else z.split(batch_size)[i]
+            out = self.process_batch(x_batch, z_batch)
+            result = [torch.cat([r, o], dim=0) for r, o in zip(result, out)]
+        return result
 
     @BaseFeature.invoke_callbacks
     def process_batch(
@@ -352,20 +361,20 @@ class InceptionFeature(Feature):
     def __init__(
         self,
         inverse_transform=None,
-        ref_stats_path=None,
+        ref_stats_path: Optional[Union[str, Path]] = None,
         callbacks: Optional[List] = None,
         mean=(0.485, 0.456, 0.406),
         std=(0.229, 0.224, 0.225),
-        dp=False,
+        dp: bool = False,
         upsample=True,
         **kwargs,
     ):
-        self.device = kwargs.get("device", 0)
         self.upsample = upsample
         super().__init__(
             inverse_transform=inverse_transform,
             callbacks=callbacks,
             ref_stats_path=ref_stats_path,
+            **kwargs,
         )
         self.model = torchvision.models.inception.inception_v3(
             pretrained=True, transform_input=False
@@ -1009,6 +1018,11 @@ class DumbFeature(BaseFeature):
     @BaseFeature.invoke_callbacks
     @BaseFeature.collect_feature
     def __call__(
+        self, x, z: Optional[torch.FloatTensor] = None
+    ) -> List[torch.FloatTensor]:
+        return []
+
+    def apply_and_shift(
         self, x, z: Optional[torch.FloatTensor] = None
     ) -> List[torch.FloatTensor]:
         return []

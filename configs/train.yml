@@ -8,11 +8,14 @@ sample_params:
     params:
       n_steps: *sample_steps
       weight_step: *weight_step #0.1 #0.03 #*g_lr #*weight_step
-      step_size: *step_size
       n_sampling_steps: 1
       verbose: false
       save_every: 1
       collect_imgs: false
+      mcmc_args:
+        sampling: ula
+        step_size: *step_size
+
       
 # train
 train_params:

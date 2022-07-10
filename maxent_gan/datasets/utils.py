@@ -5,9 +5,9 @@ from typing import Any, Dict, Optional, Tuple, Union
 import gdown
 import numpy as np
 import torch
+import torchvision
 from PIL import Image
-from torch.utils.data import Dataset, TensorDataset
-from torchvision import datasets
+from torch.utils.data import ConcatDataset, Dataset, TensorDataset
 from torchvision import transforms as T
 
 from maxent_gan.utils.general_utils import DATA_DIR, IgnoreLabelDataset
@@ -21,6 +21,19 @@ from .synthetic import (
 
 
 N_CIFAR_CLASSES = 10
+
+
+class TrainGANDataset(Dataset):
+    def __init__(self, dataset: Dataset, length: int):
+        self.dataset = dataset
+        assert hasattr(self.dataset, "__len__")
+        self.length = length
+
+    def __len__(self):
+        return self.length
+
+    def __getitem__(self, idx: int):
+        return self.dataset[idx % len(self.dataset)]
 
 
 def download_celeba():
@@ -96,14 +109,32 @@ def get_cifar_dataset(
     mean: Tuple[float, float, float] = (0.5, 0.5, 0.5),
     std: Tuple[float, float, float] = (0.5, 0.5, 0.5),
     img_size: int = 32,
+    split="traintest",
     **kwargs,
 ) -> Dict[str, Dataset]:
-    dataset = datasets.CIFAR10(
-        Path(DATA_DIR, "cifar10").as_posix(),
-        download=True,
-        train=False,
-        transform=T.Compose([T.Resize(img_size), T.ToTensor(), T.Normalize(mean, std)]),
-    )
+    datasets = []
+    if "train" in split:
+        datasets.append(
+            torchvision.datasets.CIFAR10(
+                Path(DATA_DIR, "cifar10").as_posix(),
+                download=True,
+                transform=T.Compose(
+                    [T.Resize(img_size), T.ToTensor(), T.Normalize(mean, std)]
+                ),
+            )
+        )
+    if "test" in split:
+        datasets.append(
+            torchvision.datasets.CIFAR10(
+                Path(DATA_DIR, "cifar10").as_posix(),
+                download=True,
+                train=False,
+                transform=T.Compose(
+                    [T.Resize(img_size), T.ToTensor(), T.Normalize(mean, std)]
+                ),
+            )
+        )
+    dataset = ConcatDataset(datasets)
     dataset = IgnoreLabelDataset(dataset)
     return {"dataset": dataset}
 

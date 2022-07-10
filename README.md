@@ -1,14 +1,13 @@
 # Experiments on sampling from GAN with probabilistic constraints
 
 - [Experiments on sampling from GAN with probabilistic constraints](#experiments-on-sampling-from-gan-with-probabilistic-constraints)
-  - [Getting started](#getting-started)
+  - [Installation](#installation)
     - [StudioGAN:](#studiogan)
-  - [TODO:](#todo)
+  - [Usage](#usage)
+  - [Tutorials](#tutorials)
+  - [Results](#results)
 
-
-link to gdrive with checkpoints and stats: https://drive.google.com/drive/folders/1bgIBVt5JAqb8RsHHDFRVp003YYjBoSXV?usp=sharing
-
-## Getting started
+## Installation
 
 Create environment and set dependencies:
 ```zsh
@@ -47,48 +46,6 @@ If FID computation stucks that might be caused by conflict with scipy. Try runni
 ./scripts/install_studiogan.sh
 ```
 
-<!-- ```zsh
-git clone https://github.com/POSTECH-CVLab/PyTorch-StudioGAN.git thirdparty/studiogan 
-cd thirdparty/studiogan 
-git checkout cce0c6ab9584deb8dbf289e6192c125b201aa3d6
-mv src studiogan
-```
-
-```zsh
-touch studiogan/__init__.py
-
-echo "import sys
-
-sys.path.append('.')
-from . import config, utils" >> studiogan/__init__.py
-
-echo \
-"from setuptools import setup, find_packages
-
-setup(name='studiogan',
-      version='1.0',
-      packages=find_packages())" \
->> setup.py
-```
-
-```zsh
-pip install -e .
-```
-
-```zsh
-echo "tqdm ninja h5py kornia matplotlib pandas sklearn scipy seaborn wandb PyYaml click requests pyspng imageio-ffmpeg prdc" >> requirements.txt
-cd ../..
-```
-
-
-```zsh 
-poetry add `cat thirdparty/studiogan/requirements.txt`
-```
-
-Create symbolik link
-```zsh
-ln -s thirdparty/studiogan/studiogan studiogan
-``` -->
 
 To use StudioGAN as is following is needed:
 
@@ -127,40 +84,9 @@ Make bash scripts runable
 chmod +x -R scripts/*.sh
 ```
 
-
-<!-- ###
-mann
-
-```bash
-git clone git@github.com:wzell/mann.git thirdparty
-```
-
-```bash
-cd thirdparty/mann
-pip install -r requirements.txt
-echo \
-"from setuptools import setup
-
-setup(name='mann',
-      version='1.0',
-      packages=['mann'],
-      package_dir={'mann': './models'},)
-" \
->> setup.py
-
-python setup.py install
-``` -->
-
-
-
-## Usage 
+## Usage
 
 Download checkpoints:
-
-<!-- ```bash
-./scripts/get_ckpts.sh
-./scripts/get_stats.sh
-``` -->
 
 ```bash
 dvc pull
@@ -173,27 +99,23 @@ wandb login
 ```
 
 ```zsh
-python run.py configs/exp_configs/inception_feature.yml configs/gan_configs/dcgan.yml
-```
+    python run.py configs/exp_configs/dcgan-inception.yml configs/targets/discriminator.yml \
+        configs/gan_configs/cifar-10-dcgan.yml configs/feature_configs/inception.yml \
+        configs/mcmc_configs/{ula/mala/isir/ex2mcmc/flex2mcmc}.yml configs/mcmc_exp.yml
+``` 
 
 
-use pre-commit via 
+## Tutorials
 
-```zsh
-pre-commit run -a
-```
+* [docs/maxent_sample_tutorial.md](docs/maxent_sample_tutorial.md), [notebooks/maxent_sample_tutorial.ipynb](notebooks/maxent_sample_tutorial.ipynb)
 
-## TODO:
+* [docs/maxent_train_tutorial.md](docs/maxent_train_tutorial.md), [notebooks/maxent_train_tutorial.ipynb](../notebooks/maxent_train_tutorial.ipynb)
 
-* add Runner class to hold all needed inside and pass to all other objects
-* CMD central moment discrepancy
-  - do exps on images (ResNet)
-* collect results in experiments forlder
-* plan experiments and maintain actual list (+ push to dvc)
-* stacked mnist
-  - add model to count modes
 
-  
+## Results
+
+
+
 
 
 

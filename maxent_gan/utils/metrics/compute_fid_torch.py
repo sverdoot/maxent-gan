@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 from typing import Dict, Union
 
@@ -88,9 +89,9 @@ class FIDCallback(Callback):
     @torch.no_grad()
     def invoke(self, info: Dict[str, Union[float, np.ndarray]]):
         score = None
-        if self.cnt % self.invoke_every == 0:
+        step = info.get("step", self.cnt)
+        if step % self.invoke_every == 0:
             imgs = torch.from_numpy(info["imgs"])
-            print(imgs.shape)
             fake_dataset = [imgs]
             fake_dataset = IgnoreLabelDataset(TensorDataset(imgs))
             fake_mu, fake_sigma = get_activation_statistics(
@@ -111,13 +112,7 @@ class FIDCallback(Callback):
 
             if self.update_input:
                 info["fid"] = score
-            print(f"fid: {score}")
+            logger = logging.getLogger()
+            logger.info(f"\nFID: {score}")
         self.cnt += 1
         return score
-
-
-# def compute_fid_for_latents(latents, gen):
-#     block_idx = InceptionV3.BLOCK_INDEX_BY_DIM[dims]
-
-#     model = InceptionV3([block_idx]).to(device)
-#     model.eval()

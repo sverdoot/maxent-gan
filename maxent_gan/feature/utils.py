@@ -1,14 +1,17 @@
 from pathlib import Path
+from typing import Union
 
 import numpy as np
 
 from maxent_gan.utils.callbacks import CallbackRegistry
 
 from .eval_feature import evaluate
-from .feature import FeatureRegistry
+from .feature import BaseFeature, Feature, FeatureRegistry
 
 
-def create_feature(config, gan, dataloader, dataset_stuff, save_dir, device):
+def create_feature(
+    config, gan, dataloader, dataset_stuff, save_dir, device
+) -> Union[BaseFeature, Feature]:
     feature_callbacks = []
     callbacks = config.callbacks.feature_callbacks
     if callbacks:

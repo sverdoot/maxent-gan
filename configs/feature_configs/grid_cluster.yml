@@ -8,6 +8,7 @@ feature: &feature
     version: *version
     kernel: *kernel
     dis_emb: *dis_emb
+    batch_size: *batch_size
     opt_params:
       name:
         SGD

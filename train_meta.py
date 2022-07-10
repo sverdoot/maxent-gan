@@ -1,3 +1,4 @@
+import argparse
 import datetime
 import logging
 import re
@@ -8,11 +9,10 @@ from pathlib import Path
 import numpy as np
 import ruamel.yaml as yaml
 import torch
-from run import parse_arguments, reset_anchors
-from torch.optim import Adam
-from torch.utils.data import ConcatDataset, DataLoader
+from torch.optim import Adam  # noqa: F401
+from torch.utils.data import DataLoader
 
-from maxent_gan.datasets.utils import get_dataset
+from maxent_gan.datasets.utils import TrainGANDataset, get_dataset
 from maxent_gan.distribution import DistributionRegistry
 from maxent_gan.feature.utils import create_feature
 from maxent_gan.sample import MaxEntSampler
@@ -27,7 +27,7 @@ from maxent_gan.models.studiogans import (  # noqa: F401, E402  isort: skip
     StudioDis,  # noqa: F401, E402  isort: skip
     StudioGen,  # noqa: F401, E402  isort: skip
 )  # noqa: F401, E402  isort: skip
-from maxent_gan.models.utils import GANWrapper  # noqa: F401, E402  isort: skip
+from maxent_gan.models.utils import GANWrapper  # noqa: E402  isort: skip
 
 
 torch.backends.cudnn.benchmark = False
@@ -35,6 +35,82 @@ torch.backends.cudnn.deterministic = True
 
 FORMAT = "%(asctime)s %(message)s"
 logging.basicConfig(format=FORMAT, level=logging.INFO)
+
+
+def parse_arguments():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("configs", type=str, nargs="+")
+    parser.add_argument("--group", type=str)
+    parser.add_argument("--seed", type=int)
+    # parser.add_argument("--step_size_mul", type=float, default=1.0)
+    parser.add_argument("--resume", action="store_true")
+    parser.add_argument("--step_size", type=float)
+    parser.add_argument("--weight_step", type=float)
+    parser.add_argument("--feature_version", type=int)
+    # parser.add_argument("--dis_emb", action="store_true")
+    # parser.add_argument("--sweet_init", action="store_true")
+    parser.add_argument("--sample_steps", type=int)
+    # parser.add_argument(
+    #     "--kernel",
+    #     type=str,
+    #     choices=["GaussianKernel", "LinearKernel", "PolynomialKernel"],
+    # )
+    parser.add_argument("--suffix", type=str)
+
+    args = parser.parse_args()
+    return args
+
+
+def reset_anchors(args: argparse.Namespace, params: yaml.YAMLObject):
+    if args.weight_step is not None:
+        params["weight_step"] = yaml.scalarfloat.ScalarFloat(
+            args.weight_step,
+            prec=1,
+            width=10,
+            anchor=params["weight_step"].anchor.value,
+        )
+    if args.step_size is not None:
+        params["step_size"] = yaml.scalarfloat.ScalarFloat(
+            args.step_size,
+            prec=1,
+            width=10,
+            anchor=params["step_size"].anchor.value,
+        )
+    if args.feature_version:
+        params["version"] = yaml.scalarstring.LiteralScalarString(
+            args.feature_version,
+            anchor=params["version"].anchor.value,
+        )
+    # if args.kernel:
+    #     params["kernel"] = yaml.scalarstring.LiteralScalarString(
+    #         args.kernel,
+    #         anchor=params["kernel"].anchor.value,
+    #     )
+    # if args.dis_emb:
+    #     params["dis_emb"] = yaml.scalarstring.LiteralScalarString(
+    #         args.dis_emb,
+    #         anchor=params["dis_emb"].anchor.value,
+    #     )
+    # if args.sweet_init:
+    #     params["sweet_init"] = yaml.scalarstring.LiteralScalarString(
+    #         args.sweet_init,
+    #         anchor=params["sweet_init"].anchor.value,
+    #     )
+    if args.resume:
+        if "resume" in params:
+            params["resume"] = yaml.scalarstring.LiteralScalarString(
+                args.resume,
+                anchor=params["resume"].anchor.value,
+            )
+        else:
+            params["resume"] = args.resume
+    if args.suffix:
+        params["suffix"] = yaml.scalarstring.LiteralScalarString(args.suffix)
+    # if args.seed is not None:
+    #     params["seed"] = yaml.scalarint.ScalarInt(
+    #         args.sample_steps,
+    #         anchor=params["seed"].anchor.value,
+    #     )
 
 
 def main(config: DotConfig, device: torch.device, group: str):
@@ -56,6 +132,7 @@ def main(config: DotConfig, device: torch.device, group: str):
     save_dir.mkdir(exist_ok=True, parents=True)
 
     random_seed(config.seed)
+    train_config = config.train_params
 
     dataset_stuff = get_dataset(
         config.gan_config.dataset.name,
@@ -64,13 +141,13 @@ def main(config: DotConfig, device: torch.device, group: str):
         seed=config.seed,
         **config.gan_config.dataset.params,
     )
-    dataset = dataset_stuff["dataset"]
-
+    dataset = TrainGANDataset(
+        dataset_stuff["dataset"], train_config.n_train_iters * config.train_batch_size
+    )
     g = torch.Generator()
     g.manual_seed(config.seed)
-
     dataloader = DataLoader(
-        ConcatDataset([dataset, dataset]),
+        dataset,
         batch_size=config.train_batch_size,
         shuffle=True,
         num_workers=1,
@@ -87,20 +164,22 @@ def main(config: DotConfig, device: torch.device, group: str):
         config.gan_config.discriminator["ckpt_path"] = sorted(
             list((save_dir / "checkpoints").glob("d_*.pth"))
         )[-1]
-        start_epoch = (
+        start_iter = (
             int(re.findall(r"\d+", config.gan_config.generator.ckpt_path.name)[-1]) + 1
         )
     else:
         config["resume"] = False
-        start_epoch = 0
-    print(f"Start from epoch: {start_epoch}")
+        start_iter = 1
+    print(f"Start from iter: {start_iter}")
     gan = GANWrapper(
-        config.gan_config, device=device, load_weights=config.resume, eval=False
+        config.gan_config,
+        device=device,
+        load_weights=config.resume,
+        # eval=False
     )
     gan.gen.train()
     gan.dis.train()
 
-    train_config = config.train_params
     criterion_g = LossRegistry.create(train_config.criterion_g.name)
     criterion_d = LossRegistry.create(train_config.criterion_d.name)
 
@@ -161,10 +240,11 @@ def main(config: DotConfig, device: torch.device, group: str):
         device=device,
         callbacks=train_callbacks,
         sampler=sampler,
-        start_epoch=start_epoch,
+        start_iter=start_iter,
+        eval_every=train_config.eval_every,
         **train_config.trainer_kwargs,
     )
-    trainer.train(n_epochs=train_config.n_epochs)
+    trainer.train()
 
 
 if __name__ == "__main__":
@@ -190,8 +270,10 @@ if __name__ == "__main__":
     config = yaml.round_trip_load(out.decode("utf-8"))
     config = DotConfig(config)
 
-    if args.seed:
+    if args.seed is not None:
         config.seed = args.seed
+    if args.sample_steps is not None:
+        config.sample_params.params["n_steps"] = args.sample_steps
 
     config.file_name = Path(args.configs[0]).name
     config.resume = args.resume

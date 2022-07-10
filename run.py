@@ -16,6 +16,8 @@ from vizualization.plot_results import plot_res
 from maxent_gan.datasets.utils import get_dataset
 from maxent_gan.distribution import Distribution, DistributionRegistry
 from maxent_gan.feature import BaseFeature, create_feature
+from maxent_gan.models.flow.real_nvp import RNVP  # noqa: F401
+from maxent_gan.models.flow.real_nvp_minimal import RealNVPProposal
 from maxent_gan.models.utils import GANWrapper
 from maxent_gan.sample import MaxEntSampler
 from maxent_gan.utils.callbacks import CallbackRegistry
@@ -119,6 +121,9 @@ def main(config: DotConfig, device: torch.device, group: str):
                 config.sample_params.save_dir + dir_suffix,
                 datetime.datetime.now().strftime("%Y_%m_%d_%H_%M") + suffix,
             )
+        save_dir = save_dir.with_name(
+            save_dir.name + f"_{config.sample_params.params.sampling}"
+        )
         save_dir.mkdir(exist_ok=True, parents=True)
 
         yaml.round_trip_dump(config.dict, Path(save_dir, config.file_name).open("w"))
@@ -190,9 +195,10 @@ def main(config: DotConfig, device: torch.device, group: str):
                 run = wandb.run
                 run.config.update({"group": f"{group}"})
                 run.config.update({"name": f"{group}_{i}"}, allow_val_change=True)
-            start = start.to(device)
-            label = label.to(device)
-            gan.set_label(label)
+
+            if config.get("flow", None):
+                # proposal = RNVP(config.flow.params.num_flows, gan.gen.z_dim)
+                gan.gen.prior = RealNVPProposal(gan.gen.z_dim, device=device)
 
             # if config.lipschitz_step_size:
             #     config.sample_params.params.dict["step_size"] = (
@@ -201,11 +207,12 @@ def main(config: DotConfig, device: torch.device, group: str):
             #             "lipschitz_const"
             #         ]
             #     )
+            start = start.to(device)
+            label = label.to(device)
+            gan.set_label(label)
 
-            # sampler = MaxEntSampler(
-            #     gan.gen, ref_dist, feature, **config.sample_params.params
-            # )
             zs, xs, _, _ = sampler(start)
+            sampler.reset()
             gan.gen.input = gan.gen.output = gan.dis.input = gan.dis.output = None
 
             zs = torch.stack(zs, 0).cpu()

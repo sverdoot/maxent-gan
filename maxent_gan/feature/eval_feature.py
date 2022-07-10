@@ -39,7 +39,7 @@ def evaluate(
     feature, dataset, batch_size: int, device, save_path: Optional[Path] = None
 ):
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
-    stats = defaultdict(lambda: 0)
+    stats = defaultdict(lambda: 0.0)
     n = 0
     for batch in tqdm(dataloader):
         feature_result = feature.apply(batch.to(device))

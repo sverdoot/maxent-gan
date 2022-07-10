@@ -1,7 +1,8 @@
+import copy
 from typing import Dict, Iterable, List, Optional, Tuple, Union
 
 import torch
-from scipy.optimize import minimize
+from scipy.optimize import minimize  # noqa: F401
 from torch import nn
 from torch.distributions import Distribution as torchDist
 from tqdm import trange
@@ -56,7 +57,8 @@ class MaxEntSampler:
         self.callbacks = callbacks or []
 
         self.sampling = sampling
-        self.mcmc_args: Dict = mcmc_args or dict()
+        self.init_mcmc_args: Dict = copy.deepcopy(mcmc_args or dict())
+        self.mcmc_args = copy.deepcopy(self.init_mcmc_args)
 
         self.radnic_logps = []
         self.ref_logps = []
@@ -66,6 +68,11 @@ class MaxEntSampler:
 
         self.mcmc = MCMCRegistry()
         self.target = MaxEntTarget(gen, feature, ref_dist, batch_size=batch_size)
+
+    def reset(self):
+        self.mcmc_args = copy.deepcopy(self.init_mcmc_args)
+        for callback in self.callbacks:
+            callback.reset()
 
     @property
     def ref_dist(self):
@@ -79,9 +86,9 @@ class MaxEntSampler:
         meta: Optional[Dict] = None,
         keep_graph: bool = False,
     ) -> Tuple[torch.Tensor, Dict]:
-        z = z.clone()
-        z.requires_grad_(True)
-        z.grad = None
+        # z = z.clone()
+        # z.requires_grad_(True)
+        # z.grad = None
 
         avg = (it > self.burn_in_steps or it == 1) and it % self.weight_avg_every == 0
 
@@ -99,11 +106,6 @@ class MaxEntSampler:
             self.feature.avg_weight.upd(self.feature.weight)
 
         proposal = self.gen.prior
-        # if isinstance(proposal, torch.distributions.MultivariateNormal):
-        proposal = torch.distributions.MultivariateNormal(
-            torch.zeros(z.shape[-1]).to(z.device),
-            torch.eye(z.shape[-1]).to(z.device),
-        )
 
         self._ref_dist.data_batch = data_batch
         pts, meta = self.mcmc(
@@ -132,13 +134,11 @@ class MaxEntSampler:
         z: torch.Tensor,
         n_steps: Optional[int] = None,
         data_batch: Optional[torch.FloatTensor] = None,
-        collect_imgs: Optional[bool] = None,
+        collect_imgs: bool = False,
         keep_graph: bool = False,
     ) -> Tuple[List, List, List, List]:
-        n_steps = n_steps or self.n_steps
+        n_steps = n_steps if n_steps is not None else self.n_steps
         collect_imgs = collect_imgs or self.collect_imgs
-        # z = z.clone().detach().requires_grad_()
-        # z.grad = None
         zs = [z.cpu()]
         xs = []
         meta = dict()
@@ -149,7 +149,7 @@ class MaxEntSampler:
 
         it = 0
         self.feature.avg_feature.reset()
-        for it in self.trange(1, n_steps + 2):
+        for it in self.trange(1, n_steps + 1):
             new_z, meta = self.step(z, it, data_batch, meta=meta, keep_graph=keep_graph)
             if it > self.start_sample:
                 z = new_z
@@ -167,7 +167,7 @@ class MaxEntSampler:
             for callback in self.callbacks:
                 callback.invoke(self.mcmc_args)
 
-        self.target.log_prob(z.detach(), data_batch)
+        # self.target.log_prob(z.detach(), data_batch) ??
 
         return zs, xs, self.target.ref_logps, self.target.radnic_logps
 

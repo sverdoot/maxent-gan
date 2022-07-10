@@ -2,9 +2,6 @@
 **__ipynb_checkpoints__
 **.egg-info
 
-
-run_cp.py
-
 data/*
 !data/.gitkeep
 
@@ -25,6 +22,7 @@ notebooks/drafts/
 # log/*
 # !log/.gitkeep
 log/
+**/log/
 
 wandb/*
 
@@ -33,3 +31,6 @@ wandb/*
 **.pth
 **.pdf
 log/**/*.png
+
+run_cp.py
+train.py

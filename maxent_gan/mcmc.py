@@ -3,9 +3,9 @@ from typing import Callable, Dict, Optional, Tuple, Union
 import numpy as np
 import torch
 from pyro.infer import HMC, MCMC
+from torch.distributions import Normal  # noqa: F401
 from torch.distributions import Categorical
 from torch.distributions import Distribution as torchDist
-from torch.distributions import Normal
 from torch.nn import functional as F
 from tqdm import trange
 
@@ -162,7 +162,7 @@ def isir(
 
     range_ = trange if verbose else range
     for step_id in range_(n_samples + burn_in):
-        point, log_qs, log_ps, indices = isir_step(
+        point, _, log_qs, log_ps, indices = isir_step(
             point,
             target,
             proposal,
@@ -319,7 +319,8 @@ def ex2mcmc(
     *,
     step_size: float,
     n_particles: int,
-    target_acceptance_rate: float = False,
+    n_mala_steps: int = 1,
+    target_acceptance: float = False,
     verbose: bool = False,
     meta: Optional[Dict] = None,
     keep_graph: bool = False,
@@ -339,23 +340,23 @@ def ex2mcmc(
         points, meta = isir(
             point, target, proposal, 1, 0, project, n_particles=n_particles, meta=meta
         )
-        meta["grad"] = torch.autograd.grad(meta["logp"].sum(), points[1])[
-            0
-        ]  # .detach()
+        # meta["grad"] = torch.autograd.grad(meta["logp"].sum(), points[-1])[
+        #     0
+        # ]  # .detach()
         points, meta = mala(
-            points[1],
+            points[-1],
             target,
             proposal,
-            1,
-            0,
+            n_mala_steps,
+            n_mala_steps - 1,
             project,
             step_size=step_size,
-            target_acceptance=target_acceptance_rate,
+            target_acceptance=target_acceptance,
             meta=meta,
             keep_graph=keep_graph,
         )
         step_size = meta["step_size"][-1]
-        point = points[1]
+        point = points[-1]
         if not keep_graph:
             point = point.detach().requires_grad_()
         if step_id >= burn_in:
@@ -376,7 +377,7 @@ def hmc(
     *,
     step_size: float,
     leapfrog_steps: int = 1,
-    target_acceptance_rate: float = False,
+    target_acceptance: float = False,
     adapt_step_size: bool = False,
     verbose: bool = False,
     meta: Optional[Dict] = None,
@@ -390,7 +391,7 @@ def hmc(
             step_size=step_size,
             num_steps=leapfrog_steps,
             adapt_step_size=adapt_step_size,
-            target_accept_prob=target_acceptance_rate,
+            target_accept_prob=target_acceptance,
         )
         meta["hmc_kernel"] = kernel
 
@@ -414,132 +415,139 @@ def hmc(
     return chains, meta
 
 
-# DON'T REMOVE
-# @MCMCRegistry.register()
-# def flex2mcmc(
-#     start: torch.FloatTensor,
-#     target,
-#     proposal,
-#     n_samples: int,
-#     burn_in: int,
-#     project: Callable,
-#     *,
-#     n_particles: int,
-#     step_size: float,
-#     n_mala_steps: int,
-#     add_pop_size_train: int = 4096,
-#     forward_kl_weight: float = 1.0,
-#     backward_kl_weight: float = 1.0,
-#     meta: Optional[Dict] = None,
-#     verbose: bool = False,
-# ) -> Tuple[torch.FloatTensor, Dict]:
-#     """
-#     Ex2MCMC with Flow proposal
+@MCMCRegistry.register()
+def flex2mcmc(
+    start: torch.FloatTensor,
+    target,
+    proposal,
+    n_samples: int,
+    burn_in: int,
+    project: Callable,
+    *,
+    n_particles: int,
+    step_size: float,
+    n_mala_steps: int = 1,
+    add_pop_size_train: int = 4096,
+    forward_kl_weight: float = 1.0,
+    backward_kl_weight: float = 1.0,
+    target_acceptance: float = False,
+    verbose: bool = False,
+    meta: Optional[Dict] = None,
+    keep_graph: bool = False,
+) -> Tuple[torch.FloatTensor, Dict]:
+    """
+    Ex2MCMC with Flow proposal
 
-#     Args:
-#         start - strating points of shape [n_chains x dim]
-#         target - target distribution instance with method "log_prob"
-#         proposal - instance of RealNVProposal
-#         n_samples - number of last samples from each chain to return
-#         burn_in - number of first samples from each chain to throw away
-#         step_size - step size for drift term
-#         n_particles - number of particles including one from previous step
-#         n_mala_steps - number of MALA steps after each SIR step
-#         verbose - whether to show iterations' bar
+    Args:
+        start - strating points of shape [n_chains x dim]
+        target - target distribution instance with method "log_prob"
+        proposal - instance of RealNVProposal
+        n_samples - number of last samples from each chain to return
+        burn_in - number of first samples from each chain to throw away
+        step_size - step size for drift term
+        n_particles - number of particles including one from previous step
+        n_mala_steps - number of MALA steps after each SIR step
+        verbose - whether to show iterations' bar
 
-#     Returns:
-#         tensor of chains with shape [n_samples, n_chains, dim],
-#           acceptance rates for each iteration
-#     """
-#     chains = []
-#     if meta:
-#         meta["sir_accept"] = meta.get("sir_accept", [])
-#         meta["forward_kl"] = meta.get("forward_kl", [])
-#         meta["backward_kl"] = meta.get("backward_kl", [])
-#     else:
-#         meta = dict(sir_accept=[], forward_kl=[], backward_kl=[])
-#     meta["proposal_opt"] = meta.get(
-#         "proposal_opt", torch.optim.Adam(proposal.parameters(), lr=1e-3)
-#     )
+    Returns:
+        tensor of chains with shape [n_samples, n_chains, dim],
+          acceptance rates for each iteration
+    """
+    chains = []
+    if meta:
+        meta["sir_accept"] = meta.get("sir_accept", [])
+        meta["forward_kl"] = meta.get("forward_kl", [])
+        meta["backward_kl"] = meta.get("backward_kl", [])
+    else:
+        meta = dict(sir_accept=[], forward_kl=[], backward_kl=[])
+    meta["proposal_opt"] = meta.get(
+        "proposal_opt", torch.optim.Adam(proposal.parameters(), lr=1e-3)
+    )
 
-#     x = start.clone()
-#     x.requires_grad_(True)
-#     x.grad = None
+    x = start.clone()
+    x.requires_grad_(True)
+    x.grad = None
 
-#     hist_proposals = None
+    hist_proposals = None
 
-#     pbar = trange(n_samples + burn_in) if verbose else
-#           range(n_samples + burn_in)
-#     for step_id in pbar:
-#         x = x.data
-#         x.requires_grad_(True)
+    pbar = trange(n_samples + burn_in) if verbose else range(n_samples + burn_in)
+    for step_id in pbar:
+        x, proposals, log_ps, _, indices = isir_step(
+            x, target, proposal, n_particles=n_particles
+        )
+        meta["sir_accept"].append((indices != 0).float().mean().item())
+        x, meta = mala(
+            x,
+            target,
+            proposal.prior,
+            n_mala_steps,
+            n_mala_steps - 1,
+            project,
+            step_size=step_size,
+            target_acceptance=target_acceptance,
+            verbose=False,
+            meta=meta,
+        )
+        step_size = meta["step_size"]
+        x = x[-1]
+        # x, meta = ex2mcmc(x, target, proposal, 1, 0, project,
+        #         step_size=step_size,
+        #         n_particles=n_particles,
+        #         n_mala_steps=n_mala_steps,
+        #         target_acceptance_rate=target_acceptance_rate,
+        #         verbose=verbose,
+        #         meta=meta,
+        #         keep_graph=keep_graph
+        #         )
+        # x = x[-1]
 
-#         x, proposals, log_ps, _, indices = isir_step(
-#             x, target, proposal, n_particles=n_particles
-#         )
-#         meta["sir_accept"].append((indices != 0).float().mean().item())
-#         x, meta = mala(
-#             x,
-#             target,
-#             proposal.prior,
-#             n_mala_steps,
-#             n_mala_steps - 1,
-#             project,
-#             step_size=step_size,
-#             verbose=False,
-#             meta=meta,
-#         )
-#         step_size = meta["step_size"]
-#         x = x[-1]
+        if step_id >= burn_in:
+            chains.append(x)
+        else:
+            # forward KL
+            proposals_flattened = proposals.reshape(-1, x.shape[-1])
+            log_ps_flattened = log_ps.reshape(-1).detach()
 
-#         if step_id >= burn_in:
-#             chains.append(x.detach().data.clone())
-#         else:
-#             # forward KL
-#             proposals_flattened = proposals.reshape(-1, x.shape[-1])
-#             log_ps_flattened = log_ps.reshape(-1).detach()
+            if hist_proposals is not None:
+                idxs = np.random.choice(hist_proposals.shape[0], add_pop_size_train)
+                proposals_flattened = torch.cat(
+                    (proposals_flattened, hist_proposals[idxs]), dim=0
+                )
+                log_ps_flattened = torch.cat(
+                    (log_ps_flattened, hist_log_ps[idxs]), dim=0
+                )
 
-#             if hist_proposals is not None:
-#                 idxs = np.random.choice(hist_proposals.shape[0],
-#                       add_pop_size_train)
-#                 proposals_flattened = torch.cat(
-#                     (proposals_flattened, hist_proposals[idxs]), dim=0
-#                 )
-#                 log_ps_flattened = torch.cat(
-#                     (log_ps_flattened, hist_log_ps[idxs]), dim=0
-#                 )
+            log_qs = proposal.log_prob(proposals_flattened)
+            logw = log_ps_flattened - log_qs.detach()
 
-#             log_qs = proposal.log_prob(proposals_flattened)
-#             logw = log_ps_flattened - log_qs.detach()
+            kl_forw = -(log_qs * torch.softmax(logw, dim=0)).sum()
 
-#             kl_forw = -(log_qs * torch.softmax(logw, dim=0)).sum()
+            # backward KL
+            _, log_det_J = proposal.forward(proposals[:, 1:])
+            kl_back = -(log_ps[:, 1:] + log_det_J).mean()
 
-#             # backward KL
-#             _, log_det_J = proposal.forward(proposals[:, 1:])
-#             kl_back = -(log_ps[:, 1:] + log_det_J).mean()
+            # entropy reg
+            e = -proposal.log_prob(proposal.prior.sample(proposals.shape)).mean()
 
-#             # entropy reg
-#             e = -proposal.log_prob(proposal.prior.sample(proposals.shape)).mean()
+            loss = forward_kl_weight * kl_forw + backward_kl_weight * kl_back + 0.1 * e
+            meta["proposal_opt"].zero_grad()
+            loss.backward()
+            meta["proposal_opt"].step()
 
-#             loss = forward_kl_weight * kl_forw + backward_kl_weight * kl_back + 0.1 * e
-#             meta["proposal_opt"].zero_grad()
-#             loss.backward()
-#             meta["proposal_opt"].step()
+            meta["forward_kl"].append(kl_forw.item())
+            meta["backward_kl"].append(kl_back.item())
 
-#             meta["forward_kl"].append(kl_forw.item())
-#             meta["backward_kl"].append(kl_back.item())
+            if verbose:
+                pbar.set_description(
+                    f"KL forw {kl_forw.item():.3f}, \
+                    KL back {kl_back.item():.3f} Hentr {e.item():.3f}"
+                )
 
-#             if verbose:
-#                 pbar.set_description(
-#                     f"KL forw {kl_forw.item():.3f}, \
-#                     KL back {kl_back.item():.3f} Hentr {e.item():.3f}"
-#                 )
-
-#             if hist_proposals is None:
-#                 hist_proposals = proposals_flattened
-#                 hist_log_ps = log_ps_flattened
-#             else:
-#                 hist_proposals = torch.cat((hist_proposals, proposals_flattened), dim=0)
-#                 hist_log_ps = torch.cat((hist_log_ps, log_ps_flattened), dim=0)
-#     chains = torch.stack(chains, 0)
-#     return chains, meta
+            if hist_proposals is None:
+                hist_proposals = proposals_flattened
+                hist_log_ps = log_ps_flattened
+            else:
+                hist_proposals = torch.cat((hist_proposals, proposals_flattened), dim=0)
+                hist_log_ps = torch.cat((hist_log_ps, log_ps_flattened), dim=0)
+    chains = torch.stack(chains, 0)
+    return chains, meta

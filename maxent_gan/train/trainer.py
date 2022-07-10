@@ -8,8 +8,8 @@ from torch.utils.data import DataLoader
 
 from maxent_gan.distribution import CondTarget, DiscriminatorTarget, PriorTarget
 from maxent_gan.sample import MaxEntSampler
+from maxent_gan.train.loss import gradient_penalty
 from maxent_gan.utils.callbacks import Callback
-from maxent_gan.utils.train.loss import gradient_penalty
 
 
 # def opt_weight(gan, flow, feature, batch_size):
@@ -75,6 +75,17 @@ class FlowIdentity(nn.Identity):
         return x, torch.ones(x.shape[0])
 
 
+class OptimIdentity(Optimizer):
+    def __init__(self) -> None:
+        pass
+
+    def step(self, closure: Optional[Callable[[], float]] = ...) -> Optional[float]:
+        pass
+
+    def zero_grad(self, set_to_none: Optional[bool] = ...) -> None:
+        pass
+
+
 class Trainer:
     def __init__(
         self,
@@ -102,11 +113,10 @@ class Trainer:
         self.gan = gan
         if not flow:
             flow = FlowIdentity()
+            optimizer_flow = OptimIdentity()
         self.flow = flow
         self.optimizer_g = optimizer_g
         self.optimizer_d = optimizer_d
-        if not optimizer_flow:
-            optimizer_flow = torch.optim.Adam(flow.parameters())
         self.optimizer_flow = optimizer_flow
         self.criterion_g = criterion_g
         self.criterion_d = criterion_d
@@ -231,7 +241,7 @@ class Trainer:
                         )
                     scores = torch.cat(scores, 0)
             else:
-                fake_batch = self.gan.gen(g_latent.to(self.device))
+                fake_batch = self.gan.gen(z_push.to(self.device))
                 scores = self.gan.dis(fake_batch).squeeze()
 
             if not isinstance(self.flow, FlowIdentity):
@@ -239,7 +249,8 @@ class Trainer:
                 self.sampler.feature.weight[0].data -= self.sampler.weight_step * (
                     -feat[0].mean(0) + 0.01 * self.sampler.feature.weight[0].data
                 )
-                # self.sampler.feature.weight_up([f.mean(0).detach() for f in feat], self.sampler.weight_step)
+                # self.sampler.feature.weight_up([f.mean(0).detach() for f in feat],
+                # self.sampler.weight_step)
                 lik_f = self.sampler.feature.log_prob(feat).squeeze()
                 # (torch.logsumexp(lik_f, dim=0) / len(lik_f)).backward(retain_graph=True)
                 flow_kl_forward = (
@@ -321,6 +332,7 @@ class Trainer:
                 weight_norm = 0
             info = dict(
                 step=ep,
+                total=n_epochs,
                 loss_g=loss_g,
                 loss_d=loss_d,
                 imgs=imgs,

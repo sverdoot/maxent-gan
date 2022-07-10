@@ -112,7 +112,8 @@ class PlotImagesCallback(Callback):
         )
 
     def invoke(self, info: Dict[str, Union[float, np.ndarray]]):
-        if self.cnt % self.invoke_every == 0:
+        step = info.get("step", self.cnt)
+        if step % self.invoke_every == 0:
             grid = make_grid(
                 self.img_transform(
                     torch.clip(torch.from_numpy(info["imgs"][:100]), 0, 1)
@@ -288,7 +289,8 @@ class LogCallback(Callback):
         self,
         info: Dict[str, Union[float, np.ndarray]],
     ):
-        if self.cnt % self.invoke_every == 0:
+        step = info.get("step", self.cnt)
+        if step % self.invoke_every == 0:
             for save_path, key in zip(self.save_paths, self.keys):
                 if key not in info:
                     continue
@@ -444,8 +446,8 @@ class Plot2dCallback(Callback):
         self.range = range
 
     def invoke(self, info: Dict[str, Union[float, np.ndarray]]):
-        # step = self.cnt  # if "step" not in info else info["step"]
-        if self.cnt % self.invoke_every == 0:
+        step = info.get("step", self.cnt)
+        if step % self.invoke_every == 0:
             xs = info["imgs"]
             plt.figure(figsize=(4, 4))
             plt.scatter(xs[:, 0], xs[:, 1], alpha=0.1, s=10)
@@ -510,8 +512,8 @@ class Plot3dCallback(Callback):
         self.range = range
 
     def invoke(self, info: Dict[str, Union[float, np.ndarray]]):
-        # step = self.cnt  # if "step" not in info else info["step"]
-        if self.cnt % self.invoke_every == 0:
+        step = info.get("step", self.cnt)
+        if step % self.invoke_every == 0:
             xs = info["imgs"]
             fig = plt.figure(figsize=(4, 4))
             ax = fig.add_subplot(projection="3d")
@@ -569,8 +571,8 @@ class Plot2dEnergyCallback(Callback):
         self.gan = gan
 
     def invoke(self, info: Dict[str, Union[float, np.ndarray]]):
-        # step = self.cnt  # if "step" not in info else info["step"]
-        if self.cnt % self.invoke_every == 0:
+        step = info.get("step", self.cnt)
+        if step % self.invoke_every == 0:
             n_pts_ax = 100
             real_grid = np.meshgrid(
                 np.linspace(-5, 5, n_pts_ax), np.linspace(-5, 5, n_pts_ax)
@@ -622,14 +624,15 @@ class TrainLogCallback(Callback):
         # self.logger.addHandler(ch)
 
     def invoke(self, info: Dict[str, Union[float, np.ndarray]]):
-        # step = self.cnt  # if "step" not in info else info["step"]
-        if self.cnt % self.invoke_every == 0:
-            ep = info["step"]
+        step = info.get("step", self.cnt)
+        if step % self.invoke_every == 0:
             loss_g = info["loss_g"]
             loss_d = info["loss_d"]
 
             logger = logging.getLogger("train")
-            logger.info(f"Epoch: {ep}, Loss G: {loss_g}, Loss D: {loss_d}")
+            logger.info(
+                f"\nIteration: [{step}/{info['total']}], Loss G: {loss_g:.3f}, Loss D: {loss_d:.3f}"
+            )
 
         self.cnt += 1
         return 1
@@ -646,8 +649,8 @@ class CheckpointCallback(Callback):
         self.save_dir.mkdir(exist_ok=True)
 
     def invoke(self, info: Dict[str, Union[float, np.ndarray]]):
-        step = self.cnt  # if "step" not in info else info["step"]
-        if self.cnt % self.invoke_every == 0 and self.cnt > 1:
+        step = info.get("step", self.cnt)
+        if step % self.invoke_every == 0:
             if self.gan.dp:
                 torch.save(
                     self.gan.gen.module.state_dict(),
