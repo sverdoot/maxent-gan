@@ -17,7 +17,7 @@ from maxent_gan.distribution import DistributionRegistry
 from maxent_gan.feature.utils import create_feature
 from maxent_gan.sample import MaxEntSampler
 from maxent_gan.train.loss import LossRegistry
-from maxent_gan.train.trainer_meta import Trainer
+from maxent_gan.train.trainer import Trainer
 from maxent_gan.utils.callbacks import CallbackRegistry
 from maxent_gan.utils.general_utils import DotConfig, random_seed, seed_worker
 
@@ -42,12 +42,10 @@ def parse_arguments():
     parser.add_argument("configs", type=str, nargs="+")
     parser.add_argument("--group", type=str)
     parser.add_argument("--seed", type=int)
-    # parser.add_argument("--step_size_mul", type=float, default=1.0)
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--step_size", type=float)
     parser.add_argument("--weight_step", type=float)
     parser.add_argument("--feature_version", type=int)
-    # parser.add_argument("--dis_emb", action="store_true")
     # parser.add_argument("--sweet_init", action="store_true")
     parser.add_argument("--sample_steps", type=int)
     # parser.add_argument(
@@ -85,11 +83,6 @@ def reset_anchors(args: argparse.Namespace, params: yaml.YAMLObject):
     #     params["kernel"] = yaml.scalarstring.LiteralScalarString(
     #         args.kernel,
     #         anchor=params["kernel"].anchor.value,
-    #     )
-    # if args.dis_emb:
-    #     params["dis_emb"] = yaml.scalarstring.LiteralScalarString(
-    #         args.dis_emb,
-    #         anchor=params["dis_emb"].anchor.value,
     #     )
     # if args.sweet_init:
     #     params["sweet_init"] = yaml.scalarstring.LiteralScalarString(
@@ -179,6 +172,8 @@ def main(config: DotConfig, device: torch.device, group: str):
     )
     gan.gen.train()
     gan.dis.train()
+    for p in list(gan.gen.parameters()) + list(gan.dis.parameters()):
+        p.requires_grad_(True)
 
     criterion_g = LossRegistry.create(train_config.criterion_g.name)
     criterion_d = LossRegistry.create(train_config.criterion_d.name)
@@ -213,12 +208,6 @@ def main(config: DotConfig, device: torch.device, group: str):
     ref_dist = DistributionRegistry.create(
         config.sample_params.distribution.name, gan=gan
     )
-    # if (
-    #     config.sample_params.distribution.name == "PriorTarget"
-    #     and config.feature.name == "DumbFeature"
-    # ):
-    #     sampler = None
-    # else:
     feature_dataloader = DataLoader(dataset, batch_size=config.data_batch_size)
     feature = create_feature(
         config, gan, feature_dataloader, dataset_stuff, save_dir, device
@@ -241,7 +230,6 @@ def main(config: DotConfig, device: torch.device, group: str):
         callbacks=train_callbacks,
         sampler=sampler,
         start_iter=start_iter,
-        eval_every=train_config.eval_every,
         **train_config.trainer_kwargs,
     )
     trainer.train()

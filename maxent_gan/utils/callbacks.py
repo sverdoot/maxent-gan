@@ -69,7 +69,8 @@ class WandbCallback(Callback):
         )
 
     def invoke(self, info: Dict[str, Union[float, np.ndarray]]):
-        if self.cnt % self.invoke_every == 0:
+        step = info.get("step", self.cnt)
+        if step % self.invoke_every == 0:
             wandb = self.wandb
             if not self.keys:
                 self.keys = info.keys()
@@ -89,7 +90,7 @@ class WandbCallback(Callback):
                     )
                 else:
                     log[key] = info[key]
-            log["step"] = self.cnt if "step" not in info else info["step"]
+            log["step"] = step
             wandb.log(log)
         self.cnt += 1
         return 1
@@ -239,9 +240,6 @@ class EnergyCallback(Callback):
             if not batch_size:
                 batch_size = len(zs) if not self.batch_size else self.batch_size
             energy = 0
-            # log_norm_const = estimate_log_norm_constant(
-            #     self.gen, self.dis, 5000
-            # )
 
             for i, z_batch in enumerate(torch.split(zs, batch_size)):
                 if label is not None:
@@ -616,12 +614,6 @@ class Plot2dEnergyCallback(Callback):
 class TrainLogCallback(Callback):
     def __init__(self, invoke_every: int = 1) -> None:
         self.invoke_every = invoke_every
-        # self.logger = logging.getLogger('train')
-        # FORMAT = "%(asctime)s %(message)s"
-        # ch = logging.StreamHandler()
-        # ch.setLevel(logging.INFO)
-        # ch.setFormatter(logging.Formatter(FORMAT))
-        # self.logger.addHandler(ch)
 
     def invoke(self, info: Dict[str, Union[float, np.ndarray]]):
         step = info.get("step", self.cnt)

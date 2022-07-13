@@ -99,9 +99,9 @@ wandb login
 ```
 
 ```zsh
-    python run.py configs/exp_configs/dcgan-inception.yml configs/targets/discriminator.yml \
-        configs/gan_configs/cifar-10-dcgan.yml configs/feature_configs/inception.yml \
-        configs/mcmc_configs/{ula/mala/isir/ex2mcmc/flex2mcmc}.yml configs/mcmc_exp.yml
+python run.py configs/exp_configs/dcgan-inception.yml configs/targets/discriminator.yml \
+    configs/gan_configs/cifar-10-dcgan.yml configs/feature_configs/inception.yml \
+    configs/mcmc_configs/{ula/mala/isir/ex2mcmc/flex2mcmc}.yml configs/mcmc_exp.yml
 ``` 
 
 

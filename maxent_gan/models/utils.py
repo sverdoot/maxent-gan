@@ -10,6 +10,12 @@ from maxent_gan.utils.general_utils import ROOT_DIR, DotConfig
 from .base import MemoryModel, ModelRegistry
 
 
+def init_weights(m):
+    if isinstance(m, nn.Linear):
+        torch.nn.init.xavier_uniform(m.weight)
+        m.bias.data.fill_(0.01)
+
+
 class CondDataParallel(torch.nn.DataParallel):
     label = None
     cond = False
@@ -41,6 +47,9 @@ class GANWrapper:
 
         if load_weights:
             self.load_weights()
+        # else:
+        #     self.gen.apply(init_weights)
+        #     self.dis.apply(init_weights)
 
         if config.dp:
             self.gen = CondDataParallel(self.gen)

@@ -71,16 +71,15 @@ def ula(
     point.requires_grad_(True)
     point.grad = None
 
-    range_ = trange if verbose else range
-    for step_id in range_(n_samples + burn_in):
+    pbar = trange if verbose else range
+    for step_id in pbar(n_samples + burn_in):
         logp = target.log_prob(point)
         grad = torch.autograd.grad(
             logp.sum(), point, create_graph=keep_graph, retain_graph=keep_graph
-        )[
-            0
-        ]  # .detach()
+        )[0]
         noise = torch.randn_like(point, dtype=torch.float).to(point.device)
         noise_scale = (2.0 * step_size) ** 0.5
+
         point = point + step_size * grad + noise_scale * noise
         point = project(point)
 
@@ -89,7 +88,6 @@ def ula(
         if step_id >= burn_in:
             chains.append(point)
     chains = torch.stack(chains, 0)
-
     meta["mask"] = torch.ones(point.shape[0], dtype=torch.bool)
 
     return chains, meta
@@ -160,8 +158,8 @@ def isir(
     logp_x = meta["logp"]
     logq_x = proposal.log_prob(point)
 
-    range_ = trange if verbose else range
-    for step_id in range_(n_samples + burn_in):
+    pbar = trange if verbose else range
+    for step_id in pbar(n_samples + burn_in):
         point, _, log_qs, log_ps, indices = isir_step(
             point,
             target,
@@ -250,8 +248,8 @@ def mala(
     logp_x = meta["logp"]
     grad_x = meta["grad"]
 
-    range_ = trange if verbose else range
-    for step_id in range_(n_samples + burn_in):
+    pbar = trange if verbose else range
+    for step_id in pbar(n_samples + burn_in):
         noise = proposal.sample(point.shape[:-1])
         proposal_point = point + step_size * grad_x + noise * (2 * step_size) ** 0.5
         proposal_point = project(proposal_point)
@@ -335,8 +333,8 @@ def ex2mcmc(
     meta["mh_accept"] = meta.get("mh_accept", [])
     meta["step_size"] = meta.get("step_size", [])
 
-    range_ = trange if verbose else range
-    for step_id in range_(n_samples + burn_in):
+    pbar = trange if verbose else range
+    for step_id in pbar(n_samples + burn_in):
         points, meta = isir(
             point, target, proposal, 1, 0, project, n_particles=n_particles, meta=meta
         )
@@ -424,6 +422,8 @@ def flex2mcmc(
     burn_in: int,
     project: Callable,
     *,
+    # proposal_opt,
+    # proposal_scheduler,
     n_particles: int,
     step_size: float,
     n_mala_steps: int = 1,
@@ -460,9 +460,6 @@ def flex2mcmc(
         meta["backward_kl"] = meta.get("backward_kl", [])
     else:
         meta = dict(sir_accept=[], forward_kl=[], backward_kl=[])
-    meta["proposal_opt"] = meta.get(
-        "proposal_opt", torch.optim.Adam(proposal.parameters(), lr=1e-3)
-    )
 
     x = start.clone()
     x.requires_grad_(True)
@@ -490,20 +487,11 @@ def flex2mcmc(
         )
         step_size = meta["step_size"]
         x = x[-1]
-        # x, meta = ex2mcmc(x, target, proposal, 1, 0, project,
-        #         step_size=step_size,
-        #         n_particles=n_particles,
-        #         n_mala_steps=n_mala_steps,
-        #         target_acceptance_rate=target_acceptance_rate,
-        #         verbose=verbose,
-        #         meta=meta,
-        #         keep_graph=keep_graph
-        #         )
-        # x = x[-1]
 
         if step_id >= burn_in:
             chains.append(x)
-        else:
+        # else:
+        if proposal.optim.param_groups[0]["lr"] > 0:
             # forward KL
             proposals_flattened = proposals.reshape(-1, x.shape[-1])
             log_ps_flattened = log_ps.reshape(-1).detach()
@@ -530,9 +518,10 @@ def flex2mcmc(
             e = -proposal.log_prob(proposal.prior.sample(proposals.shape)).mean()
 
             loss = forward_kl_weight * kl_forw + backward_kl_weight * kl_back + 0.1 * e
-            meta["proposal_opt"].zero_grad()
+            proposal.optim.zero_grad()
             loss.backward()
-            meta["proposal_opt"].step()
+            proposal.optim.step()
+            proposal.scheduler.step()
 
             meta["forward_kl"].append(kl_forw.item())
             meta["backward_kl"].append(kl_back.item())
@@ -542,6 +531,10 @@ def flex2mcmc(
                     f"KL forw {kl_forw.item():.3f}, \
                     KL back {kl_back.item():.3f} Hentr {e.item():.3f}"
                 )
+            print(
+                f"KL forw {kl_forw.item():.3f}, \
+                    KL back {kl_back.item():.3f} Hentr {e.item():.3f}"
+            )
 
             if hist_proposals is None:
                 hist_proposals = proposals_flattened

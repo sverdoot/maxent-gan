@@ -75,8 +75,6 @@ class DiscriminatorTarget(Distribution):
                 x = self.gan.gen(chunk.to(self.device))
             dgz = self.gan.dis(x).squeeze()
             logp_z = self.proposal.log_prob(chunk)
-            # if dgz.shape != logp_z.shape:
-            #     raise Exception
             log_prob = torch.cat([log_prob, (logp_z + dgz) / 1.0])
         return log_prob.reshape(init_shape[:-1])
 
@@ -179,17 +177,6 @@ class MaxEntTarget(Distribution):
 
     def project(self, z):
         return self.proposal.project(z)
-
-
-# def grad_log_prob(
-#     point: torch.FloatTensor,
-#     log_dens: Union[Distribution, Callable],
-#     # x: Optional[Any] = None,
-# ) -> Tuple[torch.FloatTensor, torch.FloatTensor]:
-#     point = point.detach().requires_grad_()
-#     log_prob = log_dens(point)
-#     grad = torch.autograd.grad(log_prob.sum(), point)[0]
-#     return log_prob, grad
 
 
 # def estimate_log_norm_constant(

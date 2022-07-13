@@ -18,7 +18,7 @@ from maxent_gan.feature.utils import create_feature
 from maxent_gan.models.flow.real_nvp import RNVP
 from maxent_gan.sample import MaxEntSampler
 from maxent_gan.train.loss import LossRegistry
-from maxent_gan.train.trainer import Trainer
+from maxent_gan.train.trainer_flow import Trainer
 from maxent_gan.utils.callbacks import CallbackRegistry
 from maxent_gan.utils.general_utils import DotConfig, random_seed, seed_worker
 

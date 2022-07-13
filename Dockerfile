@@ -1,4 +1,4 @@
-ARG UBUNTU=18.04
+ARG UBUNTU=20.04
 
 FROM ubuntu:$UBUNTU
 
@@ -48,5 +48,5 @@ RUN poetry install
 
 RUN mkdir -p dump
 RUN mkdir -p figs
-RUN mkdir -p logs
+RUN mkdir -p log
 RUN chmod +x -R ./scripts/*

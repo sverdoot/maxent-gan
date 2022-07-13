@@ -10,8 +10,8 @@ import ruamel.yaml as yaml
 import torch
 import torchvision
 import wandb
-from torch.utils.data import DataLoader
 from tools.vizualization.plot_results import plot_res
+from torch.utils.data import DataLoader
 
 from maxent_gan.datasets.utils import get_dataset
 from maxent_gan.distribution import Distribution, DistributionRegistry
@@ -106,11 +106,6 @@ def main(config: DotConfig, device: torch.device, group: str):
 
     # sample
     if config.sample_params.sample:
-        gan = GANWrapper(config.gan_config, device)
-        ref_dist = DistributionRegistry.create(
-            config.sample_params.distribution.name, gan=gan
-        )
-
         if config.sample_params.sub_dir:
             save_dir = Path(
                 config.sample_params.save_dir + dir_suffix,
@@ -122,16 +117,19 @@ def main(config: DotConfig, device: torch.device, group: str):
                 datetime.datetime.now().strftime("%Y_%m_%d_%H_%M") + suffix,
             )
         save_dir = save_dir.with_name(
-            save_dir.name + f"_{config.sample_params.params.sampling}"
+            f"{save_dir.name}_{config.sample_params.params.sampling}"
         )
         save_dir.mkdir(exist_ok=True, parents=True)
-
         yaml.round_trip_dump(config.dict, Path(save_dir, config.file_name).open("w"))
         yaml.round_trip_dump(
             dict(gan_config=config.gan_config.dict),
             Path(save_dir, "gan_config.yml").open("w"),
         )
-
+        print(save_dir)
+        gan = GANWrapper(config.gan_config, device)
+        ref_dist = DistributionRegistry.create(
+            config.sample_params.distribution.name, gan=gan
+        )
         feature = create_feature(
             config, gan, dataloader, dataset_info, save_dir, device
         )
@@ -199,14 +197,15 @@ def main(config: DotConfig, device: torch.device, group: str):
             if config.get("flow", None):
                 # proposal = RNVP(config.flow.params.num_flows, gan.gen.z_dim)
                 gan.gen.prior = RealNVPProposal(gan.gen.z_dim, device=device)
+                opt = torch.optim.Adam(
+                    gan.gen.prior.parameters(), **config.flow.opt_params
+                )
+                gan.gen.prior.optim = opt
+                gan.gen.prior.train()
+                gan.gen.prior.scheduler = torch.optim.lr_scheduler.LambdaLR(
+                    opt, lambda it: int(it < config.flow.train_iters)
+                )
 
-            # if config.lipschitz_step_size:
-            #     config.sample_params.params.dict["step_size"] = (
-            #         args.step_size_mul
-            #         / config.gan_config.thermalize.dict[config.thermalize][
-            #             "lipschitz_const"
-            #         ]
-            #     )
             start = start.to(device)
             label = label.to(device)
             gan.set_label(label)
@@ -275,11 +274,15 @@ def main(config: DotConfig, device: torch.device, group: str):
     if config.afterall_params.sub_dir == "latest":
         results_dir = filter(Path(results_dir).glob("*"))[-1]
     else:
-        results_dir = Path(results_dir, config.afterall_params.sub_dir + suffix)
+        results_dir = Path(
+            results_dir, config.afterall_params.sub_dir + suffix + f"_{config.sampling}"
+        )
+
+    print(results_dir)
 
     assert Path(results_dir).exists()
 
-    if config.resume:
+    if config.get("resume", False):
         start_step_id = len(np.loadtxt(Path(results_dir, "fid_values.txt")))  # - 1
     else:
         start_step_id = 0
@@ -455,7 +458,7 @@ def main(config: DotConfig, device: torch.device, group: str):
             # )
             print(f"Iter: {step}\t Fid: {fid}")
             if wandb.run is not None:
-                wandb.run.log({"step": step, "overall fid": fid})
+                wandb.run.log({"step": step, "overall FID": fid})
 
             fid_values.append(fid)
             np.savetxt(

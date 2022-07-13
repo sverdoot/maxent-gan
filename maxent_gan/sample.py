@@ -25,7 +25,6 @@ class MaxEntSampler:
         start_sample: int = 0,
         n_sampling_steps: int = 1,
         weight_step: float = 0.1,
-        # step_size: float = 0.01,
         batch_size: Optional[int] = None,
         save_every: int = 1,
         verbose: bool = True,
@@ -38,6 +37,7 @@ class MaxEntSampler:
         sampling: str = "ula",
         mcmc_args: Optional[Dict] = None,
         callbacks: Optional[Iterable[Callback]] = None,
+        keep_graph: bool = False,
     ):
         self.gen = gen
         self._ref_dist = ref_dist
@@ -55,6 +55,7 @@ class MaxEntSampler:
         self.feature_reset_every = feature_reset_every
         self.collect_imgs = collect_imgs
         self.callbacks = callbacks or []
+        self.keep_graph = keep_graph
 
         self.sampling = sampling
         self.init_mcmc_args: Dict = copy.deepcopy(mcmc_args or dict())
@@ -86,10 +87,6 @@ class MaxEntSampler:
         meta: Optional[Dict] = None,
         keep_graph: bool = False,
     ) -> Tuple[torch.Tensor, Dict]:
-        # z = z.clone()
-        # z.requires_grad_(True)
-        # z.grad = None
-
         avg = (it > self.burn_in_steps or it == 1) and it % self.weight_avg_every == 0
 
         upd = (it > self.burn_in_steps or it == 1) and it % self.weight_upd_every == 0
@@ -105,16 +102,14 @@ class MaxEntSampler:
         if avg:
             self.feature.avg_weight.upd(self.feature.weight)
 
-        proposal = self.gen.prior
-
         self._ref_dist.data_batch = data_batch
         pts, meta = self.mcmc(
             self.sampling,
             z,
             self.target,
-            proposal=proposal,
+            proposal=self.gen.prior,
             n_samples=self.n_sampling_steps,
-            burn_in=0,
+            burn_in=self.n_sampling_steps - 1,
             project=self.ref_dist.project,
             **self.mcmc_args,
             meta=meta,
@@ -139,6 +134,7 @@ class MaxEntSampler:
     ) -> Tuple[List, List, List, List]:
         n_steps = n_steps if n_steps is not None else self.n_steps
         collect_imgs = collect_imgs or self.collect_imgs
+        keep_graph = keep_graph or self.keep_graph
         zs = [z.cpu()]
         xs = []
         meta = dict()

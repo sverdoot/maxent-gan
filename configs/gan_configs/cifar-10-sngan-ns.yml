@@ -21,11 +21,29 @@ gan_config:
       std: *std
     thermalize: true
     ckpt_path: checkpoints/sngan_ns_dot/DCGAN_D_CIFAR_SNGAN_NonSaturating_150001.pth
-  thermalize:
-    true: {}
-    false:
-      log_norm_const: 0.08240829594605958
-      lipschitz_const: 8.495529028320313
-      fake_score: -0.5327480739355087
-      real_score: &real_score 1.795639226436615
-      mean_score: 0.6314455762505531
+
+
+train_batch_size: &train_batch_size 64
+n_epochs: &n_epochs 200
+n_train_iters: &n_train_iters 200000
+
+criterion_g: &criterion_g
+  name: JensenNSLoss
+criterion_d: &criterion_d
+  name: JensenNSLoss
+optimizer_g: &optimizer_g
+  name: Adam
+  params:
+    lr: &g_lr 0.0001
+    betas: [0.9, 0.999]
+optimizer_d: &optimizer_d
+  name: Adam
+  params:
+    lr: 0.0001
+    betas: [0.9, 0.999]
+trainer_kwargs: &trainer_kwargs
+  n_dis: 1
+  sample_size: 10000
+  grad_acc_steps: 1
+  sample_steps: &sample_steps 1
+  alpha: 300

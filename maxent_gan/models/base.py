@@ -102,3 +102,12 @@ class MemoryModel(nn.Module):
             self.output = output
             self.input = input
         return output
+
+
+# class LogitNormalization(nn.Module):
+#     def __init__(self):
+#         super().__init__()
+
+#     def forward(self, x):
+#         if self.training:
+#             return x / torch.norm(torch.cat([x[:, None], torch.logit(1-torch.sigmoid(x))[:, None]], dim=1)

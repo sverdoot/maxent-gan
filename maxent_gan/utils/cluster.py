@@ -4,7 +4,7 @@ from pathlib import Path
 import numpy as np
 import torch
 import torchvision
-from sklearn.cluster import MiniBatchKMeans, SpectralClustering
+from sklearn.cluster import MiniBatchKMeans, SpectralClustering  # noqa: F401
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
