@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from doctest import master
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Union
 
@@ -103,8 +104,12 @@ class BaseFeature(ABC):
     def weight_up(
         self, out: List[torch.FloatTensor], step: float, grad_norm: float = 0
     ):
+        if self.opt:
+            self.opt.zero_grad()
         for i in range(len(self.weight)):
             grad = -out[i]
+            #print("grad", grad)
+            # print(torch.norm(grad, dim=-1).mean().item())
 
             for group in self.opt.param_groups:
                 group["lr"] = np.abs(step)
@@ -113,6 +118,7 @@ class BaseFeature(ABC):
                 self.weight[i].grad = grad.to(self.weight[i].device)
         if self.opt:
             self.opt.step()
+        #print("weight", self.weight)
 
         self.project_weight()
 
@@ -136,13 +142,20 @@ class BaseFeature(ABC):
     #     return with_avg
 
     def average_feature(self, masks: List[torch.BoolTensor]):
-        if isinstance(masks, torch.Tensor) and masks.ndim == 1:
+        if isinstance(masks, torch.Tensor) and (masks.ndim == 1 or masks.ndim == 2):
             masks = [masks]
-        for step_id, mask in enumerate(masks[::-1], start=1):
-            out = self.output_history[step_id]
-            for i in range(len(out)):
-                out[i][mask] = self.output_history[step_id - 1][i][mask]
-            self.avg_feature.upd([x.mean(0) for x in out])
+        if len(self.output_history) > 1:
+            for step_id, mask in enumerate(masks[::-1], start=1):
+                out = self.output_history[step_id]
+                for i in range(len(out)):
+                    # HACK
+                    if torch.cat([self.output_history[step_id - 1][i][:, None, :], out[i]], 1).shape[:-1] == mask.shape:
+                        out[i] = torch.cat([self.output_history[step_id - 1][i][:, None, :], out[i]], 1)[mask]
+                    else:
+                        out[i][mask] = self.output_history[step_id - 1][i][mask]
+                self.avg_feature.upd([x.mean(0) for x in out])
+        else:
+            self.avg_feature.upd([x.mean(0) for x in self.output_history[0]])
         self.output_history = self.output_history[:-1]
 
     @staticmethod
@@ -1026,6 +1039,13 @@ class DumbFeature(BaseFeature):
         self, x, z: Optional[torch.FloatTensor] = None
     ) -> List[torch.FloatTensor]:
         return []
+
+    @BaseFeature.invoke_callbacks
+    def process_batch(
+        self, x: torch.FloatTensor, z: Optional[torch.FloatTensor] = None
+    ) -> List[torch.FloatTensor]:
+        result = self.apply_and_shift(x)
+        return result
 
 
 @FeatureRegistry.register()

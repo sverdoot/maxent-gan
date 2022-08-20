@@ -1,6 +1,6 @@
 import zipfile
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple, Union
+from typing import Any, Dict, Optional, Sequence, Tuple, Union
 
 import gdown
 import numpy as np
@@ -153,19 +153,19 @@ def get_gaussians_grid_dataset(
     dim=2,
 ) -> Dict[str, Union[Dataset, np.ndarray]]:
     if dim == 2:
-        dataset, modes = prepare_2d_gaussian_grid_data(
+        np_dataset, modes = prepare_2d_gaussian_grid_data(
             sample_size, n_modes, xlims, ylims, sigma, seed
         )
     else:
-        dataset, modes = prepare_3d_gaussian_grid_data(
+        np_dataset, modes = prepare_3d_gaussian_grid_data(
             sample_size, n_modes, xlims, ylims, zlims, sigma, seed
         )
     mean = torch.as_tensor(mean)
     std = torch.as_tensor(std)
     dataset = IgnoreLabelDataset(
-        TensorDataset((torch.from_numpy(dataset) - mean[None, :]) / std[None, :])
+        TensorDataset((torch.from_numpy(np_dataset) - mean[None, :]) / std[None, :])
     )
-    return {"dataset": dataset, "modes": modes}
+    return {"dataset": dataset, "modes": modes, "np_dataset": np_dataset}
 
 
 def get_gaussians_ring_dataset(
@@ -176,15 +176,16 @@ def get_gaussians_ring_dataset(
     n_modes: int = 8,
     rad: float = 2,
     sigma: float = 0.02,
+    weights: Optional[Sequence] = None,
     seed: Optional[int] = None,
 ) -> Dict[str, Union[Dataset, np.ndarray]]:
-    dataset, modes = prepare_2d_ring_data(sample_size, n_modes, rad, sigma, seed)
+    np_dataset, modes = prepare_2d_ring_data(sample_size, n_modes, rad, sigma, weights, seed)
     mean = torch.as_tensor(mean)
     std = torch.as_tensor(std)
     dataset = IgnoreLabelDataset(
-        TensorDataset((torch.from_numpy(dataset) - mean[None, :]) / std[None, :])
+        TensorDataset((torch.from_numpy(np_dataset) - mean[None, :]) / std[None, :])
     )
-    return {"dataset": dataset, "modes": modes}
+    return {"dataset": dataset, "modes": modes, "np_dataset": np_dataset}
 
 
 def get_stacked_mnist_dataset(

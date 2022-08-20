@@ -161,7 +161,7 @@ class MaxEntTarget(Distribution):
         for chunk in torch.split(z, batch_size):
             chunk = chunk.to(self.device)
             x = self.gen(chunk)
-            f = self.feature(x=x, z=chunk)
+            f = self.feature.process_batch(x=x, z=chunk)
             radnic_logp = self.feature.log_prob(f)
             ref_logp = self.ref_dist.log_prob(chunk, x=x, data_batch=data_batch)
             if not isinstance(radnic_logp, torch.Tensor):
@@ -170,6 +170,7 @@ class MaxEntTarget(Distribution):
             feature_out = [
                 torch.cat([x, y.detach().cpu()]) for x, y in zip(feature_out, f)
             ]
+        feature_out = [x.reshape(*init_shape[:-1], -1) for x in feature_out]
         self.feature.output_history.append(feature_out)
         # self.radnic_logps.append(radnic_logp.detach())
         # self.ref_logps.append(ref_logp.detach())

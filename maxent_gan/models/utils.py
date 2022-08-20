@@ -71,21 +71,21 @@ class GANWrapper:
             self.gen = MemoryModel(self.gen)
             self.dis = MemoryModel(self.dis)
 
-        dis_attrs = ["transform", "output_layer", "label", "penult_layer"]
-        self.dis.__dict__.update(
-            {attr: self.dis.module.__dict__.get(attr) for attr in dis_attrs}
-        )
-        gen_attrs = ["inverse_transform", "z_dim", "label"]
-        self.gen.__dict__.update(
-            {attr: self.gen.module.__dict__.get(attr) for attr in gen_attrs}
-        )
-        self.gen.sample_label = self.gen.module.sample_label
-        if hasattr(self.gen.module, "label"):
-            self.gen.cond = self.gen.module.label
-        if hasattr(self.dis.module, "label"):
-            self.dis.cond = self.dis.module.label
+            dis_attrs = ["transform", "output_layer", "label", "penult_layer"]
+            self.dis.__dict__.update(
+                {attr: self.dis.module.__dict__.get(attr) for attr in dis_attrs}
+            )
+            gen_attrs = ["inverse_transform", "z_dim", "label"]
+            self.gen.__dict__.update(
+                {attr: self.gen.module.__dict__.get(attr) for attr in gen_attrs}
+            )
+            self.gen.sample_label = self.gen.module.sample_label
+            if hasattr(self.gen.module, "label"):
+                self.gen.cond = self.gen.module.label
+            if hasattr(self.dis.module, "label"):
+                self.dis.cond = self.dis.module.label
 
-        self.dis.transform = self.dis.module.transform
+            self.dis.transform = self.dis.module.transform
         print(f"Transform: {self.dis.transform}")
 
         if eval:

@@ -1,0 +1,168 @@
+# seed: 42
+
+# sample
+sample_params: &sample_params
+    feature: *feature
+    distribution: *target_distribution
+
+    params:
+      n_steps: *sample_steps
+      weight_step: *weight_step
+      n_sampling_steps: 1
+      verbose: false
+      save_every: 1
+      collect_imgs: false
+      sampling: *sampling
+      mcmc_args:
+        <<: *mcmc_args
+        step_size: *step_size
+      keep_graph: true
+      
+# train
+train_params: &train_params
+  n_train_iters: *n_train_iters
+  optimizer_g: *optimizer_g
+  optimizer_d: *optimizer_d
+  criterion_g: *criterion_g
+  criterion_d: *criterion_g
+  device: *device
+  save_dir: *dir
+  sub_dir: *sub_dir
+  trainer_kwargs: 
+    <<: *trainer_kwargs
+    eval_every: 5000
+    replay_prob: 1.0 #0.95
+    replay_size: *batch_size
+    meta_rate: 1.0 #0.5
+    # clip_grad_norm: 5000.0
+
+
+# afterall
+afterall_params:
+    results_dir: *dir
+    sub_dir: *sub_dir
+    init_wandb: false
+    remove_chains: true
+
+wandb_init_params: &wandb_init_params
+  project: &wandb_project maxent_gan
+  entity: &wandb_account sverdoot
+  name: *name
+  group: train
+  config:
+    sample_params:
+      <<: *sample_params
+    train_params:
+      <<: *train_params
+
+callbacks:
+  train_callbacks: &train_callbacks
+    log_callback:
+      name: TrainLogCallback
+      params:
+        invoke_every: 5000
+    plot2d:
+      name: Plot2dCallback
+      params:
+        modes: true
+        invoke_every: 5000
+        # every: 1
+        save_dir: null
+        range: *range
+    plot2d_dis:
+      name: Plot2dEnergyCallback
+      params:
+        gan: true
+        invoke_every: 5000
+        # every: 1
+        save_dir: null
+    # log_imgs:
+    #   name: LogCallback
+    #   params:
+    #     invoke_every: 25000
+    #     keys:
+    #       - grid
+    #     save_dir: null
+    # log_weight:
+    #   name: LogCallback
+    #   params:
+    #     invoke_every: 25000
+    #     keys:
+    #       - weight_norm
+    #     save_dir: null
+    emd:
+      name: EMDCallback
+      params:
+        np_dataset: true
+        invoke_every: 5000
+        update_input: true 
+    hqr_js:
+      name: HQRCallback
+      params:
+        np_dataset: true
+        modes: true
+        sigma: *sigma
+        invoke_every: 5000
+        update_input: true  
+    log_emd:
+      name: LogCallback
+      params:
+        invoke_every: 5000
+        keys:
+          - EMD
+        save_dir: null
+    log_hqr:
+      name: LogCallback
+      params:
+        invoke_every: 5000
+        keys:
+          - HQR
+        save_dir: null
+    log_jsd:
+      name: LogCallback
+      params:
+        invoke_every: 5000
+        keys:
+          - JSD
+        save_dir: null
+    ckpt:
+      name: CheckpointCallback
+      params:
+        gan: true
+        invoke_every: 500000
+        save_dir: null
+    # wandb_loss:
+    #   name: WandbCallback
+    #   params:
+    #     init_params:
+    #       <<: *wandb_init_params
+    #       reinit: False
+    #     invoke_every: 5000
+    #     keys:
+    #       - loss_d
+    #       - loss_g
+    #       - grad_norm_d
+    #       - grad_norm_g
+    # wandb_metrics:
+    #   name: WandbCallback
+    #   params:
+    #     init_params:
+    #       <<: *wandb_init_params
+    #       reinit: False
+    #     invoke_every: 5000
+    #     keys:
+    #       - emd
+    #       - hqr
+    #       - js
+
+    # wandb_imgs:
+    #   name: WandbCallback
+    #   params:
+    #     init_params:
+    #       <<: *wandb_init_params
+    #       reinit: False
+    #     invoke_every: 25000
+    #     keys:
+    #       - imgs
+
+  feature_callbacks: &feature_callbacks {}

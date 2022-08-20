@@ -12,6 +12,7 @@ import torchvision
 import wandb
 from tools.vizualization.plot_results import plot_res
 from torch.utils.data import DataLoader
+from tqdm import trange
 
 from maxent_gan.datasets.utils import get_dataset
 from maxent_gan.distribution import Distribution, DistributionRegistry
@@ -126,9 +127,9 @@ def main(config: DotConfig, device: torch.device, group: str):
             Path(save_dir, "gan_config.yml").open("w"),
         )
         print(save_dir)
-        gan = GANWrapper(config.gan_config, device)
+        gan = GANWrapper(config.gan_config, device) #, eval=False)
         ref_dist = DistributionRegistry.create(
-            config.sample_params.distribution.name, gan=gan
+            config.sample_params.distribution.name, gan=gan, batch_size=config.batch_size
         )
         feature = create_feature(
             config, gan, dataloader, dataset_info, save_dir, device
@@ -195,16 +196,32 @@ def main(config: DotConfig, device: torch.device, group: str):
                 run.config.update({"name": f"{group}_{i}"}, allow_val_change=True)
 
             if config.get("flow", None):
-                # proposal = RNVP(config.flow.params.num_flows, gan.gen.z_dim)
-                gan.gen.prior = RealNVPProposal(gan.gen.z_dim, device=device)
+                gan.gen.proposal = RealNVPProposal(gan.gen.z_dim, device=device, hidden=32, num_blocks=4)
+                if config.gan_config.dp:
+                    gan.gen.proposal = torch.nn.DataParallel(gan.gen.proposal)
+                    gan.gen.proposal.prior = gan.gen.prior
+                    gan.gen.proposal.log_prob = gan.gen.proposal.module.log_prob
+                    gan.gen.proposal.sample = gan.gen.proposal.module.sample
+                    gan.gen.proposal.inverse = gan.gen.proposal.module.inverse
+
                 opt = torch.optim.Adam(
-                    gan.gen.prior.parameters(), **config.flow.opt_params
+                    gan.gen.proposal.parameters(), 1e-3
                 )
-                gan.gen.prior.optim = opt
-                gan.gen.prior.train()
-                gan.gen.prior.scheduler = torch.optim.lr_scheduler.LambdaLR(
+                for _ in trange(1000):
+                    e = -gan.gen.proposal.log_prob(gan.gen.prior.sample((config.batch_size, ))).mean()
+                    gan.gen.proposal.zero_grad()
+                    e.backward()
+                    opt.step()
+                opt = torch.optim.Adam(
+                    gan.gen.proposal.parameters(), **config.flow.opt_params
+                )
+                gan.gen.proposal.optim = opt
+                gan.gen.proposal.train()
+                gan.gen.proposal.scheduler = torch.optim.lr_scheduler.LambdaLR(
                     opt, lambda it: int(it < config.flow.train_iters)
                 )
+            else:
+                gan.gen.proposal = gan.gen.prior
 
             start = start.to(device)
             label = label.to(device)
@@ -342,7 +359,7 @@ def main(config: DotConfig, device: torch.device, group: str):
             )
 
     if config.callbacks.afterall_callbacks:
-        gan = GANWrapper(config.gan_config, device)
+        gan = GANWrapper(config.gan_config, device, eval=True)
 
         label_file = Path(
             results_dir,

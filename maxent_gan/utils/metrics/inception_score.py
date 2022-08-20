@@ -25,7 +25,7 @@ from maxent_gan.utils.callbacks import Callback, CallbackRegistry
 N_INCEPTION_CLASSES = 1000
 MEAN_TRASFORM = [0.485, 0.456, 0.406]
 STD_TRANSFORM = [0.229, 0.224, 0.225]
-N_GEN_IMAGES = 5000
+N_GEN_IMAGES = 100005000
 
 
 @CallbackRegistry.register()
@@ -37,7 +37,7 @@ class InceptionScoreCallback(Callback):
         update_input: bool = True,
         dp: bool = False,
         batch_size: int = 128,
-    ):
+    ) -> None:
         self.device = device
         self.model = torchvision.models.inception.inception_v3(
             pretrained=True, transform_input=False

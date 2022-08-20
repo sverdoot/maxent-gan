@@ -21,4 +21,4 @@ repos:
     - id: flake8
       exclude: ^maxent_gan/utils/metrics/compute_fid_tf.py
       language_version: python3.8
-      args: ['--ignore=E129,E2,E203,W503', '--max-line-length=100']
+      args: ['--ignore=E129,E2,E203,W503', '--max-line-length=100']a

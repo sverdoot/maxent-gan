@@ -153,5 +153,26 @@ def gradient_penalty(
         retain_graph=True,
         only_inputs=True,
     )[0]
-    grad_penalty = ((grads.norm(p=2, dim=1) - 1.0) ** 2).mean() * gp_coef
+    grad_penalty = ((grads.norm(p=2, dim=-1) - 1.0) ** 2).mean() * gp_coef
     return grad_penalty
+
+
+def r1_penalty(
+    # dis,
+    score: torch.Tensor,
+    real_data,
+    coef: float,
+):
+    real_data.requires_grad_(True)
+    #dis_mix = dis(real_data).squeeze()
+    #ones = torch.ones_like(score, device=score.device)
+    grads = grad(
+        outputs=score.sum(),
+        inputs=real_data,
+        # grad_outputs=ones,
+        create_graph=True,
+        retain_graph=True,
+        only_inputs=True,
+    )[0]
+    penalty = (grads.norm(p=2, dim=-1) ** 2).mean() * coef
+    return penalty

@@ -38,7 +38,8 @@ afterall_params:
     compute_is: true
     compute_fid:  true
     # remove_chains: false
-    save_last_slice: true
+    # save_last_slice: true
+    save_chains: true
 
 params: &params
     sample_params: *sample_params

@@ -48,6 +48,7 @@ def parse_arguments():
     parser.add_argument("--feature_version", type=int)
     # parser.add_argument("--sweet_init", action="store_true")
     parser.add_argument("--sample_steps", type=int)
+    parser.add_argument("--step_every", type=int)
     # parser.add_argument(
     #     "--kernel",
     #     type=str,
@@ -147,7 +148,7 @@ def main(config: DotConfig, device: torch.device, group: str):
         worker_init_fn=seed_worker,
         generator=g,
     )
-
+    
     random_seed(config.seed)
     print(config.resume, (save_dir / "checkpoints").exists())
     if config.resume and (save_dir / "checkpoints").exists():
@@ -168,10 +169,12 @@ def main(config: DotConfig, device: torch.device, group: str):
         config.gan_config,
         device=device,
         load_weights=config.resume,
-        # eval=False
+        eval=False
     )
     gan.gen.train()
     gan.dis.train()
+    gan.gen.proposal = gan.gen.prior
+
     for p in list(gan.gen.parameters()) + list(gan.dis.parameters()):
         p.requires_grad_(True)
 
@@ -193,10 +196,7 @@ def main(config: DotConfig, device: torch.device, group: str):
         if "device" in params:
             params["device"] = device
         if "np_dataset" in params:
-            np_dataset = np.concatenate(
-                [gan.inverse_transform(batch).numpy() for batch in dataloader], 0
-            )
-            params["np_dataset"] = np_dataset
+            params["np_dataset"] = dataset_stuff["np_dataset"]
         if "save_dir" in params:
             params["save_dir"] = save_dir
         if "modes" in params:
@@ -217,7 +217,8 @@ def main(config: DotConfig, device: torch.device, group: str):
         ref_dist=ref_dist,
         feature=feature,
         **config.sample_params.params,
-    )
+    ) 
+    #if config.sample_params.params.n_steps > 0 else None
 
     trainer = Trainer(
         gan,
@@ -262,6 +263,9 @@ if __name__ == "__main__":
         config.seed = args.seed
     if args.sample_steps is not None:
         config.sample_params.params["n_steps"] = args.sample_steps
+
+    if args.step_every is not None:
+        config.trainer_kwargs.step_every = config.trainer_kwargs.step_every
 
     config.file_name = Path(args.configs[0]).name
     config.resume = args.resume

@@ -31,10 +31,9 @@ train_params: &train_params
   trainer_kwargs: 
     <<: *trainer_kwargs
     eval_every: 2500
-    replay_prob: 0.0
-    replay_size: 0
-    meta_rate: 0.8
-    # clip_grad_norm: 1000.0
+    replay_prob: 0.95
+    replay_size: 50000
+    meta_rate: 0.5
 
 
 # afterall
@@ -134,6 +133,15 @@ callbacks:
         keys:
           - fid
           - inception_score
+    wandb_imgs:
+      name: WandbCallback
+      params:
+        init_params:
+          <<: *wandb_init_params
+          reinit: False
+        invoke_every: 2500
+        keys:
+          - imgs
 
 
   feature_callbacks: &feature_callbacks {}

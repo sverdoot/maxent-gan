@@ -215,6 +215,7 @@ class RNVP(nn.Module):
         )
 
         self.prior = MNormal(torch.zeros(dim).to(device), torch.eye(dim).to(device))
+        self.to(device)
 
     def init_params(self, params):
         # torch.nn.init.xavier_uniform_(params, gain=nn.init.calculate_gain('relu'))

@@ -1,4 +1,5 @@
 import torch
+from typing import Optional
 
 
 def l2diff(x1, x2):
@@ -34,12 +35,13 @@ class CMD(object):
             scms += moment_diff(sx1, sx2, i + 2)
         return scms
 
-    def moments(self, x: torch.FloatTensor) -> torch.FloatTensor:
+    def moments(self, x: torch.FloatTensor, mean: Optional[torch.FloatTensor]=None) -> torch.FloatTensor:
         moment_id = 1
         result = x  # (moment_id + 1) * ((moment_id + 1) / moment_id) ** moment_id * x
+        mean = mean.detach() if mean is not None else x.mean(0).detach()
 
         for moment_id in range(2, self.n_moments + 1):
-            result = torch.cat([result, (x - x.mean(0).detach()) ** moment_id], 1)
+            result = torch.cat([result, (x - mean) ** moment_id], 1)
         return (
             result  # / ((moment_id + 1) * ((moment_id + 1) / moment_id) ** moment_id)
         )

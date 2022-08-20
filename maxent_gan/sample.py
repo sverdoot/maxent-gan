@@ -94,32 +94,32 @@ class MaxEntSampler:
             it > self.burn_in_steps or it == 1
         ) and it % self.feature_reset_every == 0
 
-        if upd:
-            self.feature.weight_up(self.feature.avg_feature.data, self.weight_step)
-        if reset:
-            self.feature.avg_feature.reset()
-
-        if avg:
-            self.feature.avg_weight.upd(self.feature.weight)
-
         self._ref_dist.data_batch = data_batch
         pts, meta = self.mcmc(
             self.sampling,
             z,
             self.target,
-            proposal=self.gen.prior,
-            n_samples=self.n_sampling_steps,
-            burn_in=self.n_sampling_steps - 1,
+            proposal=self.gen.proposal,
+            #n_samples=self.n_sampling_steps,
+            #burn_in=self.n_sampling_steps - 1,
             project=self.ref_dist.project,
             **self.mcmc_args,
             meta=meta,
             keep_graph=keep_graph,
         )
+        #print(self.feature.output_history[-1][0].mean(0), self.feature.ref_feature[0])
 
         self.mcmc_args.update(
             {key: meta[key][-1] for key in self.mcmc_args.keys() & meta.keys()}
         )
         self.feature.average_feature(meta["mask"])
+
+        if upd:
+            self.feature.weight_up(self.feature.avg_feature.data, self.weight_step)
+        if reset:
+            self.feature.avg_feature.reset()
+        if avg:
+            self.feature.avg_weight.upd(self.feature.weight)
 
         return pts[-1], meta
 
@@ -162,6 +162,7 @@ class MaxEntSampler:
 
             for callback in self.callbacks:
                 callback.invoke(self.mcmc_args)
+        self.feature.output_history = []
 
         # self.target.log_prob(z.detach(), data_batch) ??
 

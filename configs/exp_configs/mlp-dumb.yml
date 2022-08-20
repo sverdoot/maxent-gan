@@ -6,7 +6,7 @@ sweet_init: &sweet_init false
 
 device: &device 'cuda'
 total_n: &total_n 10000 #0
-batch_size: &batch_size 2000
+batch_size: &batch_size 5000
 
 
 data_batch_size: *batch_size

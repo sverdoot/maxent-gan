@@ -30,9 +30,10 @@ afterall_params:
     sub_dir: *sub_dir
     init_wandb: true
     
-    compute_is: false
+    compute_is: true
     compute_fid:  true
-    remove_chains: true
+    # remove_chains: true
+    save_chains: true
 
 params: &params
     sample_params: *sample_params

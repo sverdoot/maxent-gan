@@ -38,6 +38,7 @@ gan_config:
 
 train_batch_size: 256
 n_epochs: &n_epochs 500
+n_train_iters: &n_train_iters 200000
 criterion_g: &criterion_g
   name: Wasserstein1Loss
 criterion_d: &criterion_d
@@ -57,6 +58,4 @@ trainer_kwargs: &trainer_kwargs
   gp_coef: 0.7
   sample_size: 5000
   grad_acc_steps: 1
-  sample_steps: &sample_steps 5
-
-range: &range [-2.5, 2.5]
+  sample_steps: &sample_steps 1

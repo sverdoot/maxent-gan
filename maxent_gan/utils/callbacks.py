@@ -2,6 +2,7 @@ import logging
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple, Union
+import warnings
 
 import numpy as np
 import ot
@@ -343,13 +344,15 @@ class EMDCallback(Callback):
         info: Dict[str, Union[float, np.ndarray]],
         batch_size: Optional[int] = None,
     ):
-        emd = None
-        if self.cnt % self.invoke_every == 0:
-            M = ot.dist(info["imgs"], self.np_dataset)
+        step = info.get("step", self.cnt)
+        if step % self.invoke_every == 0:
+            dataset = self.np_dataset[:info["imgs"].shape[0]]
+            M = ot.dist(info["imgs"], dataset)
             emd2 = ot.emd2(
                 np.ones(info["imgs"].shape[0]) / info["imgs"].shape[0],
-                np.ones(self.np_dataset.shape[0]) / self.np_dataset.shape[0],
+                np.ones(dataset.shape[0]) / dataset.shape[0],
                 M,
+                numThreads="max",
             )
             emd = emd2 ** 0.5
             if self.update_input:
@@ -386,7 +389,8 @@ class HQRCallback(Callback):
         self,
         info: Dict[str, Union[float, np.ndarray]],
     ):
-        if self.cnt % self.invoke_every == 0:
+        step = info.get("step", self.cnt)
+        if step % self.invoke_every == 0:
             dists = np.linalg.norm(
                 info["imgs"][:, None, :] - self.modes[None, ...], axis=-1
             )
@@ -409,10 +413,12 @@ class HQRCallback(Callback):
                 [1.0 / self.modes.shape[0] for _ in range(self.modes.shape[0])] + [0],
             )
             M = 0.5 * (uniform_dist + sample_dist)
-            kl1 = sample_dist * (np.log(sample_dist) - np.log(M))
-            kl1[sample_dist == 0.0] = 0.0
-            kl2 = uniform_dist * (np.log(uniform_dist) - np.log(M))
-            kl2[uniform_dist == 0.0] = 0.0
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                kl1 = sample_dist * (np.log(sample_dist) - np.log(M))
+                kl1[sample_dist == 0.0] = 0.0
+                kl2 = uniform_dist * (np.log(uniform_dist) - np.log(M))
+                kl2[uniform_dist == 0.0] = 0.0
             js = 0.5 * (kl1 + kl2).sum()
 
             if self.update_input:
@@ -431,7 +437,7 @@ class Plot2dCallback(Callback):
         self,
         modes: np.ndarray,
         save_dir: Union[str, Path],
-        every: int,
+        # every: int,
         *,
         invoke_every: int = 1,
         range: Optional[Tuple[float, float]] = None,
@@ -440,7 +446,7 @@ class Plot2dCallback(Callback):
         self.save_dir.mkdir(exist_ok=True)
         self.modes = modes
         self.invoke_every = invoke_every
-        self.every = every
+        # self.every = every
         self.range = range
 
     def invoke(self, info: Dict[str, Union[float, np.ndarray]]):
@@ -457,7 +463,7 @@ class Plot2dCallback(Callback):
             # plt.grid()
 
             savepath = Path(
-                self.save_dir, f"{self.save_dir.parts[-2]}_2d_{self.cnt * self.every}"
+                self.save_dir, f"{self.save_dir.parts[-2]}_2d_{step}"
             ).as_posix()
             plt.savefig(savepath + ".png")
             plt.savefig(savepath + ".pdf")
@@ -476,12 +482,12 @@ class Plot2dCallback(Callback):
 
                 plt.xlim(self.range[0], self.range[1])
                 plt.ylim(self.range[0], self.range[1])
-                plt.contourf(xx, yy, vals, cmap="Greens")
+                plt.contourf(xx, yy, vals, cmap="Greens", levels=100)
                 plt.axis("off")
 
                 savepath = Path(
                     self.save_dir,
-                    f"{self.save_dir.parts[-2]}_2d_{self.cnt * self.every}_dens",
+                    f"{self.save_dir.parts[-2]}_2d_{step}_dens",
                 ).as_posix()
                 plt.savefig(savepath + ".png")
                 plt.savefig(savepath + ".pdf")
@@ -497,7 +503,6 @@ class Plot3dCallback(Callback):
         self,
         modes: np.ndarray,
         save_dir: Union[str, Path],
-        every: int,
         *,
         invoke_every: int = 1,
         range: Optional[Tuple[float, float]] = None,
@@ -506,7 +511,6 @@ class Plot3dCallback(Callback):
         self.save_dir.mkdir(exist_ok=True)
         self.modes = modes
         self.invoke_every = invoke_every
-        self.every = every
         self.range = range
 
     def invoke(self, info: Dict[str, Union[float, np.ndarray]]):
@@ -538,7 +542,7 @@ class Plot3dCallback(Callback):
                 line.set_visible(False)
 
             savepath = Path(
-                self.save_dir, f"{self.save_dir.parts[-2]}_3d_{self.cnt * self.every}"
+                self.save_dir, f"{self.save_dir.parts[-2]}_3d_{step}"
             ).as_posix()
             plt.savefig(savepath + ".png")
             plt.savefig(savepath + ".pdf")
@@ -555,7 +559,7 @@ class Plot2dEnergyCallback(Callback):
         self,
         gan,
         save_dir: Union[str, Path],
-        every: int,
+        # every: int,
         *,
         invoke_every: int = 1,
         device="cuda",
@@ -564,7 +568,7 @@ class Plot2dEnergyCallback(Callback):
         self.save_dir.mkdir(exist_ok=True)
         # self.modes = modes
         self.invoke_every = invoke_every
-        self.every = every
+        # self.every = every
         self.device = device
         self.gan = gan
 
@@ -591,7 +595,7 @@ class Plot2dEnergyCallback(Callback):
                 xs_grid[..., 0],
                 xs_grid[..., 1],
                 dgz.reshape(n_pts_ax, n_pts_ax),
-                levels=50,
+                levels=100,
             )
             fig.colorbar(im)
             plt.axis("equal")
@@ -599,7 +603,7 @@ class Plot2dEnergyCallback(Callback):
 
             savepath = Path(
                 self.save_dir,
-                f"{self.save_dir.parts[-2]}_2d_{self.cnt * self.every}_dgz",
+                f"{self.save_dir.parts[-2]}_2d_{step}_dgz",
             ).as_posix()
             plt.savefig(savepath + ".png")
             plt.savefig(savepath + ".pdf")

@@ -49,6 +49,8 @@ def ula(
     verbose: bool = False,
     meta: Optional[Dict] = None,
     keep_graph: bool = False,
+    natural_grad: bool = False, #True,
+    tikhonov_reg: float = 0.1,
 ) -> Tuple[torch.FloatTensor, Dict]:
     """
     Unadjusted Langevin Algorithm
@@ -77,10 +79,16 @@ def ula(
         grad = torch.autograd.grad(
             logp.sum(), point, create_graph=keep_graph, retain_graph=keep_graph
         )[0]
-        noise = torch.randn_like(point, dtype=torch.float).to(point.device)
-        noise_scale = (2.0 * step_size) ** 0.5
+        if natural_grad:
+            step_size_ = step_size / (tikhonov_reg + torch.norm(grad, dim=-1)[:, None].detach())
+        else:
+            step_size_ = step_size
 
-        point = point + step_size * grad + noise_scale * noise
+        noise = torch.randn_like(point, dtype=torch.float).to(point.device)
+        noise_scale = (2.0 * step_size_) ** 0.5
+
+        point = point + step_size_ * grad + noise_scale * noise
+        # point = point / torch.clamp(torch.norm(point, dim=-1), min=1)[:, None] * point.shape[-1]**.5
         point = project(point)
 
         if not keep_graph:
@@ -88,12 +96,13 @@ def ula(
         if step_id >= burn_in:
             chains.append(point)
     chains = torch.stack(chains, 0)
-    meta["mask"] = torch.ones(point.shape[0], dtype=torch.bool)
+    meta["mask"] = torch.zeros(point.shape[0], dtype=torch.bool)
 
     return chains, meta
 
 
 @MCMCRegistry.register()
+# @torch.no_grad()
 def isir_step(
     start: torch.FloatTensor,
     target,
@@ -121,6 +130,7 @@ def isir_step(
 
 
 @MCMCRegistry.register()
+@torch.no_grad()
 def isir(
     start: torch.FloatTensor,
     target,
@@ -132,6 +142,7 @@ def isir(
     n_particles: int,
     verbose: bool = False,
     meta: Optional[Dict] = None,
+    **kwargs
 ) -> Tuple[torch.FloatTensor, Dict]:
     """
     Iterated Sampling Importance Resampling
@@ -160,7 +171,7 @@ def isir(
 
     pbar = trange if verbose else range
     for step_id in pbar(n_samples + burn_in):
-        point, _, log_qs, log_ps, indices = isir_step(
+        point, _, log_ps, log_qs, indices = isir_step(
             point,
             target,
             proposal,
@@ -231,22 +242,24 @@ def mala(
     point.requires_grad_()
     point.grad = None
 
+    device = point.device
+    proposal = torch.distributions.MultivariateNormal(torch.zeros(point.shape[-1], device=device), torch.eye(point.shape[-1], device=device))
+
     meta = meta or dict()
     meta["mh_accept"] = meta.get("mh_accept", [])
     meta["step_size"] = meta.get("step_size", [])
 
+    meta["logp"] = logp_x = target.log_prob(point) #meta.get("logp", target.log_prob(point))
     if "grad" not in meta:
-        logp_x = target.log_prob(point)
         if keep_graph:
             grad_x = torch.autograd.grad(
-                logp_x.sum(), point, create_graph=keep_graph, retain_graph=keep_graph
+                meta["logp"].sum(), point, create_graph=keep_graph, retain_graph=keep_graph
             )[0]
         else:
             grad_x = torch.autograd.grad(logp_x.sum(), point)[0].detach()
-        meta["logp"] = logp_x
         meta["grad"] = grad_x
-    logp_x = meta["logp"]
-    grad_x = meta["grad"]
+    else:
+        grad_x = meta["grad"]
 
     pbar = trange if verbose else range
     for step_id in pbar(n_samples + burn_in):
@@ -335,12 +348,29 @@ def ex2mcmc(
 
     pbar = trange if verbose else range
     for step_id in pbar(n_samples + burn_in):
-        points, meta = isir(
-            point, target, proposal, 1, 0, project, n_particles=n_particles, meta=meta
-        )
+        # points, meta = isir(
+        #     point, target, proposal, 1, 0, project, n_particles=n_particles, meta=meta
+        # )
         # meta["grad"] = torch.autograd.grad(meta["logp"].sum(), points[-1])[
         #     0
         # ]  # .detach()
+        logp_x = meta["logp"]
+        logq_x = proposal.log_prob(point)
+
+        point, proposals, log_ps, log_qs, indices = isir_step(
+            point,
+            target,
+            proposal,
+            n_particles=n_particles,
+            logp_x=logp_x,
+            logq_x=logq_x,
+        )
+        logp_x = log_ps[np.arange(point.shape[0]), indices]
+        meta["sir_accept"].append((indices != 0).float().mean().item())
+        point = point.detach().requires_grad_()
+        meta["logp"] = logp_x
+        meta["mask"] = F.one_hot(indices, num_classes=n_particles).to(bool).detach().cpu()
+
         points, meta = mala(
             points[-1],
             target,
@@ -354,6 +384,7 @@ def ex2mcmc(
             keep_graph=keep_graph,
         )
         step_size = meta["step_size"][-1]
+        # print(-target.ref_dist.log_prob(point.detach()).mean().item())
         point = points[-1]
         if not keep_graph:
             point = point.detach().requires_grad_()
@@ -422,14 +453,13 @@ def flex2mcmc(
     burn_in: int,
     project: Callable,
     *,
-    # proposal_opt,
-    # proposal_scheduler,
     n_particles: int,
     step_size: float,
     n_mala_steps: int = 1,
-    add_pop_size_train: int = 4096,
+    # add_pop_size_train: int = 200, #4096,
     forward_kl_weight: float = 1.0,
     backward_kl_weight: float = 1.0,
+    entr_weight: float = 0.1,
     target_acceptance: float = False,
     verbose: bool = False,
     meta: Optional[Dict] = None,
@@ -461,65 +491,124 @@ def flex2mcmc(
     else:
         meta = dict(sir_accept=[], forward_kl=[], backward_kl=[])
 
-    x = start.clone()
-    x.requires_grad_(True)
-    x.grad = None
+    point = start.clone()
+    point.requires_grad_(True)
+    point.grad = None
 
-    hist_proposals = None
+    # hist_proposals = None
+
+    meta["logp"] = target.log_prob(point) #meta.get("logp", target.log_prob(point))
 
     pbar = trange(n_samples + burn_in) if verbose else range(n_samples + burn_in)
-    for step_id in pbar:
-        x, proposals, log_ps, _, indices = isir_step(
-            x, target, proposal, n_particles=n_particles
-        )
-        meta["sir_accept"].append((indices != 0).float().mean().item())
-        x, meta = mala(
-            x,
-            target,
-            proposal.prior,
-            n_mala_steps,
-            n_mala_steps - 1,
-            project,
-            step_size=step_size,
-            target_acceptance=target_acceptance,
-            verbose=False,
-            meta=meta,
-        )
-        step_size = meta["step_size"]
-        x = x[-1]
+    for step_id in pbar: 
+        logp_x = meta["logp"]
+        logq_x = proposal.log_prob(point)
 
+        point, _, log_ps, log_qs, indices = isir_step(
+            point,
+            target,
+            proposal,
+            n_particles=n_particles,
+            logp_x=logp_x,
+            logq_x=logq_x,
+        )
+        logp_x = log_ps[np.arange(point.shape[0]), indices]
+        logq_x = log_qs[np.arange(point.shape[0]), indices]
+        meta["sir_accept"].append((indices != 0).float().mean().item())
+        point = point.detach().requires_grad_()
+        meta["logp"] = logp_x
+        meta["mask"] = F.one_hot(indices, num_classes=n_particles).to(bool).detach().cpu()
+        if n_mala_steps > 0:
+            points, meta = mala(
+                point,
+                target,
+                proposal.prior,
+                n_mala_steps,
+                n_mala_steps - 1,
+                project,
+                step_size=step_size,
+                target_acceptance=target_acceptance,
+                verbose=False,
+                meta=meta,
+            )
+            step_size = meta["step_size"][-1]
+            point = points[-1]
+        #     print(-target.ref_dist.log_prob(point.detach()).mean().item())
+        # print(meta["sir_accept"][-1], meta["mh_accept"][-1])
+
+        meta.pop("logp")
+        meta.pop("grad")
+        
+        if not keep_graph:
+            point = point.detach().requires_grad_()
         if step_id >= burn_in:
-            chains.append(x)
-        # else:
+            chains.append(point)
+
         if proposal.optim.param_groups[0]["lr"] > 0:
             # forward KL
-            proposals_flattened = proposals.reshape(-1, x.shape[-1])
-            log_ps_flattened = log_ps.reshape(-1).detach()
+            #proposals_flattened = proposals.reshape(-1, point.shape[-1])
+            #log_ps_flattened = log_ps.reshape(-1).detach()
 
-            if hist_proposals is not None:
-                idxs = np.random.choice(hist_proposals.shape[0], add_pop_size_train)
-                proposals_flattened = torch.cat(
-                    (proposals_flattened, hist_proposals[idxs]), dim=0
-                )
-                log_ps_flattened = torch.cat(
-                    (log_ps_flattened, hist_log_ps[idxs]), dim=0
-                )
+            # if hist_proposals is not None:
+            #     idxs = np.random.choice(hist_proposals.shape[0], add_pop_size_train)
+            #     proposals_flattened = torch.cat(
+            #         (proposals_flattened, hist_proposals[idxs]), dim=0
+            #     )
+            #     log_ps_flattened = torch.cat(
+            #         (log_ps_flattened, hist_log_ps[idxs]), dim=0
+            #     )
 
-            log_qs = proposal.log_prob(proposals_flattened)
-            logw = log_ps_flattened - log_qs.detach()
+            # log_qs = proposal.log_prob(proposals_flattened)
+            # logw = log_ps_flattened - log_qs.detach()
 
-            kl_forw = -(log_qs * torch.softmax(logw, dim=0)).sum()
+            # kl_forw = -(log_qs * torch.softmax(logw, dim=0)).sum()
+
+            #population_log_proposal_prob = proposal.log_prob(proposals)
+            logw = log_ps - log_qs
+            
+            kl_forw = -(log_qs * torch.softmax(logw.detach(), dim=-1)).sum(axis=-1).mean()
+            
+            # backward KL
+            #cur_samples_x = proposals[:, 1:, :].reshape(-1, proposals.shape[-1])
+            #log_q = proposal.log_prob(cur_samples_x)
+            
+            #cur_samples_x_diff = proposal.g(cur_samples_z.detach())[0]
+            #log_target_dens_proposals_diff = log_target_dens(cur_samples_x_diff, detach=False)
+            #log_p = target.log_prob(cur_samples_x)
+
+            
+            kl_back = -(log_ps[:, 1:] - log_qs[:, 1:]).mean()
+
+            # kl_forw = -proposal.log_prob(point.detach()).mean()
 
             # backward KL
-            _, log_det_J = proposal.forward(proposals[:, 1:])
-            kl_back = -(log_ps[:, 1:] + log_det_J).mean()
+            # _, log_det_J = proposal.forward(proposals[:, 1:])
+            # kl_back = -(log_ps[:, 1:] - log_det_J).mean()
 
-            # entropy reg
-            e = -proposal.log_prob(proposal.prior.sample(proposals.shape)).mean()
+            # backward KL
+            # N_samples, lat_size = point.shape
+            # new_proposals = proposal.sample((point.shape[0], n_particles, )).reshape(-1, point.shape[-1])
+            # new_proposals_latent, log_det_J = proposal.forward(new_proposals)
+            
+            # cur_samples_x_diff, _ = proposal.inverse(new_proposals_latent.detach())
+            # log_target_dens_proposals_diff = target.log_prob(cur_samples_x_diff)
 
-            loss = forward_kl_weight * kl_forw + backward_kl_weight * kl_back + 0.1 * e
-            proposal.optim.zero_grad()
+            # kl_back = -(log_target_dens_proposals_diff - log_det_J).mean()
+
+            # z = proposal.prior.sample((point.shape[0],))
+            # x, log_det_J = proposal.inverse(z)
+            # log_ps = target.log_prob(x)
+
+            # kl_back = -(log_ps + log_det_J).mean()
+            
+            #entropy reg
+            #entr = -proposal.log_prob(proposal.prior.sample(proposals.shape)).mean()
+            #entr = proposal.log_prob(proposals[1:, :].detach()).mean()
+
+            loss = forward_kl_weight * kl_forw + backward_kl_weight * kl_back #+ entr_weight * entr
+            proposal.zero_grad()
             loss.backward()
+            #torch.nn.utils.clip_grad_norm_(proposal.parameters(), 10.0)
             proposal.optim.step()
             proposal.scheduler.step()
 
@@ -529,18 +618,18 @@ def flex2mcmc(
             if verbose:
                 pbar.set_description(
                     f"KL forw {kl_forw.item():.3f}, \
-                    KL back {kl_back.item():.3f} Hentr {e.item():.3f}"
+                    KL back {kl_back.item():.3f} " #Hentr {entr.item():.3f}"
                 )
             print(
                 f"KL forw {kl_forw.item():.3f}, \
-                    KL back {kl_back.item():.3f} Hentr {e.item():.3f}"
+                    KL back {kl_back.item():.3f} " #Hentr {entr.item():.3f}"
             )
 
-            if hist_proposals is None:
-                hist_proposals = proposals_flattened
-                hist_log_ps = log_ps_flattened
-            else:
-                hist_proposals = torch.cat((hist_proposals, proposals_flattened), dim=0)
-                hist_log_ps = torch.cat((hist_log_ps, log_ps_flattened), dim=0)
+            # if hist_proposals is None:
+            #     hist_proposals = proposals_flattened
+            #     hist_log_ps = log_ps_flattened
+            # else:
+            #     hist_proposals = torch.cat((hist_proposals, proposals_flattened), dim=0)
+            #     hist_log_ps = torch.cat((hist_log_ps, log_ps_flattened), dim=0)
     chains = torch.stack(chains, 0)
     return chains, meta

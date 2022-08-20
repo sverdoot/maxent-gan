@@ -17,9 +17,13 @@ gan_config:
     params:
       mean: *mean
       std: *std
-      z_dim: 2
+      # z_dim: 2
+      # n_layers: 4
+      # n_hid: 100
+      # n_out: 2
+      z_dim: 64
       n_layers: 4
-      n_hid: 100
+      n_hid: 128
       n_out: 2
     ckpt_path: checkpoints/mlp/G_25_gauss_js.pth
   discriminator:
@@ -28,35 +32,59 @@ gan_config:
       mean: *mean
       std: *std
       n_layers: 4
-      n_hid: 100
+      n_hid: 128
       n_in: 2
     ckpt_path: checkpoints/mlp/D_25_gauss_js.pth
-  fake_score: -0.04662973267026246
-  real_score: &real_score 0.2734628602862358
-  mean_score: 0.11341656380798666
 
+
+
+# train_batch_size: 256
+# n_epochs: &n_epochs 500 #1000
+# criterion_g: &criterion_g
+#   name: JensenLoss
+# criterion_d: &criterion_d
+#   name: JensenLoss
+# optimizer_g: &optimizer_g
+#   name: Adam
+#   params:
+#     lr: 0.0001
+#     betas: [0.5, 0.99]
+# optimizer_d: &optimizer_d
+#   name: Adam
+#   params:
+#     lr: 0.0003
+#     betas: [0.5, 0.99]
+# trainer_kwargs: &trainer_kwargs
+#   n_dis: 1
+#   sample_size: 5000
+#   grad_acc_steps: 1
+#   sample_steps: &sample_steps 5
+
+# range: &range [-2.5, 2.5]
 
 train_batch_size: 256
-n_epochs: &n_epochs 500 #1000
+# n_epochs: &n_epochs 500
+n_train_iters: &n_train_iters 50000
 criterion_g: &criterion_g
-  name: JensenLoss
+  name: JensenNSLoss
 criterion_d: &criterion_d
-  name: JensenLoss
+  name: JensenNSLoss
 optimizer_g: &optimizer_g
   name: Adam
   params:
     lr: 0.0001
-    betas: [0.5, 0.99]
+    betas: [0.5, 0.999]
 optimizer_d: &optimizer_d
   name: Adam
   params:
-    lr: 0.0003
-    betas: [0.5, 0.99]
+    lr: 0.0001
+    betas: [0.5, 0.999]
 trainer_kwargs: &trainer_kwargs
-  n_dis: 1
-  sample_size: 5000
+  n_dis: 1 #3
+  sample_size: 25000
   grad_acc_steps: 1
-  sample_steps: &sample_steps 5
+  sample_steps: &sample_steps 1
+  r1_coef: 0.05
 
 range: &range [-2.5, 2.5]
 

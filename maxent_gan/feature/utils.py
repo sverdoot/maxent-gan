@@ -23,10 +23,10 @@ def create_feature(
             if "save_dir" in params:
                 params["save_dir"] = save_dir
             if "np_dataset" in params:
-                np_dataset = np.concatenate(
-                    [gan.inverse_transform(batch).numpy() for batch in dataloader], 0
-                )
-                params["np_dataset"] = np_dataset
+                # np_dataset = np.concatenate(
+                #     [gan.inverse_transform(batch).numpy() for batch in dataloader], 0
+                # )
+                params["np_dataset"] = dataset_stuff["np_dataset"] #np_dataset
             if "modes" in params:
                 params["modes"] = dataset_stuff["modes"]
             feature_callbacks.append(CallbackRegistry.create(callback.name, **params))

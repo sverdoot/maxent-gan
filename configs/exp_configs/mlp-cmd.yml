@@ -3,7 +3,7 @@ n_steps: &n_steps 1000 #0
 every: &every 50
 seed: null
 sweet_init: &sweet_init false
-batch_size: &batch_size 2000
+batch_size: &batch_size 5000
 
 
 device: &device 'cuda'
