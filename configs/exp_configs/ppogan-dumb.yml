@@ -1,0 +1,18 @@
+dir: &dir log/dumb_feature
+n_steps: &n_steps 1000 #500
+every: &every 10
+seed: null
+sweet_init: &sweet_init false
+
+device: &device 'cuda'
+total_n: &total_n 10000
+batch_size: &batch_size 32 #1000
+data_batch_size: *batch_size
+weight_step: &weight_step 0.1 #0.01
+step_size: &step_size 0.01 #0.01
+name: &name ppogan_dumb
+burn_in_steps: &burn_in_steps 0.
+start_sample: &start_sample 0. #10
+sub_dir: &sub_dir ppogan # ppogan
+suffix: *step_size
+resume: &resume false #true
