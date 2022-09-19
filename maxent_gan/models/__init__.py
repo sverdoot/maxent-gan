@@ -17,3 +17,5 @@ from .sngan import SN_DCGAN_Generator  # noqa: F401
 from .sngan import SN_DCGAN_Discriminator, SN_ResNet_Generator32
 from .wgan import WGANDiscriminator  # noqa: F401
 from .wgan import WGANDiscriminatorIN, WGANGeneratorIN  # noqa: F401
+from .ppogan import PPODiscriminator
+from .ppogan import PPOGenerator
